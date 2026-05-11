@@ -2,7 +2,6 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
   pull_request:
 
 jobs:
@@ -34,3 +33,35 @@ jobs:
 
       - name: Run tests
         run: uv run pytest --tb=short
+
+  package-windows:
+    name: "package / Windows portable"
+    if: github.event_name == 'push'
+    needs: test
+    runs-on: windows-latest
+    env:
+      QT_BACKEND: pyside6
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install packaging dependencies
+        run: uv sync --frozen --extra pyside6 --extra package
+
+      - name: Build portable package
+        shell: pwsh
+        run: .\tools\build_windows_package.ps1
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: h-denoise-windows-x64
+          path: dist/h-denoise-windows-x64-v*.zip
+          if-no-files-found: error

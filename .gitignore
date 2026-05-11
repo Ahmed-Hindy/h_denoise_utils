@@ -15,6 +15,7 @@ build/
 
 # PyInstaller
 *.spec
+!packaging/*.spec
 
 # Unit test / coverage reports
 .pytest_cache/

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "h_denoise_utils"
-version = "2.0.0"
+version = "1.1.0"
 description = "Standalone GUI + CLI for Houdini idenoise (Intel OIDN & NVIDIA OptiX)"
 readme = "README.md"
 license = { text = "MIT" }
@@ -16,6 +16,7 @@ pyside6 = ["PySide6-Essentials>=6.0"]
 pyside2 = ["PySide2"]
 pyqt5   = ["PyQt5"]
 dev     = ["pytest>=7", "pytest-qt"]
+package = ["pyinstaller>=6.11,<7; python_version >= '3.8' and python_version < '3.15'"]
 
 [project.scripts]
 h-denoise = "h_denoise_utils.__main__:main"
@@ -25,6 +26,10 @@ Repository = "https://github.com/Ahmed-Hindy/h_denoise_utils"
 
 [tool.hatch.build.targets.wheel]
 packages = ["h_denoise_utils"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"h_denoise_utils/ui/style.qss" = "h_denoise_utils/ui/style.qss"
+"h_denoise_utils/ui/icons" = "h_denoise_utils/ui/icons"
 
 [tool.pytest.ini_options]
 testpaths    = ["tests"]
