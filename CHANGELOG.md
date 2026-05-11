@@ -18,7 +18,3 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `uv`-based project setup with optional Qt dependency extras.
 - `h-denoise` CLI entry point.
 - GitHub Actions CI (pytest on Python 3.9, 3.11, 3.12).
-
-### Removed
-- Legacy monolithic `h_denoise_utils_old.py` (2116 lines).
-- Old standalone headless helper script.
