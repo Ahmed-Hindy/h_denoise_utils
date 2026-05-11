@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "h_denoise_utils"
+version = "2.0.0"
+description = "Standalone GUI + CLI for Houdini idenoise (Intel OIDN & NVIDIA OptiX)"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.7"
+dependencies = []   # Qt is detected at runtime — no hard dependency
+
+[project.optional-dependencies]
+pyside6 = ["PySide6-Essentials>=6.0"]
+pyside2 = ["PySide2"]
+pyqt5   = ["PyQt5"]
+dev     = ["pytest>=7", "pytest-qt"]
+
+[project.scripts]
+h-denoise = "h_denoise_utils.__main__:main"
+
+[project.urls]
+Repository = "https://github.com/Ahmed-Hindy/h_denoise_utils"
+
+[tool.hatch.build.targets.wheel]
+packages = ["h_denoise_utils"]
+
+[tool.pytest.ini_options]
+testpaths    = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow-running tests",
+]
