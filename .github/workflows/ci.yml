@@ -16,7 +16,7 @@ jobs:
         python-version: ["3.9", "3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Qt system libraries
         run: |
@@ -24,7 +24,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends libgl1 libegl1 libxkbcommon0 libdbus-1-3
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -45,10 +45,10 @@ jobs:
       QT_BACKEND: pyside6
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.12"
           enable-cache: true
