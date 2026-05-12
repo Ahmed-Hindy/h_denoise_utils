@@ -38,7 +38,7 @@ jobs:
     name: "package / Windows portable"
     if: github.event_name == 'push'
     needs: test
-    runs-on: windows-latest
+    runs-on: windows-2022
     permissions:
       contents: write
     env:
