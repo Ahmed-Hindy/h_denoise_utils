@@ -398,15 +398,39 @@ QTabBar::tab:hover:!selected {
     color: #aaaaaa;
 }
 
-QFrame#chip {
+QPushButton#aovChipBtn {
+    border-radius: 10px;
+    padding: 2px 10px;
+    background-color: #252525;
+    color: #cfcfcf;
+    border: 1px solid #454545;
+}
+
+QPushButton#aovChipBtn:hover {
+    background-color: #323232;
     border: 1px solid #555555;
-    border-radius: 8px;
-    background-color: #3b3b3b;
+}
+
+QPushButton#aovChipBtn:checked {
+    background-color: #3a5f8a;
+    color: #ffffff;
+    border: 1px solid #4a7ab5;
+}
+
+QLabel#aovChipEmptyHint {
+    color: #777777;
+    font-style: italic;
+}
+
+QFrame#chip {
+    border: 1px solid #454545;
+    border-radius: 10px;
+    background-color: #252525;
 }
 
 QFrame#chip[selected="true"] {
-    border: 1px solid #5a8fd1;
-    background-color: #5a8fd1;
+    border: 1px solid #4a7ab5;
+    background-color: #3a5f8a;
 }
 
 QFrame#chip QLabel {
@@ -425,9 +449,9 @@ QFrame#chip QToolButton:hover {
 
 QLabel#aovPlaneChip {
     border: 1px solid #454545;
-    border-radius: 8px;
-    padding: 2px 6px;
-    background-color: #2b2b2b;
+    border-radius: 10px;
+    padding: 2px 10px;
+    background-color: #252525;
     color: #cfcfcf;
 }
 

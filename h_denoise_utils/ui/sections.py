@@ -62,7 +62,6 @@ def build_source_section(window, top_layout):
     input_header = QtWidgets.QLabel("Source")
     input_header.setObjectName("sectionTitle")
     input_header_row.addWidget(input_header)
-    input_header_row.addWidget(QtWidgets.QLabel("Source Path:"))
 
     window.path_edit = NoWheelComboBox()
     window.path_edit.setEditable(True)
@@ -84,7 +83,9 @@ def build_source_section(window, top_layout):
     window.scan_btn.setIcon(
         window.app_style.standardIcon(QtWidgets.QStyle.SP_BrowserReload)
     )
-    window.scan_btn.setToolTip("Scan input folder for AOVs and auto-configure")
+    window.scan_btn.setToolTip(
+        "Scan input folder for AOVs and auto-configure (F5)"
+    )
     window.scan_btn.setAutoRaise(True)
     window.scan_btn.setIconSize(QtCore.QSize(16, 16))
     window.scan_btn.setFixedSize(26, 26)
@@ -292,27 +293,27 @@ def build_extras_section(window, top_layout):
     advanced_settings_form.addRow("Backend:", window.backend_combo)
 
     window.thread_spin = NoWheelSpinBox()
-    window.thread_spin.setRange(1, 8)
+    window.thread_spin.setRange(1, 16)
     window.thread_spin.setValue(min(8, max(1, multiprocessing.cpu_count())))
     advanced_settings_form.addRow("CPU Threads:", window.thread_spin)
 
     window.albedo_combo = NoWheelComboBox()
     window.albedo_combo.setEditable(True)
-    window.albedo_combo.lineEdit().setPlaceholderText("e.g. albedo. Select or Type")
+    window.albedo_combo.lineEdit().setPlaceholderText("e.g. albedo")
     window.albedo_combo.setSizePolicy(
         QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
     )
 
     window.normal_combo = NoWheelComboBox()
     window.normal_combo.setEditable(True)
-    window.normal_combo.lineEdit().setPlaceholderText("e.g. N. Select or Type")
+    window.normal_combo.lineEdit().setPlaceholderText("e.g. N")
     window.normal_combo.setSizePolicy(
         QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
     )
 
     window.motion_combo = NoWheelComboBox()
     window.motion_combo.setEditable(True)
-    window.motion_combo.lineEdit().setPlaceholderText("e.g. velocity. Select or Type")
+    window.motion_combo.lineEdit().setPlaceholderText("e.g. velocity")
     window.motion_combo.setSizePolicy(
         QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
     )
@@ -392,9 +393,7 @@ def build_extras_section(window, top_layout):
     advanced_settings_layout.addLayout(advanced_settings_header)
 
     window.advanced_settings_body = QtWidgets.QWidget()
-    advanced_settings_body_layout = QtWidgets.QVBoxLayout(
-        window.advanced_settings_body
-    )
+    advanced_settings_body_layout = QtWidgets.QVBoxLayout(window.advanced_settings_body)
     advanced_settings_body_layout.setContentsMargins(20, 0, 0, 0)
     advanced_settings_body_layout.setSpacing(0)
     advanced_settings_body_layout.addLayout(advanced_settings_form)

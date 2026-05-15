@@ -329,22 +329,16 @@ class AovChipsInput(QtWidgets.QWidget):
 
         if not planes:
             label = QtWidgets.QLabel("No AOVs detected.")
-            label.setStyleSheet("color: #777777; font-style: italic;")
+            label.setObjectName("aovChipEmptyHint")
             self._flow.addWidget(label)
             return
 
         for p in planes:
             btn = QtWidgets.QPushButton(p)
+            btn.setObjectName("aovChipBtn")
             btn.setCheckable(True)
-            # Default to checked if we previously checked it
             if p in checked:
                 btn.setChecked(True)
-            # Make the button look like a chip
-            btn.setStyleSheet(
-                "QPushButton { border-radius: 12px; padding: 4px 12px; background-color: #3b3b3b; color: #cccccc; border: 1px solid #555555; }"
-                "QPushButton:checked { background-color: #5a8fd1; color: #ffffff; border: 1px solid #7aafee; }"
-                "QPushButton:hover { background-color: #4b4b4b; }"
-            )
             self._flow.addWidget(btn)
             self._buttons.append(btn)
 
