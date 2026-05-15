@@ -18,6 +18,12 @@ QWidget#aovChipContainer {
     background-color: #2b2b2b;
 }
 
+QScrollArea#configScroll,
+QWidget#configScrollViewport,
+QWidget#configScrollBody {
+    background-color: #2b2b2b;
+}
+
 QMenuBar {
     background-color: #2b2b2b;
     color: #dfdfdf;
@@ -49,6 +55,10 @@ QCheckBox {
     background: transparent;
 }
 
+QCheckBox:disabled {
+    color: #777777;
+}
+
 QCheckBox::indicator {
     width: 13px;
     height: 13px;
@@ -60,6 +70,16 @@ QCheckBox::indicator {
 QCheckBox::indicator:checked {
     background: #3a5f8a;
     border: 1px solid #4a7ab5;
+}
+
+QCheckBox::indicator:disabled {
+    background: #242424;
+    border: 1px solid #3a3a3a;
+}
+
+QCheckBox::indicator:checked:disabled {
+    background: #394a5e;
+    border: 1px solid #4a5664;
 }
 
 QSplitter::handle {
@@ -445,4 +465,3 @@ QPushButton#stopBtn:pressed {
     background-color: #6f3232;
     border: 1px solid #973f3f;
 }
-

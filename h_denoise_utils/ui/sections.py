@@ -22,6 +22,29 @@ from .widgets import (
 QWIDGETSIZE_MAX = 16777215
 
 
+def build_config_scroll(window, top_layout):
+    # type: (object, QtWidgets.QVBoxLayout) -> QtWidgets.QVBoxLayout
+    window.config_scroll = QtWidgets.QScrollArea()
+    window.config_scroll.setObjectName("configScroll")
+    window.config_scroll.setWidgetResizable(True)
+    window.config_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+    window.config_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+    window.config_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+    window.config_scroll.setSizePolicy(
+        QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
+    )
+    window.config_scroll.viewport().setObjectName("configScrollViewport")
+
+    window.config_scroll_body = QtWidgets.QWidget()
+    window.config_scroll_body.setObjectName("configScrollBody")
+    config_layout = QtWidgets.QVBoxLayout(window.config_scroll_body)
+    config_layout.setContentsMargins(0, 0, 0, 0)
+    config_layout.setSpacing(6)
+    window.config_scroll.setWidget(window.config_scroll_body)
+    top_layout.addWidget(window.config_scroll, 1)
+    return config_layout
+
+
 def build_source_section(window, top_layout):
     # type: (object, QtWidgets.QVBoxLayout) -> None
     window.input_section = QtWidgets.QFrame()
@@ -181,19 +204,6 @@ def build_destination_section(window, top_layout):
     window.overwrite_chk.setChecked(False)
     output_form.addRow("Replace Existing:", window.overwrite_chk)
 
-    output_path_row = QtWidgets.QWidget()
-    output_path_layout = QtWidgets.QHBoxLayout(output_path_row)
-    output_path_layout.setContentsMargins(0, 0, 0, 0)
-    output_path_layout.setSpacing(6)
-    window.open_output_btn = QtWidgets.QToolButton()
-    window.open_output_btn.setIcon(
-        window.app_style.standardIcon(QtWidgets.QStyle.SP_DirIcon)
-    )
-    window.open_output_btn.setToolTip("Open destination folder")
-    window.open_output_btn.setAutoRaise(True)
-    window.open_output_btn.setIconSize(QtCore.QSize(16, 16))
-    window.open_output_btn.setFixedSize(26, 26)
-    output_path_layout.addWidget(window.open_output_btn)
     window.output_path_label = QtWidgets.QLabel("Destination: -")
     window.output_path_label.setObjectName("outputPathLabel")
     window.output_path_label.setSizePolicy(
@@ -201,8 +211,7 @@ def build_destination_section(window, top_layout):
     )
     window.output_path_label.setToolTip("Destination folder")
     window.output_path_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
-    output_path_layout.addWidget(window.output_path_label, 1)
-    output_form.addRow(output_path_row)
+    output_form.addRow(window.output_path_label)
 
     output_body_layout.addLayout(output_form)
     window.output_body.setVisible(False)
@@ -235,6 +244,7 @@ def build_extras_section(window, top_layout):
 
     window.advanced_section = QtWidgets.QFrame()
     window.advanced_section.setObjectName("sectionCard")
+    window.advanced_section.setMaximumSize(960, 200)
     advanced_layout = QtWidgets.QVBoxLayout(window.advanced_section)
     advanced_layout.setContentsMargins(8, 4, 8, 4)
     advanced_layout.setSpacing(4)
@@ -274,11 +284,6 @@ def build_extras_section(window, top_layout):
     window.thread_spin.setValue(min(8, max(1, multiprocessing.cpu_count())))
     settings_form.addRow("CPU Threads:", window.thread_spin)
 
-    # Denoiser Inputs Grid
-    inputs_row = QtWidgets.QWidget()
-    planes_layout = QtWidgets.QGridLayout(inputs_row)
-    planes_layout.setContentsMargins(0, 0, 0, 0)
-
     window.albedo_combo = NoWheelComboBox()
     window.albedo_combo.setEditable(True)
     window.albedo_combo.lineEdit().setPlaceholderText("e.g. albedo. Select or Type")
@@ -300,19 +305,22 @@ def build_extras_section(window, top_layout):
         QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
     )
 
-    planes_layout.addWidget(QtWidgets.QLabel("Albedo (-a):"), 0, 0)
-    planes_layout.addWidget(window.albedo_combo, 0, 1)
-    planes_layout.addWidget(QtWidgets.QLabel("Normal (-n):"), 0, 2)
-    planes_layout.addWidget(window.normal_combo, 0, 3)
-    planes_layout.addWidget(QtWidgets.QLabel("Motion (-m):"), 0, 4)
-    planes_layout.addWidget(window.motion_combo, 0, 5)
-
-    settings_form.addRow("Denoiser Inputs:", inputs_row)
-
     window.temporal_chk = QtWidgets.QCheckBox()
     window.temporal_chk.setText("Use Temporal Denoise")
     window.temporal_chk.setToolTip("Requires Optix backend and motion vectors AOV")
-    settings_form.addRow("", window.temporal_chk)
+
+    settings_form.addRow("Albedo (-a):", window.albedo_combo)
+    settings_form.addRow("Normal (-n):", window.normal_combo)
+
+    motion_row = QtWidgets.QWidget()
+    motion_layout = QtWidgets.QHBoxLayout(motion_row)
+    motion_layout.setContentsMargins(0, 0, 0, 0)
+    motion_layout.setSpacing(8)
+    motion_layout.addWidget(window.temporal_chk)
+    window.motion_label = QtWidgets.QLabel("Motion (-m):")
+    motion_layout.addWidget(window.motion_label)
+    motion_layout.addWidget(window.motion_combo, 1)
+    settings_form.addRow(motion_row)
 
     divider = QtWidgets.QFrame()
     divider.setFrameShape(QtWidgets.QFrame.HLine)
@@ -356,11 +364,10 @@ def build_extras_section(window, top_layout):
     advanced_layout.addWidget(window.advanced_body)
     window.advanced_section.setMaximumHeight(48)
 
-    # Store adv_widget and adv_scroll to avoid attribute errors if they are accessed
     window.adv_widget = window.advanced_body
     window.adv_scroll = None
 
-    top_layout.addWidget(window.advanced_section, 1)
+    top_layout.addWidget(window.advanced_section)
 
 
 def build_action_bar(window, top_layout):
@@ -395,6 +402,15 @@ def build_action_bar(window, top_layout):
     window.progress_label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
     progress_row.addWidget(window.progress)
     progress_row.addWidget(window.progress_label)
+    window.open_output_btn = QtWidgets.QToolButton()
+    window.open_output_btn.setIcon(
+        window.app_style.standardIcon(QtWidgets.QStyle.SP_DirIcon)
+    )
+    window.open_output_btn.setToolTip("Open destination folder")
+    window.open_output_btn.setAutoRaise(True)
+    window.open_output_btn.setIconSize(QtCore.QSize(16, 16))
+    window.open_output_btn.setFixedSize(26, 26)
+    progress_row.addWidget(window.open_output_btn)
     progress_column.addLayout(progress_row)
 
     window.action_dest_label = QtWidgets.QLabel("→ -")
@@ -402,11 +418,6 @@ def build_action_bar(window, top_layout):
     progress_column.addWidget(window.action_dest_label)
 
     btnrow.addLayout(progress_column, 1)
-    window.vertical_spacer_widget = QtWidgets.QWidget()
-    window.vertical_spacer_widget.setSizePolicy(
-        QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
-    )
-    top_layout.addWidget(window.vertical_spacer_widget, 1)
     top_layout.addWidget(action_bar)
 
 
