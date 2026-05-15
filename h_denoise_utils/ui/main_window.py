@@ -34,6 +34,7 @@ from .state import (
 from .sections import (
     QWIDGETSIZE_MAX,
     build_action_bar,
+    build_config_scroll,
     build_destination_section,
     build_extras_section,
     build_logs_section,
@@ -91,6 +92,8 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.output_section = None  # type: Optional[QtWidgets.QFrame]
         self.output_body = None  # type: Optional[QtWidgets.QWidget]
         self.output_toggle = None  # type: Optional[QtWidgets.QToolButton]
+        self.config_scroll = None  # type: Optional[QtWidgets.QScrollArea]
+        self.config_scroll_body = None  # type: Optional[QtWidgets.QWidget]
         self._input_header_spacer = None  # type: Optional[QtWidgets.QWidget]
         self.denoise_section = None  # type: Optional[QtWidgets.QFrame]
         self.denoise_body = None  # type: Optional[QtWidgets.QWidget]
@@ -99,6 +102,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.advanced_section = None  # type: Optional[QtWidgets.QFrame]
         self.advanced_body = None  # type: Optional[QtWidgets.QWidget]
         self.advanced_toggle = None  # type: Optional[QtWidgets.QToolButton]
+        self.motion_label = None  # type: Optional[QtWidgets.QLabel]
         self._path_analysis_timer = QtCore.QTimer(self)
         self._path_analysis_timer.setSingleShot(True)
         self._path_analysis_timer.setInterval(500)
@@ -267,14 +271,20 @@ class BaseWindow(QtWidgets.QMainWindow):
         splitter.setSizes([520, 200])
 
         self._build_source_section(top_layout)
-        self._build_destination_section(top_layout)
-        self._build_extras_section(top_layout)
+        config_layout = self._build_config_scroll(top_layout)
+        self._build_destination_section(config_layout)
+        self._build_extras_section(config_layout)
+        config_layout.addStretch(1)
         self._build_action_bar(top_layout)
         self._build_logs_section(logs_layout)
 
     def _build_source_section(self, top_layout):
         # type: (QtWidgets.QVBoxLayout) -> None
         build_source_section(self, top_layout)
+
+    def _build_config_scroll(self, top_layout):
+        # type: (QtWidgets.QVBoxLayout) -> QtWidgets.QVBoxLayout
+        return build_config_scroll(self, top_layout)
 
     def _build_destination_section(self, top_layout):
         # type: (QtWidgets.QVBoxLayout) -> None
@@ -819,8 +829,6 @@ class BaseWindow(QtWidgets.QMainWindow):
                 QtCore.Qt.DownArrow if checked else QtCore.Qt.RightArrow
             )
         self.advanced_section.setMaximumHeight(QWIDGETSIZE_MAX if checked else 48)
-        if self.vertical_spacer_widget:
-            self.vertical_spacer_widget.setVisible(not checked)
 
     def _toggle_aov_body(self, checked):
         # type: (bool) -> None
