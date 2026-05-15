@@ -80,8 +80,12 @@ jobs:
           if (-not $asset) {
             throw "Package zip not found"
           }
+          $meta = & "$env:GITHUB_WORKSPACE/tools/github_release_metadata.ps1" -Tag $tag
           gh release view $tag --repo $repo *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --repo $repo --title $tag --notes "Release $tag"
+            gh release create $tag --repo $repo --title $meta.Title --notes $meta.Notes
+          }
+          else {
+            gh release edit $tag --repo $repo --title $meta.Title --notes $meta.Notes
           }
           gh release upload $tag $asset.FullName --repo $repo --clobber
