@@ -6,6 +6,8 @@ A Python GUI and scripting library for denoising EXR sequences using Houdini's `
 [![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+![h_denoise_utils app screenshot](docs/assets/app-screenshot.png)
+
 ---
 
 ## What it does
@@ -64,6 +66,16 @@ if prep["status"] == "ready":
         denoiser.denoise_one(i)
     denoiser.cleanup()
 ```
+
+---
+
+## Documentation
+
+- [Getting started](docs/getting-started.md)
+- [Codebase tour](docs/codebase-tour.md)
+- [Architecture](docs/architecture.md)
+- [Common tasks](docs/common-tasks.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
 ---
 
