@@ -2,7 +2,9 @@
 
 import os
 
+from h_denoise_utils import __version__
 from h_denoise_utils.ui.main_window import BaseWindow
+from h_denoise_utils.ui import main_window as main_window_module
 from h_denoise_utils.ui.sections import QWIDGETSIZE_MAX
 
 
@@ -30,6 +32,31 @@ def test_append_log_adds_row(qtbot):
     window._append_log("Hello", "info")
     assert window.log_table.rowCount() == 1
     assert window.log_table.item(0, 1).text() == "Hello"
+
+
+def test_about_dialog_uses_package_version(qtbot, monkeypatch):
+    window = BaseWindow()
+    qtbot.addWidget(window)
+    captured = {}
+
+    def fake_about(parent, title, message):
+        captured["parent"] = parent
+        captured["title"] = title
+        captured["message"] = message
+
+    monkeypatch.setattr(
+        main_window_module.QtWidgets.QMessageBox,
+        "about",
+        fake_about,
+    )
+
+    window._show_about()
+
+    assert captured["parent"] is window
+    assert captured["title"] == "About Denoiser"
+    assert "<b>Denoiser</b><br>Version {}<br><br>".format(__version__) in captured[
+        "message"
+    ]
 
 
 def test_output_label_updates(qtbot, tmp_path):
