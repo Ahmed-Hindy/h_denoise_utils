@@ -67,6 +67,16 @@ if prep["status"] == "ready":
 
 ---
 
+## Documentation
+
+- [Getting started](docs/getting-started.md)
+- [Codebase tour](docs/codebase-tour.md)
+- [Architecture](docs/architecture.md)
+- [Common tasks](docs/common-tasks.md)
+- [Troubleshooting](docs/troubleshooting.md)
+
+---
+
 ## Package layout
 
 ```
