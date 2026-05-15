@@ -101,7 +101,7 @@ def build_source_section(window, top_layout):
 
     window.summary_files = QtWidgets.QLabel("Files: -")
     window.summary_files.setObjectName("summaryChip")
-    window.summary_planes = QtWidgets.QLabel("Planes: 0")
+    window.summary_planes = QtWidgets.QLabel("AOVs: 0")
     window.summary_planes.setObjectName("summaryChip")
     window.summary_motion = QtWidgets.QLabel("Motion: -")
     window.summary_motion.setObjectName("summaryChip")
@@ -367,7 +367,7 @@ def build_extras_section(window, top_layout):
     advanced_settings_form.addRow("Advanced Options (JSON):", window.options_edit)
 
     window.extra_aovs_edit = QtWidgets.QLineEdit()
-    window.extra_aovs_edit.setPlaceholderText("reference planes (not denoised)")
+    window.extra_aovs_edit.setPlaceholderText("reference AOVs (not denoised)")
     advanced_settings_form.addRow("Optional auxiliary AOVs:", window.extra_aovs_edit)
 
     advanced_body_layout.addLayout(settings_form)
