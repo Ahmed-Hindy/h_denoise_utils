@@ -668,11 +668,11 @@ class BaseWindow(QtWidgets.QMainWindow):
             self._apply_planes([])
             return
         if status == "no_planes":
-            self._log("No valid planes found in EXR.", "warning")
+            self._log("No valid AOVs found in EXR.", "warning")
             self._apply_planes([])
             return
         if status == "error":
-            self._log("Failed to list planes: {}".format(result.get("error")), "error")
+            self._log("Failed to list AOVs: {}".format(result.get("error")), "error")
             self._apply_planes([])
             return
 
@@ -681,7 +681,7 @@ class BaseWindow(QtWidgets.QMainWindow):
                 "Analyzing AOVs from: {}".format(os.path.basename(exr_file)), "info"
             )
         planes = result.get("planes") or []
-        self._log("Planes detected: {}".format(planes), "info")
+        self._log("AOVs detected: {}".format(planes), "info")
         self._apply_planes(planes)
         self._flash_summary_planes()
 
@@ -902,7 +902,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         motion_ok = self._motion_vectors_available()
 
         self.summary_files.setText(files_text)
-        self.summary_planes.setText("Planes: {}".format(planes_count))
+        self.summary_planes.setText("AOVs: {}".format(planes_count))
         motion_text = "Motion: OK" if motion_ok else "Motion: missing"
         self.summary_motion.setText(motion_text)
 
