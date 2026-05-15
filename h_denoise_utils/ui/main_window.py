@@ -12,6 +12,7 @@ from .qt_compat import (
     QtWidgets,
 )
 
+from .. import __version__
 from ..core.config import (
     PRESETS,
     DenoiseConfig,
@@ -188,9 +189,11 @@ class BaseWindow(QtWidgets.QMainWindow):
         QtWidgets.QMessageBox.about(
             self,
             "About Denoiser",
-            "<b>Denoiser</b><br>Version 2.0<br><br>"
-            "Denoises images using Houdini's <code>idenoise</code> (OIDN/OptiX), "
-            "with smart AOV detection and temporal processing.",
+            (
+                "<b>Denoiser</b><br>Version {}<br><br>"
+                "Denoises images using Houdini's <code>idenoise</code> "
+                "(OIDN/OptiX), with smart AOV detection and temporal processing."
+            ).format(__version__),
         )
 
     def _show_shortcuts(self):

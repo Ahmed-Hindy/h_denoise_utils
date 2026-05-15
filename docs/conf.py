@@ -19,11 +19,13 @@ sys.modules["PySide2.QtCore"] = mock.MagicMock()
 sys.modules["PySide2.QtGui"] = mock.MagicMock()
 sys.modules["PySide2.QtWidgets"] = mock.MagicMock()
 
+from h_denoise_utils import __version__
+
 # -- Project information
 project = "h_denoise_utils"
 copyright = "2026, Ahmed Hindy"
 author = "Ahmed Hindy"
-release = "2.0"
+release = __version__
 
 # -- General configuration
 extensions = [
