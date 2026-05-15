@@ -120,7 +120,8 @@ class BaseWindow(QtWidgets.QMainWindow):
         )
         self._summary_planes_flash_original_style = None  # type: Optional[str]
         self._control_shortcut_enter = None  # type: Optional[object]
-        self._control_shortcut_f5 = None  # type: Optional[object]
+        self._scan_shortcut_f5 = None  # type: Optional[object]
+        self.main_splitter = None  # type: Optional[QtWidgets.QSplitter]
 
         self.houdini_versions = detect_houdini_versions()
         self._setup_menus()
@@ -151,6 +152,7 @@ class BaseWindow(QtWidgets.QMainWindow):
             self.log_handler.close()
         if self._aov_scan:
             self._aov_scan.cancel()
+        self._save_splitter_state()
         super(BaseWindow, self).closeEvent(event)
 
     def _load_stylesheet(self):
@@ -200,7 +202,12 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _show_shortcuts(self):
         # type: () -> None
-        message = "Shortcuts:\n\nCtrl+Enter / F5: Denoise / Stop\nCtrl+Q: Quit"
+        message = (
+            "Shortcuts:\n\n"
+            "Ctrl+Enter: Denoise / Stop\n"
+            "F5: Scan AOVs\n"
+            "Ctrl+Q: Quit"
+        )
         QtWidgets.QMessageBox.information(self, "Shortcuts", message)
 
     def _log_folder_path(self):
@@ -227,9 +234,11 @@ class BaseWindow(QtWidgets.QMainWindow):
     def _setup_ui(self):
         # type: () -> None
         ENV_IS_DEV = str(os.environ.get("ENV_IS_DEV", "")).lower() == "true"
-        title = "Denoiser {} {}".format("(DEV)" if ENV_IS_DEV else "", __version__).replace(
-            "  ", " "
-        ).strip()
+        title = (
+            "Denoiser {} {}".format("(DEV)" if ENV_IS_DEV else "", __version__)
+            .replace("  ", " ")
+            .strip()
+        )
         self.setWindowTitle(title)
         _icon_path = os.path.join(os.path.dirname(__file__), "icons", "logo.ico")
         if os.path.isfile(_icon_path):
@@ -251,8 +260,8 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.drop_overlay.setAlignment(QtCore.Qt.AlignCenter)
         self.drop_overlay.setAcceptDrops(True)
         self.drop_overlay.setStyleSheet(
-            "QLabel{border:2px dashed #5a8fd1;border-radius:8px;"
-            "background-color: rgba(90,143,209,40);color:#2a4c7f;}"
+            "QLabel{border:2px dashed #4a7ab5;border-radius:8px;"
+            "background-color: rgba(58,95,138,72);color:#dfdfdf;}"
         )
         self.drop_overlay.setVisible(False)
         self.drop_overlay.installEventFilter(self)
@@ -260,7 +269,8 @@ class BaseWindow(QtWidgets.QMainWindow):
         # Load stylesheet
         self._load_stylesheet()
 
-        splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        self.main_splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        splitter = self.main_splitter
         main.addWidget(splitter)
         top_widget = QtWidgets.QWidget()
         top_layout = QtWidgets.QVBoxLayout(top_widget)
@@ -278,6 +288,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
         splitter.setSizes([520, 200])
+        self._restore_splitter_state()
 
         self._build_source_section(top_layout)
         config_layout = self._build_config_scroll(top_layout)
@@ -361,8 +372,8 @@ class BaseWindow(QtWidgets.QMainWindow):
                 QtGui.QKeySequence("Ctrl+Return"), self
             )
             self._control_shortcut_enter.activated.connect(self._on_control)
-            self._control_shortcut_f5 = shortcut_cls(QtGui.QKeySequence("F5"), self)
-            self._control_shortcut_f5.activated.connect(self._on_control)
+            self._scan_shortcut_f5 = shortcut_cls(QtGui.QKeySequence("F5"), self)
+            self._scan_shortcut_f5.activated.connect(self._on_scan_requested)
 
     def _connect_aov_scan(self):
         # type: () -> None
@@ -509,6 +520,22 @@ class BaseWindow(QtWidgets.QMainWindow):
             elif event.type() == QtCore.QEvent.Resize:
                 self._update_drop_overlay_geometry()
         return super(BaseWindow, self).eventFilter(obj, event)
+
+    def _restore_splitter_state(self):
+        # type: () -> None
+        if not self.main_splitter:
+            return
+        state = self._settings.value("ui/main_splitter_state")
+        if state:
+            self.main_splitter.restoreState(state)
+
+    def _save_splitter_state(self):
+        # type: () -> None
+        if not self.main_splitter:
+            return
+        self._settings.setValue(
+            "ui/main_splitter_state", self.main_splitter.saveState()
+        )
 
     def _load_recent_paths(self):
         # type: () -> None
@@ -719,10 +746,12 @@ class BaseWindow(QtWidgets.QMainWindow):
         self._update_output_label()
         if not path or not os.path.exists(path):
             self._last_aov_scan_key = None
+            self._aov_state.last_error = None
             if self._aov_scan:
                 self._aov_scan.cancel()
             self._set_scan_busy(False)
             self._apply_planes([])
+            self._update_summary_strip()
             return
         scan_key = self._aov_scan_key(path)
         if not force and scan_key == self._last_aov_scan_key:
@@ -757,8 +786,10 @@ class BaseWindow(QtWidgets.QMainWindow):
                 self._update_temporal_state()
             finally:
                 self._suppress_custom_changes = False
+            self._update_summary_strip()
             return
 
+        self._aov_state.last_error = None
         available_planes = list(planes)
         self._aov_state.planes = available_planes
         self._update_planes_panel(available_planes)
@@ -938,29 +969,46 @@ class BaseWindow(QtWidgets.QMainWindow):
         else:
             files_text = "Files: -"
 
+        path_text = self._current_input_path()
         has_files = bool(selected_files) or bool(
             path and (os.path.isfile(path) or os.path.isdir(path))
         )
+        path_invalid = bool(path_text) and not has_files
         planes_count = len(self._aov_state.planes)
         motion_ok = self._motion_vectors_available()
+        path_ready = has_files or bool(path_text and os.path.exists(path_text))
 
         self.summary_files.setText(files_text)
         self.summary_planes.setText("AOVs: {}".format(planes_count))
         motion_text = "Motion: OK" if motion_ok else "Motion: missing"
         self.summary_motion.setText(motion_text)
 
-        _apply_chip_state(
-            self.summary_files,
-            "summaryChipOk" if has_files else "summaryChip",
-        )
-        _apply_chip_state(
-            self.summary_planes,
-            "summaryChipOk" if planes_count >= 1 else "summaryChipWarn",
-        )
-        _apply_chip_state(
-            self.summary_motion,
-            "summaryChipOk" if motion_ok else "summaryChipWarn",
-        )
+        if has_files:
+            files_chip = "summaryChipOk"
+        elif path_invalid:
+            files_chip = "summaryChipBad"
+        else:
+            files_chip = "summaryChip"
+
+        if self._aov_state.last_error:
+            planes_chip = "summaryChipBad"
+        elif planes_count >= 1:
+            planes_chip = "summaryChipOk"
+        elif path_ready:
+            planes_chip = "summaryChipWarn"
+        else:
+            planes_chip = "summaryChip"
+
+        if motion_ok:
+            motion_chip = "summaryChipOk"
+        elif planes_count >= 1:
+            motion_chip = "summaryChipWarn"
+        else:
+            motion_chip = "summaryChip"
+
+        _apply_chip_state(self.summary_files, files_chip)
+        _apply_chip_state(self.summary_planes, planes_chip)
+        _apply_chip_state(self.summary_motion, motion_chip)
 
     def _flash_summary_planes(self):
         # type: () -> None
@@ -968,7 +1016,7 @@ class BaseWindow(QtWidgets.QMainWindow):
             return
         if not self._summary_planes_flash_timer.isActive():
             self._summary_planes_flash_original_style = self.summary_planes.styleSheet()
-        self.summary_planes.setStyleSheet("QLabel { background-color: #5a8fd1; }")
+        self.summary_planes.setStyleSheet("QLabel { background-color: #3a5f8a; }")
         self._summary_planes_flash_timer.start(400)
 
     def _clear_summary_planes_flash(self):

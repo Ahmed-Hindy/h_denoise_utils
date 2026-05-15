@@ -61,9 +61,10 @@ def test_about_dialog_uses_package_version(qtbot, monkeypatch):
 
     assert captured["parent"] is window
     assert captured["title"] == "About Denoiser"
-    assert "<b>Denoiser</b><br>Version {}<br><br>".format(__version__) in captured[
-        "message"
-    ]
+    assert (
+        "<b>Denoiser</b><br>Version {}<br><br>".format(__version__)
+        in captured["message"]
+    )
 
 
 def test_output_label_updates(qtbot, tmp_path):
@@ -158,6 +159,51 @@ def test_settings_has_basic_and_collapsed_advanced_rows(qtbot):
     window._toggle_advanced_settings(True)
 
     assert not window.advanced_settings_body.isHidden()
+
+
+def test_f5_triggers_scan(qtbot, tmp_path):
+    class FakeAovScan:
+        def __init__(self):
+            self.starts = []
+
+        def start(self, path, selected_files):
+            self.starts.append((path, tuple(selected_files)))
+
+        def cancel(self):
+            pass
+
+    exr_path = tmp_path / "shot.0001.exr"
+    exr_path.write_bytes(b"")
+
+    window = BaseWindow()
+    qtbot.addWidget(window)
+    fake_scan = FakeAovScan()
+    window._aov_scan = fake_scan
+    window._set_path_text(str(tmp_path), analyze=False)
+
+    assert window._scan_shortcut_f5 is not None
+    window._scan_shortcut_f5.activated.emit()
+
+    assert len(fake_scan.starts) == 1
+
+
+def test_splitter_state_persists(qtbot):
+    window = BaseWindow()
+    qtbot.addWidget(window)
+    window.resize(860, 700)
+    window.main_splitter.setSizes([400, 300])
+    saved_state = window.main_splitter.saveState()
+    window._save_splitter_state()
+    window.main_splitter.setSizes([120, 120])
+    window._restore_splitter_state()
+    assert window.main_splitter.saveState() == saved_state
+
+
+def test_summary_chip_bad_for_invalid_path(qtbot):
+    window = BaseWindow()
+    qtbot.addWidget(window)
+    window._set_path_text("/path/that/does/not/exist", analyze=False)
+    assert window.summary_files.objectName() == "summaryChipBad"
 
 
 def test_temporal_checkbox_shares_motion_row(qtbot):
