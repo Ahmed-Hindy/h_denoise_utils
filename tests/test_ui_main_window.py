@@ -6,6 +6,15 @@ from h_denoise_utils.ui.main_window import BaseWindow
 from h_denoise_utils.ui.sections import QWIDGETSIZE_MAX
 
 
+def _has_ancestor(widget, ancestor):
+    parent = widget.parentWidget()
+    while parent is not None:
+        if parent is ancestor:
+            return True
+        parent = parent.parentWidget()
+    return False
+
+
 def test_window_constructs(qtbot):
     window = BaseWindow()
     qtbot.addWidget(window)
@@ -58,11 +67,33 @@ def test_destination_and_settings_share_configuration_scroll_area(qtbot):
     assert layout.itemAt(layout.count() - 1).spacerItem() is not None
     assert window.adv_scroll is None
     assert window.advanced_body.isHidden()
+    assert window.advanced_settings_body.isHidden()
 
     window._toggle_advanced(True)
 
     assert not window.advanced_body.isHidden()
+    assert window.advanced_settings_body.isHidden()
     assert window.advanced_section.maximumHeight() == QWIDGETSIZE_MAX
+
+
+def test_settings_has_basic_and_collapsed_advanced_rows(qtbot):
+    window = BaseWindow()
+    qtbot.addWidget(window)
+
+    window._toggle_advanced(True)
+
+    assert _has_ancestor(window.prefix_edit, window.advanced_body)
+    assert not _has_ancestor(window.prefix_edit, window.advanced_settings_body)
+    assert _has_ancestor(window.backend_combo, window.advanced_settings_body)
+    assert _has_ancestor(window.thread_spin, window.advanced_settings_body)
+    assert _has_ancestor(window.denoiser_combo, window.advanced_settings_body)
+    assert _has_ancestor(window.exrmode_combo, window.advanced_settings_body)
+    assert _has_ancestor(window.options_edit, window.advanced_settings_body)
+    assert _has_ancestor(window.extra_aovs_edit, window.advanced_settings_body)
+
+    window._toggle_advanced_settings(True)
+
+    assert not window.advanced_settings_body.isHidden()
 
 
 def test_temporal_checkbox_shares_motion_row(qtbot):

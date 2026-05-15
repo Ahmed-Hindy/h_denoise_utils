@@ -275,14 +275,26 @@ def build_extras_section(window, top_layout):
     settings_form.setVerticalSpacing(4)
     settings_form.setFieldGrowthPolicy(QtWidgets.QFormLayout.ExpandingFieldsGrow)
 
+    advanced_settings_form = QtWidgets.QFormLayout()
+    advanced_settings_form.setLabelAlignment(
+        QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter
+    )
+    advanced_settings_form.setFormAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+    advanced_settings_form.setContentsMargins(0, 6, 0, 0)
+    advanced_settings_form.setHorizontalSpacing(8)
+    advanced_settings_form.setVerticalSpacing(4)
+    advanced_settings_form.setFieldGrowthPolicy(
+        QtWidgets.QFormLayout.ExpandingFieldsGrow
+    )
+
     window.backend_combo = NoWheelComboBox()
     window.backend_combo.addItems(["Oidn", "Optix"])
-    settings_form.addRow("Backend:", window.backend_combo)
+    advanced_settings_form.addRow("Backend:", window.backend_combo)
 
     window.thread_spin = NoWheelSpinBox()
     window.thread_spin.setRange(1, 8)
     window.thread_spin.setValue(min(8, max(1, multiprocessing.cpu_count())))
-    settings_form.addRow("CPU Threads:", window.thread_spin)
+    advanced_settings_form.addRow("CPU Threads:", window.thread_spin)
 
     window.albedo_combo = NoWheelComboBox()
     window.albedo_combo.setEditable(True)
@@ -309,6 +321,9 @@ def build_extras_section(window, top_layout):
     window.temporal_chk.setText("Use Temporal Denoise")
     window.temporal_chk.setToolTip("Requires Optix backend and motion vectors AOV")
 
+    window.prefix_edit = QtWidgets.QLineEdit("den_")
+    window.prefix_edit.setMaxLength(32)
+    settings_form.addRow("Output Prefix:", window.prefix_edit)
     settings_form.addRow("Albedo (-a):", window.albedo_combo)
     settings_form.addRow("Normal (-n):", window.normal_combo)
 
@@ -325,7 +340,7 @@ def build_extras_section(window, top_layout):
     divider = QtWidgets.QFrame()
     divider.setFrameShape(QtWidgets.QFrame.HLine)
     divider.setFrameShadow(QtWidgets.QFrame.Sunken)
-    settings_form.addRow(divider)
+    advanced_settings_form.addRow(divider)
 
     window.denoiser_combo = NoWheelComboBox()
     for ver, exe in window.houdini_versions.items():
@@ -339,27 +354,54 @@ def build_extras_section(window, top_layout):
     idenoise_layout.setContentsMargins(0, 0, 0, 0)
     idenoise_layout.addWidget(window.denoiser_combo, 1)
     idenoise_layout.addWidget(window.custom_exe_btn)
-    settings_form.addRow("idenoise:", idenoise_row)
+    advanced_settings_form.addRow("idenoise:", idenoise_row)
 
     window.exrmode_combo = NoWheelComboBox()
     window.exrmode_combo.addItems(["(default HOUDINI_OIIO_EXR)", "-1", "0", "1"])
-    settings_form.addRow("EXR Read Mode:", window.exrmode_combo)
-
-    window.prefix_edit = QtWidgets.QLineEdit("den_")
-    window.prefix_edit.setMaxLength(32)
-    settings_form.addRow("Output Prefix:", window.prefix_edit)
+    advanced_settings_form.addRow("EXR Read Mode:", window.exrmode_combo)
 
     window.options_edit = QtWidgets.QLineEdit()
     window.options_edit.setPlaceholderText(
         'e.g., {"blendfactor":0.25} or {"auxareclean":true}'
     )
-    settings_form.addRow("Advanced Options (JSON):", window.options_edit)
+    advanced_settings_form.addRow("Advanced Options (JSON):", window.options_edit)
 
     window.extra_aovs_edit = QtWidgets.QLineEdit()
     window.extra_aovs_edit.setPlaceholderText("reference AOVs (not denoised)")
-    settings_form.addRow("Optional auxiliary AOVs:", window.extra_aovs_edit)
+    advanced_settings_form.addRow("Optional auxiliary AOVs:", window.extra_aovs_edit)
 
     advanced_body_layout.addLayout(settings_form)
+
+    window.advanced_settings_section = QtWidgets.QFrame()
+    window.advanced_settings_section.setObjectName("nestedSettingsCard")
+    advanced_settings_layout = QtWidgets.QVBoxLayout(window.advanced_settings_section)
+    advanced_settings_layout.setContentsMargins(0, 4, 0, 0)
+    advanced_settings_layout.setSpacing(2)
+
+    advanced_settings_header = QtWidgets.QHBoxLayout()
+    window.advanced_settings_toggle = QtWidgets.QToolButton()
+    window.advanced_settings_toggle.setArrowType(QtCore.Qt.RightArrow)
+    window.advanced_settings_toggle.setCheckable(True)
+    window.advanced_settings_toggle.setChecked(False)
+    window.advanced_settings_toggle.setAutoRaise(True)
+    advanced_settings_header.addWidget(window.advanced_settings_toggle)
+    advanced_settings_title = QtWidgets.QLabel("Advanced Settings")
+    advanced_settings_title.setObjectName("subsectionTitle")
+    advanced_settings_header.addWidget(advanced_settings_title)
+    advanced_settings_header.addStretch(1)
+    advanced_settings_layout.addLayout(advanced_settings_header)
+
+    window.advanced_settings_body = QtWidgets.QWidget()
+    advanced_settings_body_layout = QtWidgets.QVBoxLayout(
+        window.advanced_settings_body
+    )
+    advanced_settings_body_layout.setContentsMargins(20, 0, 0, 0)
+    advanced_settings_body_layout.setSpacing(0)
+    advanced_settings_body_layout.addLayout(advanced_settings_form)
+    window.advanced_settings_body.setVisible(False)
+    advanced_settings_layout.addWidget(window.advanced_settings_body)
+    advanced_body_layout.addWidget(window.advanced_settings_section)
+
     window.advanced_body.setVisible(False)
     advanced_layout.addWidget(window.advanced_body)
     window.advanced_section.setMaximumHeight(48)
