@@ -102,6 +102,9 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.advanced_section = None  # type: Optional[QtWidgets.QFrame]
         self.advanced_body = None  # type: Optional[QtWidgets.QWidget]
         self.advanced_toggle = None  # type: Optional[QtWidgets.QToolButton]
+        self.advanced_settings_section = None  # type: Optional[QtWidgets.QFrame]
+        self.advanced_settings_body = None  # type: Optional[QtWidgets.QWidget]
+        self.advanced_settings_toggle = None  # type: Optional[QtWidgets.QToolButton]
         self.motion_label = None  # type: Optional[QtWidgets.QLabel]
         self._path_analysis_timer = QtCore.QTimer(self)
         self._path_analysis_timer.setSingleShot(True)
@@ -329,6 +332,10 @@ class BaseWindow(QtWidgets.QMainWindow):
             self.aov_toggle.toggled.connect(self._toggle_aov_body)
         if self.advanced_toggle:
             self.advanced_toggle.toggled.connect(self._toggle_advanced)
+        if self.advanced_settings_toggle:
+            self.advanced_settings_toggle.toggled.connect(
+                self._toggle_advanced_settings
+            )
         self.control_btn.clicked.connect(self._on_control)
         self.backend_combo.currentTextChanged.connect(self._on_backend_changed)
         self.backend_combo.currentTextChanged.connect(self._mark_custom)
@@ -829,6 +836,16 @@ class BaseWindow(QtWidgets.QMainWindow):
                 QtCore.Qt.DownArrow if checked else QtCore.Qt.RightArrow
             )
         self.advanced_section.setMaximumHeight(QWIDGETSIZE_MAX if checked else 48)
+
+    def _toggle_advanced_settings(self, checked):
+        # type: (bool) -> None
+        if not self.advanced_settings_body:
+            return
+        self.advanced_settings_body.setVisible(checked)
+        if self.advanced_settings_toggle:
+            self.advanced_settings_toggle.setArrowType(
+                QtCore.Qt.DownArrow if checked else QtCore.Qt.RightArrow
+            )
 
     def _toggle_aov_body(self, checked):
         # type: (bool) -> None

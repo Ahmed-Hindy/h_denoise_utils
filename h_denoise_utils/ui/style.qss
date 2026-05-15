@@ -172,6 +172,11 @@ QLabel#sectionTitle {
     color: #ffffff;
 }
 
+QLabel#subsectionTitle {
+    font-weight: 600;
+    color: #cfcfcf;
+}
+
 QLabel#summaryChip {
     border: 1px solid #454545;
     border-radius: 10px;
