@@ -69,6 +69,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         self._recent_paths = []  # type: List[str]
         self._input_state = InputState()
         self._aov_state = AovState()
+        self._last_aov_scan_key = None
         self._ui_state = UiState()
         self._denoise_state = DenoiseState()
         self.log_records = []  # type: List[dict]
@@ -318,7 +319,7 @@ class BaseWindow(QtWidgets.QMainWindow):
     def _connect_signals(self):
         # type: () -> None
         self.browse_btn.clicked.connect(self._browse)
-        self.scan_btn.clicked.connect(self._analyze_input)
+        self.scan_btn.clicked.connect(self._on_scan_requested)
         self.open_output_btn.clicked.connect(self._open_output_folder)
         self.path_edit.currentTextChanged.connect(self._on_path_text_changed)
         self.path_edit.lineEdit().editingFinished.connect(self._analyze_input)
@@ -542,7 +543,11 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.path_edit.blockSignals(False)
         self._set_input_path_state(path)
         if analyze:
-            self._analyze_input()
+            self._analyze_input(force=True)
+
+    def _on_scan_requested(self, _checked=False):
+        # type: (bool) -> None
+        self._analyze_input(force=True)
 
     def _on_path_text_changed(self, text):
         # type: (str) -> None
@@ -695,18 +700,34 @@ class BaseWindow(QtWidgets.QMainWindow):
         self._apply_planes(planes)
         self._flash_summary_planes()
 
-    def _analyze_input(self):
+    def _aov_scan_key(self, path):
+        # type: (str) -> tuple
+        def normalize(value):
+            # type: (str) -> str
+            return os.path.normcase(os.path.abspath(os.path.normpath(value)))
+
+        return (
+            normalize(path),
+            tuple(normalize(f) for f in self._input_state.selected_files),
+        )
+
+    def _analyze_input(self, force=False):
         """Analyze input files to populate AOVs and configure settings."""
         path = self._effective_input_path()
         self._update_output_label()
         if not path or not os.path.exists(path):
+            self._last_aov_scan_key = None
             if self._aov_scan:
                 self._aov_scan.cancel()
             self._set_scan_busy(False)
             self._apply_planes([])
             return
+        scan_key = self._aov_scan_key(path)
+        if not force and scan_key == self._last_aov_scan_key:
+            return
         self._remember_path(path)
         if self._aov_scan:
+            self._last_aov_scan_key = scan_key
             self._aov_scan.start(path, self._input_state.selected_files)
 
     def _auto_select_preset(self, planes):
