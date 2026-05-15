@@ -43,6 +43,36 @@ def test_output_label_updates(qtbot, tmp_path):
     assert os.path.basename(path_text).lower().endswith("denoised")
 
 
+def test_auto_scan_skips_focus_loss_repeat_but_scan_button_forces(qtbot, tmp_path):
+    class FakeAovScan:
+        def __init__(self):
+            self.starts = []
+
+        def start(self, path, selected_files):
+            self.starts.append((path, tuple(selected_files)))
+
+        def cancel(self):
+            pass
+
+    exr_path = tmp_path / "CanRun_sh001_renderCompositingMain_v001.0001.exr"
+    exr_path.write_bytes(b"")
+
+    window = BaseWindow()
+    qtbot.addWidget(window)
+    fake_scan = FakeAovScan()
+    window._aov_scan = fake_scan
+
+    window._set_selected_files([str(exr_path)])
+    window._set_path_text(str(exr_path), analyze=True)
+    window.path_edit.lineEdit().editingFinished.emit()
+
+    assert len(fake_scan.starts) == 1
+
+    window._on_scan_requested()
+
+    assert len(fake_scan.starts) == 2
+
+
 def test_action_bar_contains_output_button_and_settings_width_is_bounded(qtbot):
     window = BaseWindow()
     qtbot.addWidget(window)
