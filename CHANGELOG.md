@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.0] — 2026-05-15
+
+### Added
+- Window title shows the installed package version (and `(DEV)` when `ENV_IS_DEV=true`).
+- README screenshot and documentation links.
+- GitHub Releases upload for the Windows portable zip when a `v*` tag is pushed.
+
+### Changed
+- Refined denoiser UI layout: status summary strip, destination preview in the action bar, and shared configuration scroll area.
+- Advanced settings collapsed into expandable sections (basic vs. advanced rows).
+- UI copy renamed from "planes" to "AOVs" for consistency.
+- About dialog reads version from `__version__` instead of a hardcoded string.
+- CI: updated GitHub Actions runtimes and artifact upload action; pinned Windows packaging to `windows-2022`.
+
+### Fixed
+- Avoid duplicate AOV scans when the input path is re-analyzed without changes.
+
 ## [1.1.0] — 2026-05-12
 
 ### Added

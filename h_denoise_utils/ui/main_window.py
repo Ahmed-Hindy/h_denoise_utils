@@ -41,6 +41,7 @@ from .sections import (
     build_logs_section,
     build_source_section,
 )
+
 from .worker import DenoiseWorker
 from ..utils.file_utils import compute_output_folder
 from .logging_handler import QtLogHandler
@@ -226,9 +227,10 @@ class BaseWindow(QtWidgets.QMainWindow):
     def _setup_ui(self):
         # type: () -> None
         ENV_IS_DEV = str(os.environ.get("ENV_IS_DEV", "")).lower() == "true"
-        self.setWindowTitle("Denoiser") if not ENV_IS_DEV else self.setWindowTitle(
-            "Denoiser (DEV)"
-        )
+        title = "Denoiser {} {}".format("(DEV)" if ENV_IS_DEV else "", __version__).replace(
+            "  ", " "
+        ).strip()
+        self.setWindowTitle(title)
         _icon_path = os.path.join(os.path.dirname(__file__), "icons", "logo.ico")
         if os.path.isfile(_icon_path):
             self.setWindowIcon(QtGui.QIcon(_icon_path))

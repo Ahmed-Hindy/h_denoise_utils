@@ -42,7 +42,7 @@ from .utils.file_utils import (
     compute_output_folder,
 )
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __all__ = [
     # Config
     "AOVConfig",

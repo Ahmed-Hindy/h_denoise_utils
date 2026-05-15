@@ -17,6 +17,13 @@ def _has_ancestor(widget, ancestor):
     return False
 
 
+def test_window_title_includes_version(qtbot, monkeypatch):
+    monkeypatch.delenv("ENV_IS_DEV", raising=False)
+    window = BaseWindow()
+    qtbot.addWidget(window)
+    assert window.windowTitle() == "Denoiser {}".format(__version__)
+
+
 def test_window_constructs(qtbot):
     window = BaseWindow()
     qtbot.addWidget(window)
