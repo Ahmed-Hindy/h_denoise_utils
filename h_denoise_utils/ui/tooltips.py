@@ -1,4 +1,8 @@
-"""Static tooltip strings for the denoiser GUI."""
+"""Tooltip strings for the denoiser GUI.
+
+Static strings are module-level constants. Dynamic tooltips use the format
+templates below or the small helper functions at the bottom of this module.
+"""
 
 # Source
 PATH_EDIT = "Path to an image file or a folder containing images."
@@ -13,6 +17,7 @@ SUMMARY_MOTION = (
     "Whether motion-vector AOVs were found (needed for temporal)"
 )
 SCAN_SPINNER = "Scanning input for AOVs…"
+PLANES_TOGGLE = "Count: {} | Last scan: {}"
 
 # Destination
 OUTPUT_TOGGLE = "Show or hide destination options"
@@ -22,7 +27,9 @@ AOVS_INPUT = (
 )
 AOVS_CUSTOM_INPUT = "Comma-separated AOV names not shown as chips"
 OVERWRITE_CHK = "Overwrite existing outputs"
-OUTPUT_PATH_LABEL = "Destination folder"
+OUTPUT_DESTINATION = "Destination: {}"
+OUTPUT_DESTINATION_EMPTY = "Destination: -"
+ACTION_DESTINATION = "→ {}"
 
 # Settings
 ADVANCED_TOGGLE = "Show or hide denoise settings"
@@ -37,7 +44,15 @@ NORMAL_COMBO = "Normal AOV name; improves quality when present"
 MOTION_COMBO = (
     "Motion vectors AOV; required for temporal denoising"
 )
-TEMPORAL_CHK = "Requires Optix backend and motion vectors AOV"
+TEMPORAL_CHK_ENABLED = (
+    "Use previous frame for temporal denoising (OptiX only)"
+)
+TEMPORAL_CHK_BACKEND_UNSUPPORTED = (
+    "Temporal denoising not supported by {}"
+)
+TEMPORAL_CHK_NO_MOTION = (
+    "Requires motion vectors AOV to enable temporal denoising"
+)
 DENOISER_COMBO = "Houdini idenoise executable to run"
 CUSTOM_EXE_BTN = "Browse for a custom idenoise executable"
 EXRMODE_COMBO = (
@@ -46,6 +61,7 @@ EXRMODE_COMBO = (
 OPTIONS_EDIT = (
     "JSON options passed to idenoise (e.g. blendfactor, auxareclean)"
 )
+OPTIONS_INVALID_JSON = "Invalid JSON: {}"
 EXTRA_AOVS_EDIT = "Reference AOVs included but not denoised"
 
 # Action bar
@@ -57,3 +73,30 @@ OPEN_OUTPUT_BTN = "Open destination folder"
 
 # Logs
 LOG_FILTER_COMBO = "Filter log messages by severity"
+
+
+def planes_toggle(count, timestamp):
+    # type: (int, str) -> str
+    return PLANES_TOGGLE.format(count, timestamp)
+
+
+def temporal_backend_unsupported(backend_display):
+    # type: (str) -> str
+    return TEMPORAL_CHK_BACKEND_UNSUPPORTED.format(backend_display)
+
+
+def options_invalid_json(exc):
+    # type: (object) -> str
+    return OPTIONS_INVALID_JSON.format(exc)
+
+
+def output_destination_label(preview_path):
+    # type: (str) -> str
+    if preview_path:
+        return OUTPUT_DESTINATION.format(preview_path)
+    return OUTPUT_DESTINATION_EMPTY
+
+
+def action_destination_label(preview_path):
+    # type: (str) -> str
+    return ACTION_DESTINATION.format(preview_path if preview_path else "-")
