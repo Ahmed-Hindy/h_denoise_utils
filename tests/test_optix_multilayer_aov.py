@@ -5,9 +5,12 @@ from pathlib import Path
 from tools.optix_multilayer_aov import (
     PlaneInfo,
     build_denoiser_command,
+    build_extract_command,
+    build_recompose_command,
     is_auto_denoisable_aov,
     parse_oiiotool_info,
     parse_plane_list,
+    required_extraction_planes,
 )
 
 
@@ -34,6 +37,19 @@ def test_parse_oiiotool_info_reads_subimages_and_channels():
         "indirectdiffuse.G",
         "indirectdiffuse.B",
     ]
+
+
+def test_parse_oiiotool_info_does_not_fold_metadata_into_channels():
+    text = """
+ subimage  0: 1280 x  720, 4 channel, half openexr
+    channel list: R, G, B, A
+    name: "C"
+    compression: "zips"
+    typeSemantics: "color"
+"""
+    planes = parse_oiiotool_info(text)
+
+    assert planes[0].channels == ["R", "G", "B", "A"]
 
 
 def test_parse_plane_list_splits_commas_and_preserves_order():
@@ -71,6 +87,80 @@ def test_build_denoiser_command_includes_guides_and_single_aov():
         "directdiffuse.exr",
         "-oaov0",
         "directdiffuse_denoised.exr",
+    ]
+
+
+def test_build_extract_command_batches_all_subimages():
+    planes = [
+        PlaneInfo(index=0, name="C", channels=["R", "G", "B", "A"]),
+        PlaneInfo(index=1, name="albedo", channels=["albedo.R", "albedo.G", "albedo.B"]),
+    ]
+    extracted = {
+        0: Path("000_C.exr"),
+        1: Path("001_albedo.exr"),
+    }
+
+    assert build_extract_command(
+        Path("hoiiotool.exe"),
+        Path("source.exr"),
+        planes,
+        extracted,
+    ) == [
+        "hoiiotool.exe",
+        "source.exr",
+        "--subimage",
+        "0",
+        "-o",
+        "000_C.exr",
+        "source.exr",
+        "--subimage",
+        "1",
+        "-o",
+        "001_albedo.exr",
+    ]
+
+
+def test_required_extraction_planes_uses_only_denoiser_inputs():
+    beauty = PlaneInfo(index=0, name="C", channels=["R", "G", "B", "A"])
+    albedo = PlaneInfo(index=1, name="albedo", channels=["albedo.R", "albedo.G", "albedo.B"])
+    depth = PlaneInfo(index=2, name="depth", channels=["depth.z"])
+    diffuse = PlaneInfo(index=3, name="directdiffuse", channels=["R", "G", "B"])
+    normal = PlaneInfo(index=4, name="N", channels=["N.x", "N.y", "N.z"])
+
+    required = required_extraction_planes(
+        beauty=beauty,
+        albedo=albedo,
+        normal=normal,
+        denoise_aovs=[diffuse],
+    )
+
+    assert [plane.name for plane in required] == ["C", "albedo", "N", "directdiffuse"]
+    assert depth not in required
+
+
+def test_build_recompose_command_reuses_source_for_untouched_planes():
+    beauty = PlaneInfo(index=0, name="C", channels=["R", "G", "B", "A"])
+    albedo = PlaneInfo(index=1, name="albedo", channels=["albedo.R", "albedo.G", "albedo.B"])
+    diffuse = PlaneInfo(index=2, name="directdiffuse", channels=["R", "G", "B"])
+
+    assert build_recompose_command(
+        Path("hoiiotool.exe"),
+        Path("source.exr"),
+        [beauty, albedo, diffuse],
+        Path("C_denoised.exr"),
+        {2: Path("directdiffuse_denoised.exr")},
+        beauty,
+        Path("output.exr"),
+    ) == [
+        "hoiiotool.exe",
+        "C_denoised.exr",
+        "source.exr",
+        "--subimage",
+        "1",
+        "directdiffuse_denoised.exr",
+        "--siappendall",
+        "-o",
+        "output.exr",
     ]
 
 
