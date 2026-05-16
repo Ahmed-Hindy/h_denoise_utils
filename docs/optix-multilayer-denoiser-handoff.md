@@ -1,6 +1,6 @@
 # OptiX Multilayer Denoiser Handoff
 
-Last updated: 2026-05-16
+Last updated: 2026-05-17
 
 This is a handoff note for future agents continuing the Houdini-free OptiX denoiser experiment. The short version: the Python prototype can produce correct multilayer EXR output with in-process OpenImageIO, and the forked C++ denoiser now has a validated direct multipart EXR path for the Canyon Run sample.
 
@@ -11,7 +11,7 @@ Primary repo:
 - Repository: `Ahmed-Hindy/h_denoise_utils`
 - Experiment worktree: `C:\Users\Ahmed Hindy\.codex\worktrees\7de0\h_denoise_utils`
 - Branch: `ci/optix-multilayer-aov-experiment`
-- Current workflow pin while this note is being updated: fork commit `cdd8e82fa01cb2196905392519f1b7d73c1aa217`
+- Current workflow pin while this note is being updated: fork commit `6bcdb70cbb5db436d51d8ca904276d52a889f403`
 - Main user workspace remains separate at `G:\Projects\Dev\Github\h_denoise_utils`, usually on `feat/ui-denoising-lock`.
 
 Forked denoiser repo:
@@ -19,7 +19,7 @@ Forked denoiser repo:
 - Repository: `Ahmed-Hindy/NvidiaAIDenoiser`
 - Local clone: `G:\Projects\Dev\Github\NvidiaAIDenoiser`
 - Branch: `hdu/multilayer-exr-output`
-- Latest fork commit at this handoff: `cdd8e82 Advance multipart output subimages`
+- Latest fork commit at this handoff: `6bcdb70 Preserve multipart color space metadata`
 - Upstream base: `DeclanRussell/NvidiaAIDenoiser` tag `3.0`, original pinned commit `4910227d0a0d60dc93c6529bae7cf6e2744f97fd`
 - OptiX SDK submodule pinned in CI to commit `fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd`
 
@@ -234,6 +234,25 @@ Commit `cdd8e82 Advance multipart output subimages`:
   - `Written out: ...\cpp_multipart_optix.exr`
   - `Done!`
 
+Metadata check after `cdd8e82`:
+
+- Pixel data and multipart structure matched Houdini across all 22 subimages.
+- Source-to-built metadata differed only in `oiio:ColorSpace` on all 22 subimages.
+- Houdini-to-built metadata had 66 total differences:
+  - `oiio:ColorSpace` on all 22 subimages
+  - `DateTime` on all 22 subimages
+  - `date` on all 22 subimages
+- Source and Houdini use `oiio:ColorSpace` values of `ACES - ACEScg` for color AOVs and `raw` for data planes such as `depth`, `N`, and `P`.
+- The built output omitted the actual `oiio:ColorSpace` EXR attribute, so OIIO readers reported `Linear`.
+- User preference on 2026-05-17: metadata should be preserved from the source. Treat source metadata preservation as the target; Houdini's changed `DateTime` and added `date` are not source-preserving.
+
+Commit `6bcdb70 Preserve multipart color space metadata`:
+
+- Captures each source subimage's `oiio:ColorSpace` during multipart layout inspection.
+- Reapplies that colorspace to the output `ImageSpec` before the initial multi-subimage `open(...)`.
+- Uses the same metadata-preserved spec when advancing later parts with `AppendSubimage`.
+- Workflow pin has been advanced to this fork commit; CI/artifact validation should confirm whether the written EXR now preserves `oiio:ColorSpace`.
+
 ## Useful Test Commands
 
 Run one-call multi-AOV against extracted planes:
@@ -282,19 +301,22 @@ Diff a subimage:
 
 ## Next Steps
 
-1. Wire `tools/optix_multilayer_aov.py` or the app integration to prefer direct C++ `-multipart` mode when a compatible compiled `Denoiser.exe` is available.
-2. Keep the Python OIIO/hoiiotool prototype path as a fallback until the C++ mode is exercised on more production EXRs.
-3. Broaden validation beyond the Canyon Run sample:
+1. Build and validate fork commit `6bcdb70cbb5db436d51d8ca904276d52a889f403` through the `h_denoise_utils` GitHub Actions workflow.
+2. Confirm source-to-built metadata no longer differs on `oiio:ColorSpace`; expected remaining Houdini-to-built metadata differences are Houdini's `DateTime` and `date` changes only.
+3. Wire `tools/optix_multilayer_aov.py` or the app integration to prefer direct C++ `-multipart` mode when a compatible compiled `Denoiser.exe` is available.
+4. Keep the Python OIIO/hoiiotool prototype path as a fallback until the C++ mode is exercised on more production EXRs.
+5. Broaden validation beyond the Canyon Run sample:
    - different AOV name sets
    - missing guide planes
    - non-`C` beauty names
    - EXRs with unusual data windows or channel formats
-4. Profile end-to-end runtime for the direct C++ path against the current Python OIIO prototype and Houdini `idenoise` baseline.
-5. If future runtime failures appear, inspect multipart EXR writing first; the denoising output matched Houdini once the writer produced valid parts.
+6. Profile end-to-end runtime for the direct C++ path against the current Python OIIO prototype and Houdini `idenoise` baseline.
+7. If future runtime failures appear, inspect multipart EXR writing first; the denoising output matched Houdini once the writer produced valid parts.
 
 ## Current Strategic Read
 
 - The Python OIIO prototype proves the data path and metadata preservation approach.
 - The C++ denoiser copyback bug was real and is fixed; one-call multi-AOV now matches Houdini.
 - Direct C++ multipart output is now validated on the Canyon Run sample.
+- Metadata preservation is now being tightened so the direct C++ path matches the source EXR's explicit colorspace metadata instead of relying on reader defaults.
 - Best production direction is still C++ OIIO inside the denoiser, because it removes Python, Houdini, `hoiiotool`, and temp EXR extraction/recomposition from the hot path.
