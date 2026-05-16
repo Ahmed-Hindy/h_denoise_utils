@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - ci/optix-build-experiment
+      - ci/optix-multilayer-aov-experiment
     paths:
       - .github/workflows/build-optix.yml
 
@@ -18,9 +19,9 @@ jobs:
     timeout-minutes: 90
 
     env:
-      OPTIX_SOURCE_REPO: https://github.com/DeclanRussell/NvidiaAIDenoiser.git
-      OPTIX_SOURCE_TAG: "3.0"
-      OPTIX_SOURCE_COMMIT: 4910227d0a0d60dc93c6529bae7cf6e2744f97fd
+      OPTIX_SOURCE_REPO: https://github.com/Ahmed-Hindy/NvidiaAIDenoiser.git
+      OPTIX_SOURCE_REF: hdu/multilayer-exr-output
+      OPTIX_SOURCE_COMMIT: 9c6d5f498cceacda59467e5dd1db9b27b2d12c0f
       OPTIX_DEV_TAG: v9.0.0
       OPTIX_DEV_COMMIT: fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd
       CUDA_VERSION: "12.9.0"
@@ -41,7 +42,7 @@ jobs:
       - name: Clone pinned OptiX denoiser source
         shell: pwsh
         run: |
-          git clone --branch $env:OPTIX_SOURCE_TAG --recursive $env:OPTIX_SOURCE_REPO $env:SRC_DIR 2>&1 |
+          git clone --branch $env:OPTIX_SOURCE_REF --recursive $env:OPTIX_SOURCE_REPO $env:SRC_DIR 2>&1 |
             Tee-Object -FilePath (Join-Path $env:LOG_DIR "git-clone.log")
           if ($LASTEXITCODE -ne 0) {
             throw "git clone failed with exit code $LASTEXITCODE"
@@ -100,13 +101,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Cache pip downloads
-        uses: actions/cache@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
         with:
-          path: ~\AppData\Local\pip\Cache
-          key: ${{ runner.os }}-pip-optix-build-${{ hashFiles('.github/workflows/build-optix.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-optix-build-
+          enable-cache: true
+          cache-dependency-glob: .github/workflows/build-optix.yml
 
       - name: Cache Conan packages
         uses: actions/cache@v4
@@ -121,14 +120,19 @@ jobs:
       - name: Install build tooling
         shell: pwsh
         run: |
-          python -m pip install --upgrade pip conan 2>&1 |
-            Tee-Object -FilePath (Join-Path $env:LOG_DIR "pip-install.log")
+          uv --version 2>&1 |
+            Tee-Object -FilePath (Join-Path $env:LOG_DIR "uv-version.txt")
           if ($LASTEXITCODE -ne 0) {
-            throw "pip install failed with exit code $LASTEXITCODE"
+            throw "uv version failed with exit code $LASTEXITCODE"
+          }
+
+          uvx --from conan conan --version 2>&1 |
+            Tee-Object -FilePath (Join-Path $env:LOG_DIR "conan-version.txt")
+          if ($LASTEXITCODE -ne 0) {
+            throw "conan version failed with exit code $LASTEXITCODE"
           }
 
           python --version | Out-File -FilePath (Join-Path $env:LOG_DIR "python-version.txt") -Encoding utf8
-          conan --version | Out-File -FilePath (Join-Path $env:LOG_DIR "conan-version.txt") -Encoding utf8
           cmake --version | Out-File -FilePath (Join-Path $env:LOG_DIR "cmake-version.txt") -Encoding utf8
           nvcc -V | Out-File -FilePath (Join-Path $env:LOG_DIR "nvcc-version.txt") -Encoding utf8
 
@@ -136,13 +140,13 @@ jobs:
         shell: pwsh
         working-directory: ${{ env.SRC_DIR }}
         run: |
-          conan profile detect --force 2>&1 |
+          uvx --from conan conan profile detect --force 2>&1 |
             Tee-Object -FilePath (Join-Path $env:LOG_DIR "conan-profile-detect.log")
           if ($LASTEXITCODE -ne 0) {
             throw "conan profile detect failed with exit code $LASTEXITCODE"
           }
 
-          conan install . --build=missing -s:h compiler.cppstd=20 -s:b compiler.cppstd=20 2>&1 |
+          uvx --from conan conan install . --build=missing -s:h compiler.cppstd=20 -s:b compiler.cppstd=20 2>&1 |
             Tee-Object -FilePath (Join-Path $env:LOG_DIR "conan-install.log")
           if ($LASTEXITCODE -ne 0) {
             throw "conan install failed with exit code $LASTEXITCODE"
@@ -209,7 +213,7 @@ jobs:
             name = "NvidiaAIDenoiser"
             executable = "Denoiser.exe"
             source_repository = $env:OPTIX_SOURCE_REPO
-            source_tag = $env:OPTIX_SOURCE_TAG
+            source_ref = $env:OPTIX_SOURCE_REF
             source_commit = $env:OPTIX_SOURCE_COMMIT
             optix_dev_tag = $env:OPTIX_DEV_TAG
             optix_dev_commit = $env:OPTIX_DEV_COMMIT
