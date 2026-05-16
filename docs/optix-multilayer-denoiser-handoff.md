@@ -11,7 +11,7 @@ Primary repo:
 - Repository: `Ahmed-Hindy/h_denoise_utils`
 - Experiment worktree: `C:\Users\Ahmed Hindy\.codex\worktrees\7de0\h_denoise_utils`
 - Branch: `ci/optix-multilayer-aov-experiment`
-- Current workflow pin while this note is being updated: fork commit `37bead3ade03bb03f6bf5005eb3461a638d07a5a`
+- Current workflow pin while this note is being updated: fork commit `8893b605903f273512b750d45993bbe27a003362`
 - Main user workspace remains separate at `G:\Projects\Dev\Github\h_denoise_utils`, usually on `feat/ui-denoising-lock`.
 
 Forked denoiser repo:
@@ -19,7 +19,7 @@ Forked denoiser repo:
 - Repository: `Ahmed-Hindy/NvidiaAIDenoiser`
 - Local clone: `G:\Projects\Dev\Github\NvidiaAIDenoiser`
 - Branch: `hdu/multilayer-exr-output`
-- Latest fork commit at this handoff: `37bead3 Use Conan OpenEXR include layout`
+- Latest fork commit at this handoff: `8893b60 Require OpenEXR headers directly`
 - Upstream base: `DeclanRussell/NvidiaAIDenoiser` tag `3.0`, original pinned commit `4910227d0a0d60dc93c6529bae7cf6e2744f97fd`
 - OptiX SDK submodule pinned in CI to commit `fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd`
 
@@ -39,7 +39,7 @@ In `NvidiaAIDenoiser`:
 - `src/main.cpp`
   Main C++ denoiser. The fork has fixes for multi-AOV copyback and direct multipart EXR support. The current multipart writer copies source OpenEXR part headers and writes pixels through OpenEXR's native multipart API to preserve source metadata.
 - `conanfile.txt`
-  Uses `openimageio/[>=2.4 <4]`, static by default.
+  Uses `openimageio/[>=2.4 <4]`, plus direct `openexr/[>=3.2.3 <4]` and `imath/[>3.1.9 <4]` requirements so headers are available to the denoiser target. Static by default.
 - `CMakeLists.txt`
   Links OpenImageIO for inspection/pixel loading and OpenEXR for metadata-preserving multipart output.
 
@@ -127,6 +127,10 @@ Failed run:
   Builds fork commit `d6e0096a1c358e942189a7401436201154dcf8d3`.
   Configure succeeded, which confirmed the CMake OpenEXR target was available, but compile failed because Conan exposed OpenEXR headers through the `include/OpenEXR` include directory and the code used `#include <OpenEXR/ImfChannelList.h>`.
   The follow-up fork commit `37bead3` switches to no-prefix OpenEXR includes such as `#include <ImfChannelList.h>` and links `Imath::Imath` explicitly for `half`.
+- Run `25974129735`
+  Builds fork commit `37bead3ade03bb03f6bf5005eb3461a638d07a5a`.
+  Configure succeeded, but compile still could not find `ImfChannelList.h`. Diagnosis from the Conan logs: OpenEXR and Imath were transitive dependencies of OpenImageIO, and Conan warned about transitive dependencies with `headers=False`; the headers were not available to this target as transitive deps.
+  The follow-up fork commit `8893b60` adds direct `openexr` and `imath` requirements to `conanfile.txt`.
 
 Validated build target:
 
@@ -282,6 +286,12 @@ Commit `37bead3 Use Conan OpenEXR include layout`:
 
 - Switches OpenEXR includes from `OpenEXR/Imf*.h` to `Imf*.h` to match the Conan package include directories used in CI.
 - Adds an explicit `find_package(Imath CONFIG REQUIRED)` and links `Imath::Imath` for `half.h`.
+- CI run `25974129735` still failed because OpenEXR and Imath were transitive dependencies with headers unavailable to this target.
+
+Commit `8893b60 Require OpenEXR headers directly`:
+
+- Adds `openexr/[>=3.2.3 <4]` and `imath/[>3.1.9 <4]` as direct Conan requirements.
+- Keeps OpenImageIO for image inspection/pixel loading and OpenEXR/Imath for native header-preserving output.
 - Workflow pin has been advanced to this fork commit; CI/artifact validation should confirm source-to-built metadata parity.
 
 ## Useful Test Commands
@@ -332,7 +342,7 @@ Diff a subimage:
 
 ## Next Steps
 
-1. Build and validate fork commit `37bead3ade03bb03f6bf5005eb3461a638d07a5a` through the `h_denoise_utils` GitHub Actions workflow.
+1. Build and validate fork commit `8893b605903f273512b750d45993bbe27a003362` through the `h_denoise_utils` GitHub Actions workflow.
 2. Confirm source-to-built metadata parity across all source header attributes, not just `oiio:ColorSpace`.
 3. Wire `tools/optix_multilayer_aov.py` or the app integration to prefer direct C++ `-multipart` mode when a compatible compiled `Denoiser.exe` is available.
 4. Keep the Python OIIO/hoiiotool prototype path as a fallback until the C++ mode is exercised on more production EXRs.
