@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-17
 
-This is a handoff note for future agents continuing the Houdini-free OptiX denoiser experiment. The short version: the Python prototype can produce correct multilayer EXR output with in-process OpenImageIO, and the forked C++ denoiser now has a validated direct multipart EXR path for the Canyon Run sample.
+This is a handoff note for future agents continuing the Houdini-free OptiX denoiser experiment. The short version: the Python prototype can produce correct multilayer EXR output with in-process OpenImageIO, and the forked C++ denoiser now has a validated direct multipart EXR path for the Canyon Run sample, including source OpenEXR header metadata preservation.
 
 ## Repositories And Branches
 
@@ -11,7 +11,7 @@ Primary repo:
 - Repository: `Ahmed-Hindy/h_denoise_utils`
 - Experiment worktree: `C:\Users\Ahmed Hindy\.codex\worktrees\7de0\h_denoise_utils`
 - Branch: `ci/optix-multilayer-aov-experiment`
-- Current workflow pin while this note is being updated: fork commit `8893b605903f273512b750d45993bbe27a003362`
+- Current validated workflow pin: fork commit `8893b605903f273512b750d45993bbe27a003362`
 - Main user workspace remains separate at `G:\Projects\Dev\Github\h_denoise_utils`, usually on `feat/ui-denoising-lock`.
 
 Forked denoiser repo:
@@ -114,6 +114,9 @@ Successful runs:
 - Run `25973654566`
   Built fork commit `6bcdb70cbb5db436d51d8ca904276d52a889f403`.
   Artifact source attempted explicit `oiio:ColorSpace` restoration through OIIO specs; build succeeded, but validation showed OpenEXR headers still omitted the actual `oiio:ColorSpace` attribute.
+- Run `25974285778`
+  Built fork commit `8893b605903f273512b750d45993bbe27a003362`.
+  Artifact source uses OpenEXR-native multipart output and direct Conan `openexr`/`imath` requirements. Local validation passed: all 22 subimages pixel-matched Houdini's OptiX output, and source-vs-built raw OpenEXR part headers had zero attribute value diffs and zero attribute order diffs.
 
 Failed run:
 
@@ -134,9 +137,15 @@ Failed run:
 
 Validated build target:
 
+- Fork commit `8893b605903f273512b750d45993bbe27a003362`
+  Uses OpenImageIO for source inspection and float pixel loading, then writes the final multipart EXR with OpenEXR's native `MultiPartOutputFile` and copied source `Header` objects.
+  Built in run `25974285778` and passed Canyon Run multipart validation, including raw source header metadata parity.
+
+Previously validated for pixels only:
+
 - Fork commit `cdd8e82fa01cb2196905392519f1b7d73c1aa217`
   Keeps the multi-subimage upfront `open(out_path, count, specs)` call, then follows OIIO's documented pattern by reopening with `AppendSubimage` before writing each subimage after the first.
-  Built in run `25969194038` and passed the Canyon Run multipart validation.
+  Built in run `25969194038` and passed Canyon Run pixel/multipart validation, but did not preserve source `oiio:ColorSpace` header attributes.
 
 ## C++ Fork Changes
 
@@ -292,7 +301,24 @@ Commit `8893b60 Require OpenEXR headers directly`:
 
 - Adds `openexr/[>=3.2.3 <4]` and `imath/[>3.1.9 <4]` as direct Conan requirements.
 - Keeps OpenImageIO for image inspection/pixel loading and OpenEXR/Imath for native header-preserving output.
-- Workflow pin has been advanced to this fork commit; CI/artifact validation should confirm source-to-built metadata parity.
+- Built successfully in h_denoise_utils Actions run `25974285778`.
+- Local artifact path:
+  `%TEMP%\hdu-optix-multipart-artifact-25974285778\Denoiser.exe`
+- Manifest source commit:
+  `8893b605903f273512b750d45993bbe27a003362`
+- Direct multipart command exited `0` and wrote:
+  `%TEMP%\hdu-cpp-multipart-20260517-011920\cpp_multipart_optix.exr`
+- Runtime log showed:
+  - `Denoising complete in 0.014 seconds`
+  - `Written out: ...\cpp_multipart_optix.exr`
+  - `Done!`
+- Pixel validation against Houdini's OptiX reference passed for all 22 subimages.
+- Raw source-vs-built OpenEXR header validation passed:
+  - compared 22 part headers
+  - raw attribute value diff count: `0`
+  - attribute order diff count: `0`
+  - `oiio:ColorSpace` is present as a real EXR attribute in the built output: `ACES - ACEScg` for color AOVs and `raw` for `depth`, `N`, and `P`
+- This is the current best artifact for app/prototype integration work.
 
 ## Useful Test Commands
 
@@ -332,6 +358,13 @@ $oiiotool = "C:\Program Files\Side Effects Software\Houdini 21.0.631\bin\hoiioto
 & $oiiotool --info -v -a $output
 ```
 
+Inspect actual OpenEXR color-space attributes:
+
+```powershell
+& "C:\msys64\ucrt64\bin\exrheader.exe" $output |
+  Select-String -Pattern "oiio:ColorSpace|name \(type string\)|type \(type string\)"
+```
+
 Diff a subimage:
 
 ```powershell
@@ -340,24 +373,94 @@ Diff a subimage:
 & $oiiotool "$env:TEMP\ref_directdiffuse.exr" "$env:TEMP\candidate_directdiffuse.exr" --diff
 ```
 
+Raw source-vs-built metadata parity check:
+
+```powershell
+$source = "G:\Projects\AYON_PROJECTS\Canyon_Run\sq001\sh001\publish\render\renderFxMain\v001\CanRun_sh001_renderFxMain_v001.exr"
+$built = "$env:TEMP\hdu-cpp-multipart-20260517-011920\cpp_multipart_optix.exr"
+$env:HDU_SOURCE_EXR = $source
+$env:HDU_BUILT_EXR = $built
+@'
+import json
+import os
+import struct
+
+PARTS = 22
+
+def read_cstring(f):
+    data = bytearray()
+    while True:
+        b = f.read(1)
+        if not b:
+            raise EOFError("unexpected EOF")
+        if b == b"\0":
+            return bytes(data)
+        data.extend(b)
+
+def read_headers(path):
+    headers = []
+    with open(path, "rb") as f:
+        magic = f.read(4)
+        f.read(4)
+        if magic != bytes.fromhex("762f3101"):
+            raise RuntimeError(f"{path}: bad OpenEXR magic")
+        for _ in range(PARTS):
+            attrs = {}
+            order = []
+            while True:
+                name = read_cstring(f)
+                if not name:
+                    break
+                attr_type = read_cstring(f)
+                size = struct.unpack("<I", f.read(4))[0]
+                value = f.read(size)
+                key = name.decode("utf-8", "replace")
+                typ = attr_type.decode("utf-8", "replace")
+                attrs[key] = (typ, size, value.hex())
+                order.append(key)
+            headers.append((attrs, order))
+    return headers
+
+source_headers = read_headers(os.environ["HDU_SOURCE_EXR"])
+built_headers = read_headers(os.environ["HDU_BUILT_EXR"])
+value_diffs = []
+order_diffs = []
+for index, (source_header, built_header) in enumerate(zip(source_headers, built_headers)):
+    source_attrs, source_order = source_header
+    built_attrs, built_order = built_header
+    for key in sorted(set(source_attrs) | set(built_attrs)):
+        if source_attrs.get(key) != built_attrs.get(key):
+            value_diffs.append((index, key))
+    if source_order != built_order:
+        order_diffs.append(index)
+print(json.dumps({
+    "parts": PARTS,
+    "raw_attribute_value_diff_count": len(value_diffs),
+    "attribute_order_diff_count": len(order_diffs),
+    "value_diffs": value_diffs[:20],
+    "order_diffs": order_diffs[:20],
+}, indent=2))
+if value_diffs:
+    raise SystemExit(1)
+'@ | python -
+```
+
 ## Next Steps
 
-1. Build and validate fork commit `8893b605903f273512b750d45993bbe27a003362` through the `h_denoise_utils` GitHub Actions workflow.
-2. Confirm source-to-built metadata parity across all source header attributes, not just `oiio:ColorSpace`.
-3. Wire `tools/optix_multilayer_aov.py` or the app integration to prefer direct C++ `-multipart` mode when a compatible compiled `Denoiser.exe` is available.
-4. Keep the Python OIIO/hoiiotool prototype path as a fallback until the C++ mode is exercised on more production EXRs.
-5. Broaden validation beyond the Canyon Run sample:
+1. Wire `tools/optix_multilayer_aov.py` or the app integration to prefer direct C++ `-multipart` mode when a compatible compiled `Denoiser.exe` is available.
+2. Keep the Python OIIO/hoiiotool prototype path as a fallback until the C++ mode is exercised on more production EXRs.
+3. Broaden validation beyond the Canyon Run sample:
    - different AOV name sets
    - missing guide planes
    - non-`C` beauty names
    - EXRs with unusual data windows or channel formats
-6. Profile end-to-end runtime for the direct C++ path against the current Python OIIO prototype and Houdini `idenoise` baseline.
-7. If future runtime failures appear, inspect multipart EXR writing first; the denoising output matched Houdini once the writer produced valid parts.
+4. Profile end-to-end runtime for the direct C++ path against the current Python OIIO prototype and Houdini `idenoise` baseline.
+5. If future runtime failures appear, inspect multipart EXR writing first; the denoising output matched Houdini once the writer produced valid parts.
 
 ## Current Strategic Read
 
 - The Python OIIO prototype proves the data path and metadata preservation approach.
 - The C++ denoiser copyback bug was real and is fixed; one-call multi-AOV now matches Houdini.
 - Direct C++ multipart output is now validated on the Canyon Run sample.
-- Metadata preservation now targets source OpenEXR headers wholesale; OIIO spec rewriting was not enough because it still failed to serialize `oiio:ColorSpace`.
+- Metadata preservation now targets source OpenEXR headers wholesale; the validated `8893b60` artifact has zero raw header attribute value diffs against the source across all 22 parts.
 - Best production direction is still C++ OIIO inside the denoiser, because it removes Python, Houdini, `hoiiotool`, and temp EXR extraction/recomposition from the hot path.
