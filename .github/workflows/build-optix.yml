@@ -1,0 +1,205 @@
+name: Build OptiX Denoiser
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 90
+
+    env:
+      OPTIX_SOURCE_REPO: https://github.com/DeclanRussell/NvidiaAIDenoiser.git
+      OPTIX_SOURCE_TAG: "3.0"
+      OPTIX_SOURCE_COMMIT: 2518b7d591e7fc28f8cbce6896d8d1210f7cff1b
+      CUDA_VERSION: "12.9.0"
+      SRC_DIR: ${{ github.workspace }}\_optix-src
+      INSTALL_DIR: ${{ github.workspace }}\_optix-install
+      LOG_DIR: ${{ github.workspace }}\optix-build-logs
+      PACKAGE_DIR: ${{ github.workspace }}\optix-denoiser-windows-x64
+
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v6
+
+      - name: Prepare directories
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:LOG_DIR, $env:INSTALL_DIR, $env:PACKAGE_DIR | Out-Null
+
+      - name: Clone pinned OptiX denoiser source
+        shell: pwsh
+        run: |
+          git clone --branch $env:OPTIX_SOURCE_TAG --recursive $env:OPTIX_SOURCE_REPO $env:SRC_DIR 2>&1 |
+            Tee-Object -FilePath (Join-Path $env:LOG_DIR "git-clone.log")
+          if ($LASTEXITCODE -ne 0) {
+            throw "git clone failed with exit code $LASTEXITCODE"
+          }
+
+          Push-Location $env:SRC_DIR
+          try {
+            $actualCommit = (git rev-parse HEAD).Trim()
+            if ($actualCommit -ne $env:OPTIX_SOURCE_COMMIT) {
+              throw "Expected $env:OPTIX_SOURCE_COMMIT but checked out $actualCommit"
+            }
+            git submodule status --recursive 2>&1 |
+              Tee-Object -FilePath (Join-Path $env:LOG_DIR "git-submodules.log")
+            if ($LASTEXITCODE -ne 0) {
+              throw "git submodule status failed with exit code $LASTEXITCODE"
+            }
+          }
+          finally {
+            Pop-Location
+          }
+
+      - name: Install CUDA 12.9
+        id: cuda-toolkit
+        uses: Jimver/cuda-toolkit@v0.2.29
+        with:
+          cuda: ${{ env.CUDA_VERSION }}
+          method: network
+          sub-packages: '["nvcc", "cudart", "visual_studio_integration"]'
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip conan 2>&1 |
+            Tee-Object -FilePath (Join-Path $env:LOG_DIR "pip-install.log")
+          if ($LASTEXITCODE -ne 0) {
+            throw "pip install failed with exit code $LASTEXITCODE"
+          }
+
+          python --version | Out-File -FilePath (Join-Path $env:LOG_DIR "python-version.txt") -Encoding utf8
+          conan --version | Out-File -FilePath (Join-Path $env:LOG_DIR "conan-version.txt") -Encoding utf8
+          cmake --version | Out-File -FilePath (Join-Path $env:LOG_DIR "cmake-version.txt") -Encoding utf8
+          nvcc -V | Out-File -FilePath (Join-Path $env:LOG_DIR "nvcc-version.txt") -Encoding utf8
+
+      - name: Configure dependencies with Conan
+        shell: pwsh
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          conan profile detect --force 2>&1 |
+            Tee-Object -FilePath (Join-Path $env:LOG_DIR "conan-profile-detect.log")
+          if ($LASTEXITCODE -ne 0) {
+            throw "conan profile detect failed with exit code $LASTEXITCODE"
+          }
+
+          conan install . --build=missing -s:h compiler.cppstd=20 -s:b compiler.cppstd=20 2>&1 |
+            Tee-Object -FilePath (Join-Path $env:LOG_DIR "conan-install.log")
+          if ($LASTEXITCODE -ne 0) {
+            throw "conan install failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Configure CMake
+        shell: pwsh
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          cmake -S . -B build `
+            -G "Visual Studio 17 2022" `
+            -A x64 `
+            -DCMAKE_POLICY_DEFAULT_CMP0091=NEW `
+            -DCMAKE_TOOLCHAIN_FILE=build/generators/conan_toolchain.cmake `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_INSTALL_PREFIX="$env:INSTALL_DIR" 2>&1 |
+            Tee-Object -FilePath (Join-Path $env:LOG_DIR "cmake-configure.log")
+          if ($LASTEXITCODE -ne 0) {
+            throw "cmake configure failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Build Denoiser.exe
+        shell: pwsh
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          cmake --build build --config Release --parallel 2 2>&1 |
+            Tee-Object -FilePath (Join-Path $env:LOG_DIR "cmake-build.log")
+          if ($LASTEXITCODE -ne 0) {
+            throw "cmake build failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Install build output
+        shell: pwsh
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          cmake --install build --config Release 2>&1 |
+            Tee-Object -FilePath (Join-Path $env:LOG_DIR "cmake-install.log")
+          if ($LASTEXITCODE -ne 0) {
+            throw "cmake install failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Stage OptiX artifact
+        shell: pwsh
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          $exe = Get-ChildItem -Path $env:INSTALL_DIR, (Join-Path $env:SRC_DIR "build") -Filter "Denoiser.exe" -Recurse -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $exe) {
+            throw "Denoiser.exe was not found after build"
+          }
+
+          Copy-Item -LiteralPath $exe.FullName -Destination (Join-Path $env:PACKAGE_DIR "Denoiser.exe") -Force
+          Copy-Item -LiteralPath (Join-Path $env:SRC_DIR "LICENSE") -Destination (Join-Path $env:PACKAGE_DIR "LICENSE.NvidiaAIDenoiser.txt") -Force
+          Copy-Item -LiteralPath (Join-Path $env:SRC_DIR "README.md") -Destination (Join-Path $env:PACKAGE_DIR "README.NvidiaAIDenoiser.md") -Force
+
+          $hash = (Get-FileHash -LiteralPath (Join-Path $env:PACKAGE_DIR "Denoiser.exe") -Algorithm SHA256).Hash.ToLowerInvariant()
+          $size = (Get-Item -LiteralPath (Join-Path $env:PACKAGE_DIR "Denoiser.exe")).Length
+          $manifest = [ordered]@{
+            name = "NvidiaAIDenoiser"
+            executable = "Denoiser.exe"
+            source_repository = $env:OPTIX_SOURCE_REPO
+            source_tag = $env:OPTIX_SOURCE_TAG
+            source_commit = $env:OPTIX_SOURCE_COMMIT
+            cuda_version = $env:CUDA_VERSION
+            runner_os = $env:RUNNER_OS
+            runner_arch = $env:RUNNER_ARCH
+            github_run_id = $env:GITHUB_RUN_ID
+            github_run_attempt = $env:GITHUB_RUN_ATTEMPT
+            built_at_utc = (Get-Date).ToUniversalTime().ToString("o")
+            sha256 = $hash
+            size_bytes = $size
+          }
+          $manifest | ConvertTo-Json -Depth 4 | Out-File -FilePath (Join-Path $env:PACKAGE_DIR "manifest.json") -Encoding utf8
+          $hash | Out-File -FilePath (Join-Path $env:PACKAGE_DIR "Denoiser.exe.sha256") -Encoding ascii
+
+      - name: Collect diagnostics
+        if: always()
+        shell: pwsh
+        run: |
+          $diag = Join-Path $env:GITHUB_WORKSPACE "optix-diagnostics"
+          New-Item -ItemType Directory -Force -Path $diag | Out-Null
+
+          if (Test-Path -LiteralPath $env:LOG_DIR) {
+            Copy-Item -LiteralPath $env:LOG_DIR -Destination (Join-Path $diag "logs") -Recurse -Force
+          }
+
+          $buildDir = Join-Path $env:SRC_DIR "build"
+          if (Test-Path -LiteralPath $buildDir) {
+            Get-ChildItem -LiteralPath $buildDir -Filter "CMakeCache.txt" -Recurse -ErrorAction SilentlyContinue |
+              Copy-Item -Destination $diag -Force
+            Get-ChildItem -LiteralPath $buildDir -Include "*.log", "*.txt" -Recurse -ErrorAction SilentlyContinue |
+              Copy-Item -Destination $diag -Force
+          }
+
+      - name: Upload OptiX denoiser artifact
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: optix-denoiser-windows-x64
+          path: optix-denoiser-windows-x64
+          if-no-files-found: error
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: optix-build-diagnostics
+          path: optix-diagnostics
+          if-no-files-found: warn
