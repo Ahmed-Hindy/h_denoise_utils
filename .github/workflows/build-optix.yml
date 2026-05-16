@@ -2,6 +2,11 @@ name: Build OptiX Denoiser
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - ci/optix-build-experiment
+    paths:
+      - .github/workflows/build-optix.yml
 
 permissions:
   contents: read
