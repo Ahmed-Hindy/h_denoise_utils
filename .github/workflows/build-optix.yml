@@ -21,7 +21,7 @@ jobs:
     env:
       OPTIX_SOURCE_REPO: https://github.com/Ahmed-Hindy/NvidiaAIDenoiser.git
       OPTIX_SOURCE_REF: hdu/multilayer-exr-output
-      OPTIX_SOURCE_COMMIT: 343b570e4fb41477f4b4c7376c8814efb0e18082
+      OPTIX_SOURCE_COMMIT: 861fa7a5105d3ed846c9e849274ec81d71feb29b
       OPTIX_DEV_TAG: v9.0.0
       OPTIX_DEV_COMMIT: fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd
       CUDA_VERSION: "12.9.0"

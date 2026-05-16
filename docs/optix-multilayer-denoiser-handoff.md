@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-16
 
-This is a handoff note for future agents continuing the Houdini-free OptiX denoiser experiment. The short version: the Python prototype can now produce correct multilayer EXR output with in-process OpenImageIO, and the forked C++ denoiser has started moving toward direct multipart EXR support.
+This is a handoff note for future agents continuing the Houdini-free OptiX denoiser experiment. The short version: the Python prototype can now produce correct multilayer EXR output with in-process OpenImageIO, and the forked C++ denoiser is moving toward direct multipart EXR support.
 
 ## Repositories And Branches
 
@@ -11,7 +11,7 @@ Primary repo:
 - Repository: `Ahmed-Hindy/h_denoise_utils`
 - Experiment worktree: `C:\Users\Ahmed Hindy\.codex\worktrees\7de0\h_denoise_utils`
 - Branch: `ci/optix-multilayer-aov-experiment`
-- Latest branch commit at this handoff: `0b9fe04 Build buffered multipart copy fix`
+- Current workflow pin while this note is being updated: fork commit `861fa7a5105d3ed846c9e849274ec81d71feb29b`
 - Main user workspace remains separate at `G:\Projects\Dev\Github\h_denoise_utils`, usually on `feat/ui-denoising-lock`.
 
 Forked denoiser repo:
@@ -19,7 +19,7 @@ Forked denoiser repo:
 - Repository: `Ahmed-Hindy/NvidiaAIDenoiser`
 - Local clone: `G:\Projects\Dev\Github\NvidiaAIDenoiser`
 - Branch: `hdu/multilayer-exr-output`
-- Latest branch commit at this handoff: `343b570 Copy unchanged multipart planes through buffers`
+- Latest fork commit at this handoff: `861fa7a Fix multipart unchanged-plane reads`
 - Upstream base: `DeclanRussell/NvidiaAIDenoiser` tag `3.0`, original pinned commit `4910227d0a0d60dc93c6529bae7cf6e2744f97fd`
 - OptiX SDK submodule pinned in CI to commit `fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd`
 
@@ -104,11 +104,19 @@ Successful runs:
   Built fork commit `b9baf17374583689f03400b510e2cdc419c0b914`.
   Artifact source opened the multipart output with all subimage specs up front.
 
-Current run at this handoff:
+Failed run:
 
 - Run `25968791148`
   Builds fork commit `343b570e4fb41477f4b4c7376c8814efb0e18082`.
-  This is the buffered unchanged-plane copy fix. At the moment this note was first written, the run was still in progress.
+  This was the buffered unchanged-plane copy fix, but it failed during compile.
+  The build error was:
+  `main.cpp(381,25): error C2661: 'OpenImageIO::v3_1::ImageInput::read_image': no overloaded function takes 2 arguments`
+  The CI OpenImageIO version exposes span-based `ImageInput::read_image` overloads, not the older two-argument `(TypeDesc, pointer)` overload.
+
+Current pending build target:
+
+- Fork commit `861fa7a5105d3ed846c9e849274ec81d71feb29b`
+  Replaces the failing unchanged-plane `ImageInput::read_image` call with `OIIO::ImageBuf::get_pixels`, matching the API style already used for beauty, guide, and AOV inputs in `src/main.cpp`.
 
 ## C++ Fork Changes
 
@@ -179,7 +187,17 @@ Commit `343b570 Copy unchanged multipart planes through buffers`:
   - `input->read_image(OIIO::TypeDesc::FLOAT, pixels.data())`
   - `output->write_image(OIIO::TypeDesc::FLOAT, pixels.data())`
 - This should avoid the OpenEXR quick-copy path and channel-list mismatch issue.
-- Needs artifact validation after run `25968791148` completes.
+- CI run `25968791148` failed to compile because the runner's OpenImageIO `ImageInput::read_image` no longer has the two-argument overload used here.
+
+Commit `861fa7a Fix multipart unchanged-plane reads`:
+
+- Keeps the buffered unchanged-plane copy strategy.
+- Replaces the failing `ImageInput::read_image` call with:
+  - `OIIO::ImageBuf source_plane(multipart.filename, subimage.index, 0)`
+  - `source_plane.init_spec(...)`
+  - `source_plane.get_pixels(roi, OIIO::TypeDesc::FLOAT, pixels.data())`
+- This avoids the uncertain `ImageInput` overload and uses the same `ImageBuf::get_pixels` API that already compiled elsewhere in this file.
+- The `h_denoise_utils` workflow is being advanced to pin this commit.
 
 ## Useful Test Commands
 
@@ -202,7 +220,7 @@ $extract = "$env:TEMP\hdu-multilayer-oiio-20260516-195051\prototype_work\extract
 Run direct C++ multipart mode:
 
 ```powershell
-$denoiser = "$env:TEMP\hdu-optix-multipart-artifact-25968791148\Denoiser.exe"
+$denoiser = "$env:TEMP\hdu-optix-multipart-artifact-<run-id>\Denoiser.exe"
 $source = "G:\Projects\AYON_PROJECTS\Canyon_Run\sq001\sh001\publish\render\renderFxMain\v001\CanRun_sh001_renderFxMain_v001.exr"
 $output = "$env:TEMP\cpp_multipart_optix.exr"
 & $denoiser -v 1 `
@@ -229,16 +247,17 @@ Diff a subimage:
 
 ## Next Steps
 
-1. Wait for Actions run `25968791148`.
-2. Download artifact `optix-denoiser-windows-x64`.
-3. Run direct C++ `-multipart` test against the Canyon Run source EXR.
-4. Validate:
+1. Push the workflow pin for fork commit `861fa7a5105d3ed846c9e849274ec81d71feb29b` if it is not already pushed.
+2. Wait for the new Actions build in `Ahmed-Hindy/h_denoise_utils`.
+3. Download artifact `optix-denoiser-windows-x64`.
+4. Run direct C++ `-multipart` test against the Canyon Run source EXR.
+5. Validate:
    - process exit code is `0`
    - output has `22` subimages
    - `C`, `directdiffuse`, `indirectdiffuse` match Houdini output
    - unchanged planes like `depth` and `P` match source
-5. If the buffered copy build still fails, inspect `commands.log` first. The previous failure class was OpenEXR/OIIO output copying, not OptiX denoising.
-6. Once direct multipart C++ validates, update `tools/optix_multilayer_aov.py` or app integration to prefer the new C++ mode for the compiled OptiX path.
+6. If the build still fails, inspect `cmake-build.log` first. If runtime still fails, inspect the multipart writer before changing OptiX denoising logic; the latest issues have been EXR/OIIO copy/write problems, not denoising math.
+7. Once direct multipart C++ validates, update `tools/optix_multilayer_aov.py` or app integration to prefer the new C++ mode for the compiled OptiX path.
 
 ## Current Strategic Read
 
