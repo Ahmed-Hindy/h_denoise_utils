@@ -20,7 +20,7 @@ jobs:
     env:
       OPTIX_SOURCE_REPO: https://github.com/DeclanRussell/NvidiaAIDenoiser.git
       OPTIX_SOURCE_TAG: "3.0"
-      OPTIX_SOURCE_COMMIT: 2518b7d591e7fc28f8cbce6896d8d1210f7cff1b
+      OPTIX_SOURCE_COMMIT: 4910227d0a0d60dc93c6529bae7cf6e2744f97fd
       CUDA_VERSION: "12.9.0"
       SRC_DIR: ${{ github.workspace }}\_optix-src
       INSTALL_DIR: ${{ github.workspace }}\_optix-install
