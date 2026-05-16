@@ -20,6 +20,7 @@ from ..core.config import (
 )
 from ..discovery.houdini import detect_houdini_versions
 from .aov_scan_manager import AovScanManager
+from . import tooltips
 from .services.output_paths import preview_output_path
 from .services.recent_paths import (
     load_recent_paths,
@@ -385,14 +386,49 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _set_tooltips(self):
         # type: () -> None
-        self.path_edit.setToolTip(
-            "Path to an image file or a folder containing images."
-        )
-        self.backend_combo.setToolTip("Oidn = CPU, Optix = GPU (NVIDIA)")
-        self.temporal_chk.setToolTip(
-            "Requires motion vectors AOV to enable temporal denoising"
-        )
-        self.files_list.setToolTip("Files selected for denoising")
+        self.path_edit.setToolTip(tooltips.PATH_EDIT)
+        self.browse_btn.setToolTip(tooltips.BROWSE_BTN)
+        self.scan_btn.setToolTip(tooltips.SCAN_BTN)
+        self.files_list.setToolTip(tooltips.FILES_LIST)
+        self.files_remove_btn.setToolTip(tooltips.FILES_REMOVE_BTN)
+        self.files_clear_btn.setToolTip(tooltips.FILES_CLEAR_BTN)
+        if self.summary_files:
+            self.summary_files.setToolTip(tooltips.SUMMARY_FILES)
+        if self.summary_planes:
+            self.summary_planes.setToolTip(tooltips.SUMMARY_PLANES)
+        if self.summary_motion:
+            self.summary_motion.setToolTip(tooltips.SUMMARY_MOTION)
+        if self.scan_spinner:
+            self.scan_spinner.setToolTip(tooltips.SCAN_SPINNER)
+
+        self.output_toggle.setToolTip(tooltips.OUTPUT_TOGGLE)
+        self.preset_combo.setToolTip(tooltips.PRESET_COMBO)
+        self.aovs_input.setToolTip(tooltips.AOVS_INPUT)
+        self.aovs_input.custom_input.setToolTip(tooltips.AOVS_CUSTOM_INPUT)
+        self.overwrite_chk.setToolTip(tooltips.OVERWRITE_CHK)
+        self.output_path_label.setToolTip(tooltips.OUTPUT_PATH_LABEL)
+
+        self.advanced_toggle.setToolTip(tooltips.ADVANCED_TOGGLE)
+        self.advanced_settings_toggle.setToolTip(tooltips.ADVANCED_SETTINGS_TOGGLE)
+        self.backend_combo.setToolTip(tooltips.BACKEND_COMBO)
+        self.thread_spin.setToolTip(tooltips.THREAD_SPIN)
+        self.prefix_edit.setToolTip(tooltips.PREFIX_EDIT)
+        self.albedo_combo.setToolTip(tooltips.ALBEDO_COMBO)
+        self.normal_combo.setToolTip(tooltips.NORMAL_COMBO)
+        self.motion_combo.setToolTip(tooltips.MOTION_COMBO)
+        self.temporal_chk.setToolTip(tooltips.TEMPORAL_CHK)
+        self.denoiser_combo.setToolTip(tooltips.DENOISER_COMBO)
+        self.custom_exe_btn.setToolTip(tooltips.CUSTOM_EXE_BTN)
+        self.exrmode_combo.setToolTip(tooltips.EXRMODE_COMBO)
+        self.options_edit.setToolTip(tooltips.OPTIONS_EDIT)
+        self.extra_aovs_edit.setToolTip(tooltips.EXTRA_AOVS_EDIT)
+
+        self.control_btn.setToolTip(tooltips.CONTROL_BTN_START)
+        self.progress.setToolTip(tooltips.PROGRESS)
+        self.progress_label.setToolTip(tooltips.PROGRESS_LABEL)
+        self.open_output_btn.setToolTip(tooltips.OPEN_OUTPUT_BTN)
+
+        self.log_filter_combo.setToolTip(tooltips.LOG_FILTER_COMBO)
 
     def _browse(self):
         # type: () -> None
@@ -1314,6 +1350,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.control_btn.setText("Stop")
         self.control_btn.setIcon(self.stop_icon)
         self.control_btn.setObjectName("stopBtn")
+        self.control_btn.setToolTip(tooltips.CONTROL_BTN_STOP)
         button_style = self.control_btn.style()
         button_style.unpolish(self.control_btn)
         button_style.polish(self.control_btn)
@@ -1347,6 +1384,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.control_btn.setText("Denoise")
         self.control_btn.setIcon(self.play_icon)
         self.control_btn.setObjectName("primaryBtn")
+        self.control_btn.setToolTip(tooltips.CONTROL_BTN_START)
         button_style = self.control_btn.style()
         button_style.unpolish(self.control_btn)
         button_style.polish(self.control_btn)

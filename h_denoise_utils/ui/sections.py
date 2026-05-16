@@ -73,7 +73,6 @@ def build_source_section(window, top_layout):
     window.browse_btn.setIcon(
         window.app_style.standardIcon(QtWidgets.QStyle.SP_DirOpenIcon)
     )
-    window.browse_btn.setToolTip("Browse for folder")
     window.browse_btn.setAutoRaise(True)
     window.browse_btn.setIconSize(QtCore.QSize(16, 16))
     window.browse_btn.setFixedSize(26, 26)
@@ -82,9 +81,6 @@ def build_source_section(window, top_layout):
     window.scan_btn = QtWidgets.QToolButton()
     window.scan_btn.setIcon(
         window.app_style.standardIcon(QtWidgets.QStyle.SP_BrowserReload)
-    )
-    window.scan_btn.setToolTip(
-        "Scan input folder for AOVs and auto-configure (F5)"
     )
     window.scan_btn.setAutoRaise(True)
     window.scan_btn.setIconSize(QtCore.QSize(16, 16))
@@ -201,7 +197,6 @@ def build_destination_section(window, top_layout):
 
     window.overwrite_chk = QtWidgets.QCheckBox()
     window.overwrite_chk.setText("")
-    window.overwrite_chk.setToolTip("Overwrite existing outputs")
     window.overwrite_chk.setChecked(False)
     output_form.addRow("Replace Existing:", window.overwrite_chk)
 
@@ -210,7 +205,6 @@ def build_destination_section(window, top_layout):
     window.output_path_label.setSizePolicy(
         QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred
     )
-    window.output_path_label.setToolTip("Destination folder")
     window.output_path_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
     output_form.addRow(window.output_path_label)
 
@@ -320,8 +314,6 @@ def build_extras_section(window, top_layout):
 
     window.temporal_chk = QtWidgets.QCheckBox()
     window.temporal_chk.setText("Use Temporal Denoise")
-    window.temporal_chk.setToolTip("Requires Optix backend and motion vectors AOV")
-
     window.prefix_edit = QtWidgets.QLineEdit("den_")
     window.prefix_edit.setMaxLength(32)
     settings_form.addRow("Output Prefix:", window.prefix_edit)
@@ -447,7 +439,6 @@ def build_action_bar(window, top_layout):
     window.open_output_btn.setIcon(
         window.app_style.standardIcon(QtWidgets.QStyle.SP_DirIcon)
     )
-    window.open_output_btn.setToolTip("Open destination folder")
     window.open_output_btn.setAutoRaise(True)
     window.open_output_btn.setIconSize(QtCore.QSize(16, 16))
     window.open_output_btn.setFixedSize(26, 26)
