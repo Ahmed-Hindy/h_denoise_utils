@@ -406,7 +406,6 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.aovs_input.setToolTip(tooltips.AOVS_INPUT)
         self.aovs_input.custom_input.setToolTip(tooltips.AOVS_CUSTOM_INPUT)
         self.overwrite_chk.setToolTip(tooltips.OVERWRITE_CHK)
-        self.output_path_label.setToolTip(tooltips.OUTPUT_PATH_LABEL)
 
         self.advanced_toggle.setToolTip(tooltips.ADVANCED_TOGGLE)
         self.advanced_settings_toggle.setToolTip(tooltips.ADVANCED_SETTINGS_TOGGLE)
@@ -416,7 +415,6 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.albedo_combo.setToolTip(tooltips.ALBEDO_COMBO)
         self.normal_combo.setToolTip(tooltips.NORMAL_COMBO)
         self.motion_combo.setToolTip(tooltips.MOTION_COMBO)
-        self.temporal_chk.setToolTip(tooltips.TEMPORAL_CHK)
         self.denoiser_combo.setToolTip(tooltips.DENOISER_COMBO)
         self.custom_exe_btn.setToolTip(tooltips.CUSTOM_EXE_BTN)
         self.exrmode_combo.setToolTip(tooltips.EXRMODE_COMBO)
@@ -429,6 +427,9 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.open_output_btn.setToolTip(tooltips.OPEN_OUTPUT_BTN)
 
         self.log_filter_combo.setToolTip(tooltips.LOG_FILTER_COMBO)
+
+        self._update_temporal_state()
+        self._update_output_label()
 
     def _browse(self):
         # type: () -> None
@@ -875,7 +876,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         timestamp = QtCore.QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
         self.planes_toggle.setText("Detected AOVs ({})".format(len(planes)))
         self.planes_toggle.setToolTip(
-            "Count: {} | Last scan: {}".format(len(planes), timestamp)
+            tooltips.planes_toggle(len(planes), timestamp)
         )
         self._set_planes_preview(planes)
         has_planes = bool(planes)
@@ -968,14 +969,11 @@ class BaseWindow(QtWidgets.QMainWindow):
         if not self.output_path_label:
             return
         preview = self._output_preview_path()
-        if preview:
-            text = "Destination: {}".format(preview)
-        else:
-            text = "Destination: -"
+        text = tooltips.output_destination_label(preview)
         self.output_path_label.setText(text)
         self.output_path_label.setToolTip(text)
         if self.action_dest_label:
-            action_text = "→ {}".format(preview if preview else "-")
+            action_text = tooltips.action_destination_label(preview)
             self.action_dest_label.setText(action_text)
             self.action_dest_label.setToolTip(action_text)
         self._update_summary_strip()
@@ -1193,22 +1191,18 @@ class BaseWindow(QtWidgets.QMainWindow):
         if allow_temporal:
             self.temporal_chk.setEnabled(True)
             self.temporal_chk.setChecked(bool(desired_checked))
-            self.temporal_chk.setToolTip(
-                "Use previous frame for temporal denoising (OptiX only)"
-            )
+            self.temporal_chk.setToolTip(tooltips.TEMPORAL_CHK_ENABLED)
         else:
             self.temporal_chk.setChecked(False)
             self.temporal_chk.setEnabled(False)
             if backend != "optix":
                 self.temporal_chk.setToolTip(
-                    "Temporal denoising not supported by {}".format(
+                    tooltips.temporal_backend_unsupported(
                         self.backend_combo.currentText()
                     )
                 )
             else:
-                self.temporal_chk.setToolTip(
-                    "Requires motion vectors AOV to enable temporal denoising"
-                )
+                self.temporal_chk.setToolTip(tooltips.TEMPORAL_CHK_NO_MOTION)
 
         self._update_summary_strip()
         return allow_temporal
@@ -1260,7 +1254,7 @@ class BaseWindow(QtWidgets.QMainWindow):
             options_style = self.options_edit.style()
             options_style.unpolish(self.options_edit)
             options_style.polish(self.options_edit)
-            self.options_edit.setToolTip("")
+            self.options_edit.setToolTip(tooltips.OPTIONS_EDIT)
             return True
         try:
             json.loads(text)
@@ -1269,7 +1263,7 @@ class BaseWindow(QtWidgets.QMainWindow):
             options_style = self.options_edit.style()
             options_style.unpolish(self.options_edit)
             options_style.polish(self.options_edit)
-            self.options_edit.setToolTip("Invalid JSON: {}".format(exc))
+            self.options_edit.setToolTip(tooltips.options_invalid_json(exc))
             if show_message:
                 QtWidgets.QMessageBox.warning(
                     self,
@@ -1281,7 +1275,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         options_style = self.options_edit.style()
         options_style.unpolish(self.options_edit)
         options_style.polish(self.options_edit)
-        self.options_edit.setToolTip("")
+        self.options_edit.setToolTip(tooltips.OPTIONS_EDIT)
         return True
 
     # --- Denoise workflow ---
