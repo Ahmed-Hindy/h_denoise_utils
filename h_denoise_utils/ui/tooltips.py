@@ -29,13 +29,13 @@ ADVANCED_TOGGLE = "Show or hide denoise settings"
 ADVANCED_SETTINGS_TOGGLE = "Show or hide idenoise and EXR options"
 BACKEND_COMBO = "Oidn = CPU, Optix = GPU (NVIDIA)"
 THREAD_SPIN = "CPU threads passed to idenoise (-t)"
-PREFIX_EDIT = "Prefix added to denoised output filenames"
+PREFIX_EDIT = "Prefix added to output filenames"
 ALBEDO_COMBO = (
-    "Albedo AOV name for idenoise (-a); improves quality when present"
+    "Albedo AOV name; improves quality when present"
 )
-NORMAL_COMBO = "Normal AOV name for idenoise (-n)"
+NORMAL_COMBO = "Normal AOV name; improves quality when present"
 MOTION_COMBO = (
-    "Motion vectors AOV name for idenoise (-m); required for temporal"
+    "Motion vectors AOV; required for temporal denoising"
 )
 TEMPORAL_CHK = "Requires Optix backend and motion vectors AOV"
 DENOISER_COMBO = "Houdini idenoise executable to run"
@@ -49,9 +49,9 @@ OPTIONS_EDIT = (
 EXTRA_AOVS_EDIT = "Reference AOVs included but not denoised"
 
 # Action bar
-CONTROL_BTN_START = "Start batch denoising"
+CONTROL_BTN_START = "Start denoising"
 CONTROL_BTN_STOP = "Stop the running denoise"
-PROGRESS = "Overall batch progress"
+PROGRESS = "Overall progress"
 PROGRESS_LABEL = "Current file index and estimated time remaining"
 OPEN_OUTPUT_BTN = "Open destination folder"
 
