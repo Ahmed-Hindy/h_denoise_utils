@@ -11,7 +11,7 @@ Primary repo:
 - Repository: `Ahmed-Hindy/h_denoise_utils`
 - Experiment worktree: `C:\Users\Ahmed Hindy\.codex\worktrees\7de0\h_denoise_utils`
 - Branch: `ci/optix-multilayer-aov-experiment`
-- Current workflow pin while this note is being updated: fork commit `6bcdb70cbb5db436d51d8ca904276d52a889f403`
+- Current workflow pin while this note is being updated: fork commit `d6e0096a1c358e942189a7401436201154dcf8d3`
 - Main user workspace remains separate at `G:\Projects\Dev\Github\h_denoise_utils`, usually on `feat/ui-denoising-lock`.
 
 Forked denoiser repo:
@@ -19,7 +19,7 @@ Forked denoiser repo:
 - Repository: `Ahmed-Hindy/NvidiaAIDenoiser`
 - Local clone: `G:\Projects\Dev\Github\NvidiaAIDenoiser`
 - Branch: `hdu/multilayer-exr-output`
-- Latest fork commit at this handoff: `6bcdb70 Preserve multipart color space metadata`
+- Latest fork commit at this handoff: `d6e0096 Preserve multipart EXR headers`
 - Upstream base: `DeclanRussell/NvidiaAIDenoiser` tag `3.0`, original pinned commit `4910227d0a0d60dc93c6529bae7cf6e2744f97fd`
 - OptiX SDK submodule pinned in CI to commit `fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd`
 
@@ -37,9 +37,11 @@ In `h_denoise_utils`:
 In `NvidiaAIDenoiser`:
 
 - `src/main.cpp`
-  Main C++ denoiser. The fork has fixes for multi-AOV copyback and first-pass direct multipart EXR support.
+  Main C++ denoiser. The fork has fixes for multi-AOV copyback and direct multipart EXR support. The current multipart writer copies source OpenEXR part headers and writes pixels through OpenEXR's native multipart API to preserve source metadata.
 - `conanfile.txt`
   Uses `openimageio/[>=2.4 <4]`, static by default.
+- `CMakeLists.txt`
+  Links OpenImageIO for inspection/pixel loading and OpenEXR for metadata-preserving multipart output.
 
 ## Python Prototype Results
 
@@ -109,6 +111,9 @@ Successful runs:
 - Run `25969194038`
   Built fork commit `cdd8e82fa01cb2196905392519f1b7d73c1aa217`.
   Artifact source advances multipart output subimages with `AppendSubimage`.
+- Run `25973654566`
+  Built fork commit `6bcdb70cbb5db436d51d8ca904276d52a889f403`.
+  Artifact source attempted explicit `oiio:ColorSpace` restoration through OIIO specs; build succeeded, but validation showed OpenEXR headers still omitted the actual `oiio:ColorSpace` attribute.
 
 Failed run:
 
@@ -251,7 +256,23 @@ Commit `6bcdb70 Preserve multipart color space metadata`:
 - Captures each source subimage's `oiio:ColorSpace` during multipart layout inspection.
 - Reapplies that colorspace to the output `ImageSpec` before the initial multi-subimage `open(...)`.
 - Uses the same metadata-preserved spec when advancing later parts with `AppendSubimage`.
-- Workflow pin has been advanced to this fork commit; CI/artifact validation should confirm whether the written EXR now preserves `oiio:ColorSpace`.
+- Built successfully in h_denoise_utils Actions run `25973654566`.
+- Local artifact path:
+  `%TEMP%\hdu-optix-multipart-artifact-25973654566\Denoiser.exe`
+- Direct multipart command exited `0` and wrote:
+  `%TEMP%\hdu-cpp-multipart-20260517-004727\cpp_multipart_optix.exr`
+- Validation showed this approach was insufficient: the actual OpenEXR headers still omitted `oiio:ColorSpace`, and OIIO continued to report `Linear` for all parts.
+- User clarified on 2026-05-17: all source metadata should be preserved, not just colorspace.
+
+Commit `d6e0096 Preserve multipart EXR headers`:
+
+- Replaces final OIIO multipart serialization with OpenEXR-native multipart output.
+- Opens the source with `MultiPartInputFile` and copies each source part's `Header` directly into the output header list.
+- Writes each denoised or unchanged part with `OutputPart`, `FrameBuffer`, and native channel packing.
+- Uses OIIO only for source inspection and float pixel loading, not for final header serialization.
+- This should preserve arbitrary source part attributes, including `oiio:ColorSpace`, renderer metadata, dates, custom strings, compression, data/display windows, channel lists, and other OpenEXR header attributes.
+- Current implementation supports scanline multipart EXRs with non-subsampled channels, which matches the Canyon Run sample.
+- Workflow pin has been advanced to this fork commit; CI/artifact validation should confirm source-to-built metadata parity.
 
 ## Useful Test Commands
 
@@ -301,8 +322,8 @@ Diff a subimage:
 
 ## Next Steps
 
-1. Build and validate fork commit `6bcdb70cbb5db436d51d8ca904276d52a889f403` through the `h_denoise_utils` GitHub Actions workflow.
-2. Confirm source-to-built metadata no longer differs on `oiio:ColorSpace`; expected remaining Houdini-to-built metadata differences are Houdini's `DateTime` and `date` changes only.
+1. Build and validate fork commit `d6e0096a1c358e942189a7401436201154dcf8d3` through the `h_denoise_utils` GitHub Actions workflow.
+2. Confirm source-to-built metadata parity across all source header attributes, not just `oiio:ColorSpace`.
 3. Wire `tools/optix_multilayer_aov.py` or the app integration to prefer direct C++ `-multipart` mode when a compatible compiled `Denoiser.exe` is available.
 4. Keep the Python OIIO/hoiiotool prototype path as a fallback until the C++ mode is exercised on more production EXRs.
 5. Broaden validation beyond the Canyon Run sample:
@@ -318,5 +339,5 @@ Diff a subimage:
 - The Python OIIO prototype proves the data path and metadata preservation approach.
 - The C++ denoiser copyback bug was real and is fixed; one-call multi-AOV now matches Houdini.
 - Direct C++ multipart output is now validated on the Canyon Run sample.
-- Metadata preservation is now being tightened so the direct C++ path matches the source EXR's explicit colorspace metadata instead of relying on reader defaults.
+- Metadata preservation now targets source OpenEXR headers wholesale; OIIO spec rewriting was not enough because it still failed to serialize `oiio:ColorSpace`.
 - Best production direction is still C++ OIIO inside the denoiser, because it removes Python, Houdini, `hoiiotool`, and temp EXR extraction/recomposition from the hot path.
