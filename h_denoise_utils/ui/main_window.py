@@ -123,6 +123,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         self._control_shortcut_enter = None  # type: Optional[object]
         self._scan_shortcut_f5 = None  # type: Optional[object]
         self.main_splitter = None  # type: Optional[QtWidgets.QSplitter]
+        self._pre_run_enabled = {}  # type: dict
 
         self.houdini_versions = detect_houdini_versions()
         self._setup_menus()
@@ -328,6 +329,50 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.preset_combo.setCurrentText("Beauty")
         self._apply_preset("Beauty")
         self._update_output_label()
+
+    def _lockable_widgets(self):
+        # type: () -> List[QtWidgets.QWidget]
+        """Return the ordered list of interactive widgets to lock during a run."""
+        widgets = [
+            self.path_edit,
+            self.browse_btn,
+            self.scan_btn,
+            self.files_remove_btn,
+            self.files_clear_btn,
+            self.preset_combo,
+            self.aovs_input,
+            self.overwrite_chk,
+            self.output_toggle,
+            self.advanced_toggle,
+            self.advanced_settings_toggle,
+            self.prefix_edit,
+            self.albedo_combo,
+            self.normal_combo,
+            self.motion_combo,
+            self.temporal_chk,
+            self.backend_combo,
+            self.thread_spin,
+            self.denoiser_combo,
+            self.custom_exe_btn,
+            self.exrmode_combo,
+            self.options_edit,
+            self.extra_aovs_edit,
+            self.log_filter_combo,
+        ]
+        return [w for w in widgets if w is not None]
+
+    def _apply_ui_lock(self, locked):
+        # type: (bool) -> None
+        if locked:
+            self._pre_run_enabled = {
+                w: w.isEnabled() for w in self._lockable_widgets()
+            }
+            for w in self._lockable_widgets():
+                w.setEnabled(False)
+        else:
+            for w, was_enabled in (self._pre_run_enabled or {}).items():
+                w.setEnabled(was_enabled)
+            self._pre_run_enabled = {}
 
     # --- Signal wiring ---
     def _connect_signals(self):
@@ -1356,6 +1401,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         self._run_start = time.time()
         self.progress_label.setText("File 0 of 0 | ETA --:--")
 
+        self._apply_ui_lock(True)
         self.worker.start()
 
     def _stop_denoise(self):
@@ -1375,6 +1421,7 @@ class BaseWindow(QtWidgets.QMainWindow):
     def _on_finished(self, summary):
         # type: (dict) -> None
         self._ui_state.is_running = False
+        self._apply_ui_lock(False)
         self.control_btn.setText("Denoise")
         self.control_btn.setIcon(self.play_icon)
         self.control_btn.setObjectName("primaryBtn")

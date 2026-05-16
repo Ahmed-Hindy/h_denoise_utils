@@ -42,3 +42,8 @@ markers = [
     "integration: Integration tests",
     "slow: Slow-running tests",
 ]
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.79.4",
+]
