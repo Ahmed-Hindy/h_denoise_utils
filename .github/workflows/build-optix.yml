@@ -21,11 +21,13 @@ jobs:
       OPTIX_SOURCE_REPO: https://github.com/DeclanRussell/NvidiaAIDenoiser.git
       OPTIX_SOURCE_TAG: "3.0"
       OPTIX_SOURCE_COMMIT: 4910227d0a0d60dc93c6529bae7cf6e2744f97fd
+      OPTIX_DEV_TAG: v9.0.0
+      OPTIX_DEV_COMMIT: fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd
       CUDA_VERSION: "12.9.0"
       SRC_DIR: ${{ github.workspace }}\_optix-src
       INSTALL_DIR: ${{ github.workspace }}\_optix-install
       LOG_DIR: ${{ github.workspace }}\optix-build-logs
-      PACKAGE_DIR: ${{ github.workspace }}\optix-denoiser-windows-x64
+      PACKAGE_DIR: ${{ github.workspace }}\optix-denoiser-windows-x64-optix-9-0
 
     steps:
       - name: Checkout this repository
@@ -51,6 +53,30 @@ jobs:
             if ($actualCommit -ne $env:OPTIX_SOURCE_COMMIT) {
               throw "Expected $env:OPTIX_SOURCE_COMMIT but checked out $actualCommit"
             }
+
+            Push-Location "contrib\optix"
+            try {
+              git fetch --tags origin 2>&1 |
+                Tee-Object -FilePath (Join-Path $env:LOG_DIR "git-optix-fetch.log")
+              if ($LASTEXITCODE -ne 0) {
+                throw "git optix fetch failed with exit code $LASTEXITCODE"
+              }
+
+              git checkout $env:OPTIX_DEV_COMMIT 2>&1 |
+                Tee-Object -FilePath (Join-Path $env:LOG_DIR "git-optix-checkout.log")
+              if ($LASTEXITCODE -ne 0) {
+                throw "git optix checkout failed with exit code $LASTEXITCODE"
+              }
+
+              $actualOptixCommit = (git rev-parse HEAD).Trim()
+              if ($actualOptixCommit -ne $env:OPTIX_DEV_COMMIT) {
+                throw "Expected OptiX $env:OPTIX_DEV_COMMIT but checked out $actualOptixCommit"
+              }
+            }
+            finally {
+              Pop-Location
+            }
+
             git submodule status --recursive 2>&1 |
               Tee-Object -FilePath (Join-Path $env:LOG_DIR "git-submodules.log")
             if ($LASTEXITCODE -ne 0) {
@@ -86,8 +112,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~\.conan2
-          key: ${{ runner.os }}-conan-optix-${{ env.OPTIX_SOURCE_COMMIT }}-${{ hashFiles('.github/workflows/build-optix.yml') }}
+          key: ${{ runner.os }}-conan-optix-${{ env.OPTIX_SOURCE_COMMIT }}-${{ env.OPTIX_DEV_COMMIT }}-${{ hashFiles('.github/workflows/build-optix.yml') }}
           restore-keys: |
+            ${{ runner.os }}-conan-optix-${{ env.OPTIX_SOURCE_COMMIT }}-${{ env.OPTIX_DEV_COMMIT }}-
             ${{ runner.os }}-conan-optix-${{ env.OPTIX_SOURCE_COMMIT }}-
             ${{ runner.os }}-conan-optix-
 
@@ -184,6 +211,8 @@ jobs:
             source_repository = $env:OPTIX_SOURCE_REPO
             source_tag = $env:OPTIX_SOURCE_TAG
             source_commit = $env:OPTIX_SOURCE_COMMIT
+            optix_dev_tag = $env:OPTIX_DEV_TAG
+            optix_dev_commit = $env:OPTIX_DEV_COMMIT
             cuda_version = $env:CUDA_VERSION
             runner_os = $env:RUNNER_OS
             runner_arch = $env:RUNNER_ARCH
@@ -220,7 +249,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: optix-denoiser-windows-x64
-          path: optix-denoiser-windows-x64
+          path: optix-denoiser-windows-x64-optix-9-0
           if-no-files-found: error
 
       - name: Upload build diagnostics
