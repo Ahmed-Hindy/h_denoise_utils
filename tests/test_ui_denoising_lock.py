@@ -8,12 +8,16 @@ Covers:
   - A widget disabled before the run remains disabled after unlock.
   - Calling _apply_ui_lock(False) with no prior lock is a no-op.
   - Ctrl+Enter shortcut calls _stop_denoise when is_running=True.
+  - Scan and temporal callbacks cannot re-enable locked widgets mid-run.
+  - F5 scan shortcut is ignored while is_running=True.
+  - Drag-and-drop input changes are ignored while is_running=True.
 
 Requirements: 1.1, 1.2, 2.1, 2.2, 3.3, 4.1, 5.1, 5.2
 """
 
 import pytest
 from h_denoise_utils.ui.main_window import BaseWindow
+from h_denoise_utils.ui.qt_compat import QtCore
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +157,102 @@ def test_ctrl_enter_calls_stop_denoise_when_running(window, monkeypatch):
     assert len(stop_calls) == 1, (
         "Expected _stop_denoise to be called once via Ctrl+Enter when is_running=True"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 7 - Scan completion cannot unlock scan_btn while running
+# Requirements: 1.1, 3.1, 3.2
+# ---------------------------------------------------------------------------
+
+
+def test_scan_busy_callback_keeps_scan_button_disabled_while_running(window):
+    """A scan state callback must not re-enable scan_btn during an active run."""
+    window._ui_state.is_running = True
+    window._apply_ui_lock(True)
+
+    window._set_scan_busy(False)
+
+    assert not window.scan_btn.isEnabled(), (
+        "scan_btn must remain disabled while is_running=True"
+    )
+
+    window._ui_state.is_running = False
+    window._apply_ui_lock(False)
+    assert window.scan_btn.isEnabled(), "scan_btn must restore after unlock"
+
+
+# ---------------------------------------------------------------------------
+# Test 8 - Temporal callback cannot unlock temporal_chk while running
+# Requirements: 1.1, 3.1, 3.2
+# ---------------------------------------------------------------------------
+
+
+def test_temporal_callback_keeps_checkbox_disabled_while_running(
+    window, monkeypatch
+):
+    """Temporal state refreshes must not re-enable temporal_chk during a run."""
+    monkeypatch.setattr(window, "_motion_vectors_available", lambda: True)
+    window.backend_combo.setCurrentText("Optix")
+    window._update_temporal_state(desired_checked=True)
+    assert window.temporal_chk.isEnabled(), "temporal_chk must start enabled"
+
+    window._ui_state.is_running = True
+    window._apply_ui_lock(True)
+
+    assert window._update_temporal_state(desired_checked=True)
+    assert not window.temporal_chk.isEnabled(), (
+        "temporal_chk must remain disabled while is_running=True"
+    )
+
+    window._ui_state.is_running = False
+    window._apply_ui_lock(False)
+    assert window.temporal_chk.isEnabled(), "temporal_chk must restore after unlock"
+
+
+# ---------------------------------------------------------------------------
+# Test 9 - F5 scan shortcut is ignored while running
+# Requirements: 1.1, 3.1, 4.1
+# ---------------------------------------------------------------------------
+
+
+def test_f5_scan_shortcut_is_ignored_while_running(window, monkeypatch):
+    """The scan shortcut must not start analysis while a denoise run is active."""
+    analyze_calls = []
+
+    def fake_analyze_input(force=False):
+        analyze_calls.append(force)
+
+    monkeypatch.setattr(window, "_analyze_input", fake_analyze_input)
+    window._ui_state.is_running = True
+
+    assert window._scan_shortcut_f5 is not None, "_scan_shortcut_f5 must be set up"
+    window._scan_shortcut_f5.activated.emit()
+
+    assert analyze_calls == [], "F5 scan shortcut must be ignored during a run"
+
+
+# ---------------------------------------------------------------------------
+# Test 10 - Drag-and-drop input changes are ignored while running
+# Requirements: 1.1, 3.1
+# ---------------------------------------------------------------------------
+
+
+def test_drop_input_is_ignored_while_running(window, tmp_path, monkeypatch):
+    """Window-level drops must not change the active input while locked."""
+    dropped_file = tmp_path / "beauty.exr"
+    dropped_file.write_text("placeholder")
+    set_path_calls = []
+
+    def fake_set_path_text(path, analyze=False, clear_selected=False):
+        set_path_calls.append((path, analyze, clear_selected))
+
+    monkeypatch.setattr(window, "_set_path_text", fake_set_path_text)
+    window._ui_state.is_running = True
+
+    window._set_path_from_drop([QtCore.QUrl.fromLocalFile(str(dropped_file))])
+
+    assert set_path_calls == [], "drop must not update path while is_running=True"
+    assert window._input_state.selected_files == []
 
 
 # ---------------------------------------------------------------------------
