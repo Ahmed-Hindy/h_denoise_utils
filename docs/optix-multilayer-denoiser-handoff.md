@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-16
 
-This is a handoff note for future agents continuing the Houdini-free OptiX denoiser experiment. The short version: the Python prototype can now produce correct multilayer EXR output with in-process OpenImageIO, and the forked C++ denoiser is moving toward direct multipart EXR support.
+This is a handoff note for future agents continuing the Houdini-free OptiX denoiser experiment. The short version: the Python prototype can produce correct multilayer EXR output with in-process OpenImageIO, and the forked C++ denoiser now has a validated direct multipart EXR path for the Canyon Run sample.
 
 ## Repositories And Branches
 
@@ -106,6 +106,9 @@ Successful runs:
 - Run `25969000605`
   Built fork commit `861fa7a5105d3ed846c9e849274ec81d71feb29b`.
   Compile succeeded after replacing the failing `ImageInput::read_image` call with `ImageBuf::get_pixels`.
+- Run `25969194038`
+  Built fork commit `cdd8e82fa01cb2196905392519f1b7d73c1aa217`.
+  Artifact source advances multipart output subimages with `AppendSubimage`.
 
 Failed run:
 
@@ -116,10 +119,11 @@ Failed run:
   `main.cpp(381,25): error C2661: 'OpenImageIO::v3_1::ImageInput::read_image': no overloaded function takes 2 arguments`
   The CI OpenImageIO version exposes span-based `ImageInput::read_image` overloads, not the older two-argument `(TypeDesc, pointer)` overload.
 
-Current pending build target:
+Validated build target:
 
 - Fork commit `cdd8e82fa01cb2196905392519f1b7d73c1aa217`
   Keeps the multi-subimage upfront `open(out_path, count, specs)` call, then follows OIIO's documented pattern by reopening with `AppendSubimage` before writing each subimage after the first.
+  Built in run `25969194038` and passed the Canyon Run multipart validation.
 
 ## C++ Fork Changes
 
@@ -210,7 +214,25 @@ Commit `cdd8e82 Advance multipart output subimages`:
 
 - Adds `AppendSubimage` advancement inside `writeMultipartOutput` for subimages after the first.
 - This follows OIIO's documented multi-subimage writing pattern: declare all specs up front, write subimage 0, then call `open(out_path, spec, AppendSubimage)` before writing later subimages.
-- Needs CI artifact validation after the workflow pin is pushed.
+- Built successfully in h_denoise_utils Actions run `25969194038`.
+- Local artifact path:
+  `%TEMP%\hdu-optix-multipart-artifact-25969194038\Denoiser.exe`
+- Direct multipart validation command exited `0`.
+- Output path:
+  `%TEMP%\hdu-cpp-multipart-20260516-211541\cpp_multipart_optix.exr`
+- Output inspection reported `22` subimages.
+- Validation summary:
+  `%TEMP%\hdu-cpp-multipart-20260516-211541\summary.validation.json`
+- Diffs that passed:
+  - `C` subimage `0` against Houdini OptiX output
+  - `directdiffuse` subimage `6` against Houdini OptiX output
+  - `indirectdiffuse` subimage `15` against Houdini OptiX output
+  - `depth` subimage `5` against the original source
+  - `P` subimage `21` against the original source
+- Runtime log showed:
+  - `Denoising complete in 0.016 seconds`
+  - `Written out: ...\cpp_multipart_optix.exr`
+  - `Done!`
 
 ## Useful Test Commands
 
@@ -260,21 +282,19 @@ Diff a subimage:
 
 ## Next Steps
 
-1. Push the workflow pin for fork commit `cdd8e82fa01cb2196905392519f1b7d73c1aa217` if it is not already pushed.
-2. Wait for the new Actions build in `Ahmed-Hindy/h_denoise_utils`.
-3. Download artifact `optix-denoiser-windows-x64`.
-4. Run direct C++ `-multipart` test against the Canyon Run source EXR.
-5. Validate:
-   - process exit code is `0`
-   - output has `22` subimages
-   - `C`, `directdiffuse`, `indirectdiffuse` match Houdini output
-   - unchanged planes like `depth` and `P` match source
-6. If the build still fails, inspect `cmake-build.log` first. If runtime still fails, inspect the multipart writer before changing OptiX denoising logic; the latest issues have been EXR/OIIO copy/write problems, not denoising math.
-7. Once direct multipart C++ validates, update `tools/optix_multilayer_aov.py` or app integration to prefer the new C++ mode for the compiled OptiX path.
+1. Wire `tools/optix_multilayer_aov.py` or the app integration to prefer direct C++ `-multipart` mode when a compatible compiled `Denoiser.exe` is available.
+2. Keep the Python OIIO/hoiiotool prototype path as a fallback until the C++ mode is exercised on more production EXRs.
+3. Broaden validation beyond the Canyon Run sample:
+   - different AOV name sets
+   - missing guide planes
+   - non-`C` beauty names
+   - EXRs with unusual data windows or channel formats
+4. Profile end-to-end runtime for the direct C++ path against the current Python OIIO prototype and Houdini `idenoise` baseline.
+5. If future runtime failures appear, inspect multipart EXR writing first; the denoising output matched Houdini once the writer produced valid parts.
 
 ## Current Strategic Read
 
 - The Python OIIO prototype proves the data path and metadata preservation approach.
 - The C++ denoiser copyback bug was real and is fixed; one-call multi-AOV now matches Houdini.
-- Direct C++ multipart output is close, but writer correctness is still being validated.
+- Direct C++ multipart output is now validated on the Canyon Run sample.
 - Best production direction is still C++ OIIO inside the denoiser, because it removes Python, Houdini, `hoiiotool`, and temp EXR extraction/recomposition from the hot path.
