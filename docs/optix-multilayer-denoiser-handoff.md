@@ -11,7 +11,7 @@ Primary repo:
 - Repository: `Ahmed-Hindy/h_denoise_utils`
 - Experiment worktree: `C:\Users\Ahmed Hindy\.codex\worktrees\7de0\h_denoise_utils`
 - Branch: `ci/optix-multilayer-aov-experiment`
-- Current workflow pin while this note is being updated: fork commit `861fa7a5105d3ed846c9e849274ec81d71feb29b`
+- Current workflow pin while this note is being updated: fork commit `cdd8e82fa01cb2196905392519f1b7d73c1aa217`
 - Main user workspace remains separate at `G:\Projects\Dev\Github\h_denoise_utils`, usually on `feat/ui-denoising-lock`.
 
 Forked denoiser repo:
@@ -19,7 +19,7 @@ Forked denoiser repo:
 - Repository: `Ahmed-Hindy/NvidiaAIDenoiser`
 - Local clone: `G:\Projects\Dev\Github\NvidiaAIDenoiser`
 - Branch: `hdu/multilayer-exr-output`
-- Latest fork commit at this handoff: `861fa7a Fix multipart unchanged-plane reads`
+- Latest fork commit at this handoff: `cdd8e82 Advance multipart output subimages`
 - Upstream base: `DeclanRussell/NvidiaAIDenoiser` tag `3.0`, original pinned commit `4910227d0a0d60dc93c6529bae7cf6e2744f97fd`
 - OptiX SDK submodule pinned in CI to commit `fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd`
 
@@ -103,6 +103,9 @@ Successful runs:
 - Run `25968596239`
   Built fork commit `b9baf17374583689f03400b510e2cdc419c0b914`.
   Artifact source opened the multipart output with all subimage specs up front.
+- Run `25969000605`
+  Built fork commit `861fa7a5105d3ed846c9e849274ec81d71feb29b`.
+  Compile succeeded after replacing the failing `ImageInput::read_image` call with `ImageBuf::get_pixels`.
 
 Failed run:
 
@@ -115,8 +118,8 @@ Failed run:
 
 Current pending build target:
 
-- Fork commit `861fa7a5105d3ed846c9e849274ec81d71feb29b`
-  Replaces the failing unchanged-plane `ImageInput::read_image` call with `OIIO::ImageBuf::get_pixels`, matching the API style already used for beauty, guide, and AOV inputs in `src/main.cpp`.
+- Fork commit `cdd8e82fa01cb2196905392519f1b7d73c1aa217`
+  Keeps the multi-subimage upfront `open(out_path, count, specs)` call, then follows OIIO's documented pattern by reopening with `AppendSubimage` before writing each subimage after the first.
 
 ## C++ Fork Changes
 
@@ -197,7 +200,17 @@ Commit `861fa7a Fix multipart unchanged-plane reads`:
   - `source_plane.init_spec(...)`
   - `source_plane.get_pixels(roi, OIIO::TypeDesc::FLOAT, pixels.data())`
 - This avoids the uncertain `ImageInput` overload and uses the same `ImageBuf::get_pixels` API that already compiled elsewhere in this file.
-- The `h_denoise_utils` workflow is being advanced to pin this commit.
+- The `h_denoise_utils` workflow pinned and built this commit in run `25969000605`.
+- Runtime still failed after denoising with exit code `-1073741819`.
+- The output file advertised `22` subimages, but diff/extraction showed corrupt pixel data. OpenEXR reported invalid chunk leaders such as:
+  `Invalid part number reconstructing chunk table: expect 1, found 0`
+- That means all writes were still landing in part `0`; the writer had declared all subimages, but was not advancing the active output part before each `write_image`.
+
+Commit `cdd8e82 Advance multipart output subimages`:
+
+- Adds `AppendSubimage` advancement inside `writeMultipartOutput` for subimages after the first.
+- This follows OIIO's documented multi-subimage writing pattern: declare all specs up front, write subimage 0, then call `open(out_path, spec, AppendSubimage)` before writing later subimages.
+- Needs CI artifact validation after the workflow pin is pushed.
 
 ## Useful Test Commands
 
@@ -247,7 +260,7 @@ Diff a subimage:
 
 ## Next Steps
 
-1. Push the workflow pin for fork commit `861fa7a5105d3ed846c9e849274ec81d71feb29b` if it is not already pushed.
+1. Push the workflow pin for fork commit `cdd8e82fa01cb2196905392519f1b7d73c1aa217` if it is not already pushed.
 2. Wait for the new Actions build in `Ahmed-Hindy/h_denoise_utils`.
 3. Download artifact `optix-denoiser-windows-x64`.
 4. Run direct C++ `-multipart` test against the Canyon Run source EXR.
