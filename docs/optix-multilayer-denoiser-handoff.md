@@ -11,7 +11,7 @@ Primary repo:
 - Repository: `Ahmed-Hindy/h_denoise_utils`
 - Experiment worktree: `C:\Users\Ahmed Hindy\.codex\worktrees\7de0\h_denoise_utils`
 - Branch: `ci/optix-multilayer-aov-experiment`
-- Current workflow pin while this note is being updated: fork commit `d6e0096a1c358e942189a7401436201154dcf8d3`
+- Current workflow pin while this note is being updated: fork commit `37bead3ade03bb03f6bf5005eb3461a638d07a5a`
 - Main user workspace remains separate at `G:\Projects\Dev\Github\h_denoise_utils`, usually on `feat/ui-denoising-lock`.
 
 Forked denoiser repo:
@@ -19,7 +19,7 @@ Forked denoiser repo:
 - Repository: `Ahmed-Hindy/NvidiaAIDenoiser`
 - Local clone: `G:\Projects\Dev\Github\NvidiaAIDenoiser`
 - Branch: `hdu/multilayer-exr-output`
-- Latest fork commit at this handoff: `d6e0096 Preserve multipart EXR headers`
+- Latest fork commit at this handoff: `37bead3 Use Conan OpenEXR include layout`
 - Upstream base: `DeclanRussell/NvidiaAIDenoiser` tag `3.0`, original pinned commit `4910227d0a0d60dc93c6529bae7cf6e2744f97fd`
 - OptiX SDK submodule pinned in CI to commit `fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd`
 
@@ -123,6 +123,10 @@ Failed run:
   The build error was:
   `main.cpp(381,25): error C2661: 'OpenImageIO::v3_1::ImageInput::read_image': no overloaded function takes 2 arguments`
   The CI OpenImageIO version exposes span-based `ImageInput::read_image` overloads, not the older two-argument `(TypeDesc, pointer)` overload.
+- Run `25973969574`
+  Builds fork commit `d6e0096a1c358e942189a7401436201154dcf8d3`.
+  Configure succeeded, which confirmed the CMake OpenEXR target was available, but compile failed because Conan exposed OpenEXR headers through the `include/OpenEXR` include directory and the code used `#include <OpenEXR/ImfChannelList.h>`.
+  The follow-up fork commit `37bead3` switches to no-prefix OpenEXR includes such as `#include <ImfChannelList.h>` and links `Imath::Imath` explicitly for `half`.
 
 Validated build target:
 
@@ -272,6 +276,12 @@ Commit `d6e0096 Preserve multipart EXR headers`:
 - Uses OIIO only for source inspection and float pixel loading, not for final header serialization.
 - This should preserve arbitrary source part attributes, including `oiio:ColorSpace`, renderer metadata, dates, custom strings, compression, data/display windows, channel lists, and other OpenEXR header attributes.
 - Current implementation supports scanline multipart EXRs with non-subsampled channels, which matches the Canyon Run sample.
+- CI run `25973969574` failed at compile because of OpenEXR include layout, not because of the writer logic.
+
+Commit `37bead3 Use Conan OpenEXR include layout`:
+
+- Switches OpenEXR includes from `OpenEXR/Imf*.h` to `Imf*.h` to match the Conan package include directories used in CI.
+- Adds an explicit `find_package(Imath CONFIG REQUIRED)` and links `Imath::Imath` for `half.h`.
 - Workflow pin has been advanced to this fork commit; CI/artifact validation should confirm source-to-built metadata parity.
 
 ## Useful Test Commands
@@ -322,7 +332,7 @@ Diff a subimage:
 
 ## Next Steps
 
-1. Build and validate fork commit `d6e0096a1c358e942189a7401436201154dcf8d3` through the `h_denoise_utils` GitHub Actions workflow.
+1. Build and validate fork commit `37bead3ade03bb03f6bf5005eb3461a638d07a5a` through the `h_denoise_utils` GitHub Actions workflow.
 2. Confirm source-to-built metadata parity across all source header attributes, not just `oiio:ColorSpace`.
 3. Wire `tools/optix_multilayer_aov.py` or the app integration to prefer direct C++ `-multipart` mode when a compatible compiled `Denoiser.exe` is available.
 4. Keep the Python OIIO/hoiiotool prototype path as a fallback until the C++ mode is exercised on more production EXRs.
