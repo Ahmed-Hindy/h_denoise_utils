@@ -1,6 +1,6 @@
 # h_denoise_utils
 
-A Python GUI and scripting library for denoising EXR sequences using Houdini's `idenoise` — supports both Intel OIDN (CPU) and NVIDIA OptiX (GPU).
+A Python GUI and scripting library for denoising multipart EXR sequences using a bundled NVIDIA OptiX denoiser.
 
 [![CI](https://github.com/Ahmed-Hindy/h_denoise_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Ahmed-Hindy/h_denoise_utils/actions)
 [![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
@@ -14,15 +14,15 @@ A Python GUI and scripting library for denoising EXR sequences using Houdini's `
 
 - Batch denoise EXR image sequences (single files or whole folders)
 - Auto-detect AOVs from EXR files and pick sensible defaults
-- Run inside Houdini or completely standalone — Qt binding is auto-detected
+- Run without Houdini — Qt binding is auto-detected
 - Full GUI with dark theme, or use the scripting API headlessly
-- Temporal denoising support (OptiX + motion vectors)
+- Preserve source OpenEXR metadata while denoising selected multipart AOVs
 
 ---
 
 ## Setup
 
-Requires [uv](https://docs.astral.sh/uv/) and a Houdini installation (for `idenoise`).
+Requires [uv](https://docs.astral.sh/uv/) for development. The Windows OptiX package bundles the denoiser executable.
 
 ```bash
 git clone https://github.com/Ahmed-Hindy/h_denoise_utils.git
@@ -43,12 +43,6 @@ uv run h-denoise
 python -m h_denoise_utils
 ```
 
-**From inside Houdini:**
-```python
-import h_denoise_utils
-h_denoise_utils.show_ui()  # uses Houdini's bundled PySide2 automatically
-```
-
 **Scripting:**
 ```python
 from h_denoise_utils.core.denoiser import Denoiser
@@ -56,8 +50,8 @@ from h_denoise_utils.core.config import DenoiseConfig, AOVConfig
 
 denoiser = Denoiser(
     input_path="/path/to/renders",
-    denoise_config=DenoiseConfig(backend="optix", temporal=True, prefix="den_"),
-    aov_config=AOVConfig(normal_plane="N", albedo_plane="albedo"),
+    denoise_config=DenoiseConfig(backend="optix", prefix="den_"),
+    aov_config=AOVConfig(beauty_plane="C", normal_plane="N", albedo_plane="albedo"),
 )
 
 prep = denoiser.prepare()
@@ -84,7 +78,7 @@ if prep["status"] == "ready":
 ```
 h_denoise_utils/
 ├── core/          # DenoiseConfig, AOVConfig, command builder, batch denoiser
-├── discovery/     # Houdini install detection, EXR plane inspection, AOV validation
+├── discovery/     # Bundled denoiser lookup, EXR plane inspection, AOV validation
 ├── utils/         # File scanning, output path helpers, subprocess wrappers
 ├── ui/            # Qt GUI (main window, sections, custom widgets, dark stylesheet)
 └── logger.py      # Standalone logging setup (console + rotating file)
@@ -104,7 +98,7 @@ uv run pytest
 ## Requirements
 
 - Python 3.7+
-- Houdini (any version with `idenoise` in its `bin/`)
+- Bundled OptiX Windows package, or `HDU_DENOISER_EXE` pointing at `Denoiser.exe`
 - One of: PySide6, PySide2, PyQt6, PyQt5 — for the GUI only
 
 ---

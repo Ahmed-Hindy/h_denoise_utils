@@ -57,13 +57,19 @@ jobs:
       - name: Install packaging dependencies
         run: uv sync --frozen --extra pyside6 --extra package
 
+      - name: Fetch bundled OptiX denoiser
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .\tools\fetch_optix_denoiser.ps1
+
       - name: Build portable package
         shell: pwsh
-        run: .\tools\build_windows_package.ps1 -Variant houdini
+        run: .\tools\build_windows_package.ps1 -Variant optix
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
         with:
-          name: h-denoise-houdini-windows-x64
-          path: dist/h-denoise-houdini-windows-x64-v*.zip
+          name: h-denoise-optix-windows-x64
+          path: dist/h-denoise-optix-windows-x64-v*.zip
           if-no-files-found: error

@@ -13,8 +13,8 @@ from .config import (
     normalize_plane_name,
     is_beauty_plane,
 )
-from .command_builder import build_idenoise_command
-from ..discovery.houdini import detect_default_denoiser
+from .command_builder import build_bundled_optix_command
+from ..discovery.bundled_denoiser import resolve_bundled_denoiser
 from ..discovery.exr_inspector import list_exr_planes
 from ..discovery.aov_validator import filter_existing_aovs
 from ..utils.file_utils import (
@@ -30,14 +30,14 @@ logger = logging.getLogger(__name__)
 
 
 class Denoiser:
-    """Batch image denoiser using Houdini's idenoise."""
+    """Batch image denoiser using the bundled OptiX multipart executable."""
 
     def __init__(
         self,
         input_path,  # type: str
         denoise_config=None,  # type: Optional[DenoiseConfig]
         aov_config=None,  # type: Optional[AOVConfig]
-        idenoise_path=None,  # type: Optional[str]
+        denoiser_path=None,  # type: Optional[str]
         output_folder=None,  # type: Optional[str]
         extensions=None,  # type: Optional[List[str]]
         file_list=None,  # type: Optional[List[str]]
@@ -49,14 +49,14 @@ class Denoiser:
             input_path: Path to file or folder
             denoise_config: Denoising configuration
             aov_config: AOV configuration
-            idenoise_path: Path to idenoise executable
+            denoiser_path: Optional path to bundled OptiX denoiser executable
             output_folder: Output directory
             extensions: File extensions to process (empty or None = no filtering)
         """
         self.input_path = input_path
         self.denoise_config = denoise_config or DenoiseConfig()
         self.aov_config = aov_config or AOVConfig()
-        self.idenoise_path = idenoise_path or detect_default_denoiser()
+        self.denoiser_path = denoiser_path or resolve_bundled_denoiser(required=False)
         self.output_folder = output_folder
         self.extensions = DEFAULT_INPUT_EXTS if extensions is None else extensions
         self.file_list = file_list
@@ -73,8 +73,22 @@ class Denoiser:
         Returns:
             Dict with preparation results
         """
-        if not self.idenoise_path or not os.path.isfile(self.idenoise_path):
-            raise FileNotFoundError("Could not locate idenoise executable")
+        if not self.denoiser_path or not os.path.isfile(self.denoiser_path):
+            raise FileNotFoundError("Could not locate bundled OptiX denoiser executable")
+        if self.denoise_config.backend != "optix":
+            raise ValueError("The bundled denoiser branch only supports OptiX")
+        if self.denoise_config.temporal:
+            raise ValueError("Temporal denoising is not validated in the bundled OptiX branch")
+        if self.denoise_config.threads:
+            raise ValueError("CPU thread count does not apply to the bundled OptiX denoiser")
+        if self.denoise_config.exrmode is not None:
+            raise ValueError("Legacy EXR mode does not apply to the bundled OptiX denoiser")
+        if self.denoise_config.options_json:
+            raise ValueError("Legacy JSON options are not supported by the bundled OptiX denoiser")
+        if self.aov_config.motionvectors_plane:
+            raise ValueError("Motion vectors are not used by the bundled OptiX denoiser v1")
+        if self.aov_config.extra_aovs:
+            raise ValueError("Extra reference AOVs are not supported by the bundled OptiX denoiser v1")
 
         # Normalize extensions
         exts = None
@@ -128,7 +142,7 @@ class Denoiser:
                 )
 
         # Create temp workspace
-        self.temp_root = tempfile.mkdtemp(prefix="idenoise_")
+        self.temp_root = tempfile.mkdtemp(prefix="optix_denoise_")
         temp_in = os.path.join(self.temp_root, "in")
         temp_out = os.path.join(self.temp_root, "out")
         os.makedirs(temp_in, exist_ok=True)
@@ -161,6 +175,7 @@ class Denoiser:
             planes = list_exr_planes(probe_file)
             if planes:
                 skip = {
+                    normalize_plane_name(self.aov_config.beauty_plane),
                     normalize_plane_name(self.aov_config.normal_plane),
                     normalize_plane_name(self.aov_config.albedo_plane),
                     normalize_plane_name(self.aov_config.motionvectors_plane),
@@ -192,6 +207,7 @@ class Denoiser:
 
         # Update config with validated values
         self.aov_config = AOVConfig(
+            beauty_plane=self.aov_config.beauty_plane,
             normal_plane=validated.get("normal_plane"),
             albedo_plane=validated.get("albedo_plane"),
             motionvectors_plane=validated.get("motionvectors_plane"),
@@ -232,24 +248,14 @@ class Denoiser:
                 "output_path": final_dst,
             }
 
-        # Build command
-        prev_frame = None
-        if self.denoise_config.temporal and prev_output:
-            prev_frame = prev_output if os.path.exists(prev_output) else src
-
-        cmd = build_idenoise_command(
-            idenoise_exe=self.idenoise_path,
+        cmd = build_bundled_optix_command(
+            denoiser_exe=self.denoiser_path,
             input_path=src,
             output_path=dst,
-            backend=self.denoise_config.backend,
+            beauty_plane=self.aov_config.beauty_plane or "C",
             normal_plane=self.aov_config.normal_plane,
             albedo_plane=self.aov_config.albedo_plane,
-            motionvectors_plane=self.aov_config.motionvectors_plane,
-            prev_frame=prev_frame,
             aovs_to_denoise=self.aov_config.aovs_to_denoise,
-            extra_aovs=self.aov_config.extra_aovs,
-            exrmode=self.denoise_config.exrmode,
-            options_json=self.denoise_config.options_json,
         )
 
         # Run denoising

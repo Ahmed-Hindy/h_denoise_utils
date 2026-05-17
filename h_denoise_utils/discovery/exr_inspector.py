@@ -1,116 +1,146 @@
-"""EXR file inspection using oiiotool."""
+"""Pure Python EXR file inspection."""
 
 import logging
 import os
-import re
-import subprocess
-
-from .houdini import (
-    detect_default_oiiotool,
-    get_oiiotool_from_running_houdini,
-)
-from ..utils.process_utils import get_subprocess_config
+import struct
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+OPENEXR_MAGIC = bytes.fromhex("762f3101")
+OPENEXR_MULTIPART_FLAG = 0x1000
+
+
+def _read_cstring(stream, first_byte=b""):
+    data = bytearray(first_byte)
+    while True:
+        b = stream.read(1)
+        if not b:
+            raise EOFError("unexpected EOF while reading EXR header")
+        if b == b"\0":
+            return bytes(data)
+        data.extend(b)
+
+
+def _read_header(stream, first_name_byte=b""):
+    attrs = {}  # type: Dict[str, Tuple[str, bytes]]
+    order = []  # type: List[str]
+    while True:
+        name = _read_cstring(stream, first_name_byte)
+        first_name_byte = b""
+        if not name:
+            break
+        attr_type = _read_cstring(stream)
+        size_data = stream.read(4)
+        if len(size_data) != 4:
+            raise EOFError("unexpected EOF while reading EXR attribute size")
+        size = struct.unpack("<I", size_data)[0]
+        value = stream.read(size)
+        if len(value) != size:
+            raise EOFError("unexpected EOF while reading EXR attribute value")
+        key = name.decode("utf-8", "replace")
+        attrs[key] = (attr_type.decode("utf-8", "replace"), value)
+        order.append(key)
+    return attrs, order
+
+
+def _read_headers(path):
+    headers = []
+    with open(path, "rb") as stream:
+        magic = stream.read(4)
+        if magic != OPENEXR_MAGIC:
+            return []
+        version_data = stream.read(4)
+        if len(version_data) != 4:
+            return []
+        version_flags = struct.unpack("<I", version_data)[0]
+        headers.append(_read_header(stream))
+        if not (version_flags & OPENEXR_MULTIPART_FLAG):
+            return headers
+
+        while True:
+            first = stream.read(1)
+            if not first or first == b"\0":
+                break
+            headers.append(_read_header(stream, first))
+    return headers
+
+
+def _string_attr(attrs, key):
+    attr = attrs.get(key)
+    if not attr:
+        return ""
+    attr_type, value = attr
+    if attr_type != "string":
+        return ""
+    return value.decode("utf-8", "replace").strip()
+
+
+def _channel_names(attrs):
+    attr = attrs.get("channels")
+    if not attr:
+        return []
+    attr_type, value = attr
+    if attr_type != "chlist":
+        return []
+
+    names = []
+    offset = 0
+    while offset < len(value):
+        end = value.find(b"\0", offset)
+        if end < 0:
+            break
+        raw_name = value[offset:end]
+        offset = end + 1
+        if not raw_name:
+            break
+        names.append(raw_name.decode("utf-8", "replace"))
+        offset += 16
+    return names
+
+
+def _layer_names_from_channels(channels):
+    stems = []
+    seen = set()
+    for channel in channels:
+        if "." not in channel:
+            continue
+        stem = channel.split(".", 1)[0]
+        if stem and stem not in seen:
+            seen.add(stem)
+            stems.append(stem)
+    if stems:
+        return stems
+
+    upper = {c.upper() for c in channels}
+    if upper.issuperset({"R", "G", "B"}):
+        return ["C"]
+    if upper == {"Z"}:
+        return ["Z"]
+    return []
 
 
 def list_exr_planes(exr_path, oiiotool_path=None):
     # type: (str, Optional[str]) -> List[str]
-    """List all plane/AOV names in an EXR file.
-
-    Supports both multipart and layered EXR formats. Returns planes in the
-    order they appear in the file (important for beauty pass detection).
-
-    Args:
-        exr_path: Path to EXR file
-        oiiotool_path: Optional path to oiiotool executable
-
-    Returns:
-        List of plane names in order of appearance
-
-    Examples:
-        >>> planes = list_exr_planes("render.exr")
-        >>> print(planes)
-        ['C', 'diffuse', 'specular', 'N']
-    """
+    """List all plane/AOV names in an EXR file without Houdini or oiiotool."""
+    _ = oiiotool_path
     if not os.path.isfile(exr_path):
         logger.warning("EXR file not found: %s", exr_path)
         return []
 
-    oiiotool = (
-        oiiotool_path
-        or get_oiiotool_from_running_houdini()
-        or detect_default_oiiotool()
-    )
-    if not oiiotool or not os.path.isfile(oiiotool):
-        logger.warning("oiiotool not found, cannot list EXR planes for %s", exr_path)
-        return []
-
-    cmd = [oiiotool, "--info", "-v", "-a", exr_path]
-    startupinfo, creationflags = get_subprocess_config()
     try:
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            startupinfo=startupinfo,
-            creationflags=creationflags,
-            timeout=120,
-        )
-    except subprocess.TimeoutExpired:
-        logger.error("oiiotool timeout reading %s", exr_path)
-        return []
-    except Exception as e:
-        logger.error("oiiotool error reading %s: %s", exr_path, e)
+        headers = _read_headers(exr_path)
+    except Exception as exc:
+        logger.warning("Unable to inspect EXR %s: %s", exr_path, exc)
         return []
 
-    txt = (proc.stdout or "") + "\n" + (proc.stderr or "")
-
-    # Use dict to preserve order (Python 3.7+)
     planes = {}  # type: Dict[str, None]
-    current_subimage_name = None  # type: Optional[str]
-
-    for ln in txt.splitlines():
-        # Match: Subimage 0: "beauty"  1920x1080 ...
-        m = re.search(r'Subimage\s+\d+\s*:\s*"([^"]*)"', ln)
-        if m:
-            name = (m.group(1) or "").strip()
-            current_subimage_name = name if name else None
-            if current_subimage_name:
-                planes[current_subimage_name] = None
+    for attrs, _order in headers:
+        part_name = _string_attr(attrs, "name")
+        if part_name:
+            planes[part_name] = None
             continue
-
-        low = ln.lower()
-        if ("channels:" in low) or ("channel list" in low):
-            parts = ln.split(":", 1)
-            chan_text = parts[1] if len(parts) > 1 else ln
-            chs = re.findall(r"[A-Za-z0-9_\.]+", chan_text)
-
-            # Multipart: prefer subimage name
-            if current_subimage_name:
-                continue
-
-            # Layered: extract layer stems (e.g., "diffuse" from "diffuse.R")
-            stems = []
-            seen = set()
-            for c in chs:
-                if "." not in c:
-                    continue
-                stem = c.split(".", 1)[0]
-                if stem in seen:
-                    continue
-                seen.add(stem)
-                stems.append(stem)
-            if stems:
-                for s in stems:
-                    planes[s] = None
-                continue
-
-            # Fallbacks for simple channel sets
-            up = {c.upper() for c in chs}
-            if up.issuperset({"R", "G", "B"}):
-                planes["C"] = None
-            elif up == {"Z"}:
-                planes["Z"] = None
+        for layer in _layer_names_from_channels(_channel_names(attrs)):
+            planes[layer] = None
 
     return list(planes.keys())

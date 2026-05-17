@@ -18,6 +18,9 @@ h_denoise_utils/vendor/optix-denoiser/
 *.spec
 !packaging/*.spec
 
+# Fetched binary package assets
+h_denoise_utils/vendor/optix-denoiser/
+
 # Unit test / coverage reports
 .pytest_cache/
 htmlcov/

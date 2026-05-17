@@ -50,12 +50,18 @@ def _ui_asset_paths() -> list[Path]:
 
 
 def _run_smoke_test() -> int:
+    from h_denoise_utils.discovery.bundled_denoiser import resolve_bundled_denoiser
     from h_denoise_utils.ui.qt_compat import QtWidgets
 
     missing = [path for path in _ui_asset_paths() if not path.is_file()]
     if missing:
         missing_list = ", ".join(str(path) for path in missing)
         print(f"Missing bundled UI asset(s): {missing_list}", file=sys.stderr)
+        return 1
+    try:
+        resolve_bundled_denoiser(required=True)
+    except FileNotFoundError as exc:
+        print(str(exc), file=sys.stderr)
         return 1
 
     app = QtWidgets.QApplication.instance()

@@ -1,8 +1,8 @@
 """
-h_denoise_utils - Houdini Image Denoising Utilities
+h_denoise_utils - Bundled OptiX Image Denoising Utilities
 
-A modular package for denoising images using Houdini's idenoise utility.
-Supports Intel OIDN and NVIDIA OptiX backends.
+A modular package for denoising multipart EXRs with a bundled NVIDIA OptiX
+denoiser executable.
 """
 
 # Core exports
@@ -17,17 +17,13 @@ from .core.config import (
     PRESETS,
 )
 from .core.command_builder import (
-    build_idenoise_command,
-    override_normal_plane,
+    build_bundled_optix_command,
 )
 
 # Discovery exports
-from .discovery.houdini import (
-    detect_houdini_versions,
-    detect_default_denoiser,
-    get_denoiser_from_running_houdini,
-    detect_default_oiiotool,
-    get_oiiotool_from_running_houdini,
+from .discovery.bundled_denoiser import (
+    PINNED_DENOISER_COMMIT,
+    resolve_bundled_denoiser,
 )
 from .discovery.exr_inspector import list_exr_planes
 from .discovery.aov_validator import validate_aov_exists, filter_existing_aovs
@@ -54,14 +50,10 @@ __all__ = [
     "BEAUTY_AOV_ALIASES",
     "PRESETS",
     # Command building
-    "build_idenoise_command",
-    "override_normal_plane",
+    "build_bundled_optix_command",
     # Discovery
-    "detect_houdini_versions",
-    "detect_default_denoiser",
-    "get_denoiser_from_running_houdini",
-    "detect_default_oiiotool",
-    "get_oiiotool_from_running_houdini",
+    "PINNED_DENOISER_COMMIT",
+    "resolve_bundled_denoiser",
     "list_exr_planes",
     "validate_aov_exists",
     "filter_existing_aovs",

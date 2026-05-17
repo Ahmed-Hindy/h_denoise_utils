@@ -1,4 +1,4 @@
-"""Qt compatibility layer for Houdini/PySide2, PySide6, PyQt6, and PyQt5."""
+"""Qt compatibility layer for PySide2, PySide6, PyQt6, and PyQt5."""
 
 import importlib
 import os

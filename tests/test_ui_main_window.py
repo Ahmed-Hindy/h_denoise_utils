@@ -148,13 +148,11 @@ def test_settings_has_basic_and_collapsed_advanced_rows(qtbot):
     window._toggle_advanced(True)
 
     assert _has_ancestor(window.prefix_edit, window.advanced_body)
+    assert _has_ancestor(window.beauty_combo, window.advanced_body)
+    assert _has_ancestor(window.albedo_combo, window.advanced_body)
+    assert _has_ancestor(window.normal_combo, window.advanced_body)
     assert not _has_ancestor(window.prefix_edit, window.advanced_settings_body)
-    assert _has_ancestor(window.backend_combo, window.advanced_settings_body)
-    assert _has_ancestor(window.thread_spin, window.advanced_settings_body)
-    assert _has_ancestor(window.denoiser_combo, window.advanced_settings_body)
-    assert _has_ancestor(window.exrmode_combo, window.advanced_settings_body)
-    assert _has_ancestor(window.options_edit, window.advanced_settings_body)
-    assert _has_ancestor(window.extra_aovs_edit, window.advanced_settings_body)
+    assert _has_ancestor(window.denoiser_status_label, window.advanced_settings_body)
 
     window._toggle_advanced_settings(True)
 
@@ -206,15 +204,12 @@ def test_summary_chip_bad_for_invalid_path(qtbot):
     assert window.summary_files.objectName() == "summaryChipBad"
 
 
-def test_temporal_checkbox_shares_motion_row(qtbot):
+def test_legacy_houdini_controls_are_not_present(qtbot):
     window = BaseWindow()
     qtbot.addWidget(window)
 
-    assert window.temporal_chk.parentWidget() is window.motion_combo.parentWidget()
-    motion_layout = window.motion_combo.parentWidget().layout()
-    assert motion_layout.indexOf(window.temporal_chk) < motion_layout.indexOf(
-        window.motion_label
-    )
-    assert motion_layout.indexOf(window.motion_label) < motion_layout.indexOf(
-        window.motion_combo
-    )
+    assert not hasattr(window, "backend_combo")
+    assert not hasattr(window, "thread_spin")
+    assert not hasattr(window, "denoiser_combo")
+    assert not hasattr(window, "exrmode_combo")
+    assert not hasattr(window, "options_edit")
