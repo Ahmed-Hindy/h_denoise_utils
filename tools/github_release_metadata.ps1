@@ -6,20 +6,20 @@ param(
 $ErrorActionPreference = "Stop"
 
 $version = $Tag.TrimStart("v")
-$notesFile = Join-Path $PSScriptRoot ".." ".github" "release-notes" "$Tag.md"
+$notesFile = [System.IO.Path]::Combine($PSScriptRoot, "..", ".github", "release-notes", "$Tag.md")
 $notesFile = [System.IO.Path]::GetFullPath($notesFile)
 
 if (Test-Path -LiteralPath $notesFile) {
     $notes = Get-Content -LiteralPath $notesFile -Raw
     $summary = (Get-Content -LiteralPath $notesFile -TotalCount 1).Trim()
-    $title = "$version — $summary"
+    $title = "$version - $summary"
     return [PSCustomObject]@{
         Title = $title
         Notes = $notes.Trim()
     }
 }
 
-$changelogPath = Join-Path $PSScriptRoot ".." "CHANGELOG.md"
+$changelogPath = [System.IO.Path]::Combine($PSScriptRoot, "..", "CHANGELOG.md")
 $changelogPath = [System.IO.Path]::GetFullPath($changelogPath)
 if (-not (Test-Path -LiteralPath $changelogPath)) {
     throw "No release notes file at $notesFile and CHANGELOG.md not found"

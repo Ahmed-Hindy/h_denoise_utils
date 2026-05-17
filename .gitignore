@@ -8,6 +8,7 @@ __pycache__/
 dist/
 build/
 .eggs/
+h_denoise_utils/vendor/optix-denoiser/
 
 # uv
 .venv/

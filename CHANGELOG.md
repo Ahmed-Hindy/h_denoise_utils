@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.3.0] — 2026-05-17
+
+### Added
+- Dual-variant Windows release workflow that publishes Houdini-linked and bundled OptiX packages to one GitHub release.
+- Variant-specific package names:
+  - `h-denoise-houdini-windows-x64-vX.Y.Z.zip`
+  - `h-denoise-optix-windows-x64-vX.Y.Z.zip`
+- Release manifest section with Houdini branch SHA, OptiX branch SHA, and pinned OptiX denoiser SHA.
+- Release variant documentation for the Houdini and OptiX package feature differences.
+
+### Changed
+- CI package artifacts now use variant-specific names.
+- Release packaging now fails if `main` and `optix-bundled-denoiser` report different package versions.
+
 ## [1.2.0] — 2026-05-15
 
 ### Added
