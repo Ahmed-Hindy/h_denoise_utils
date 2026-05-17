@@ -8,6 +8,7 @@ import sys
 _QT_TEST_FILES = {
     "test_aov_scan_manager.py",
     "test_logging_handler.py",
+    "test_ui_denoising_lock.py",
     "test_ui_main_window.py",
     "test_ui_tooltips.py",
 }

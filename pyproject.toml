@@ -15,7 +15,7 @@ dependencies = []   # Qt is detected at runtime — no hard dependency
 pyside6 = ["PySide6-Essentials>=6.0"]
 pyside2 = ["PySide2"]
 pyqt5   = ["PyQt5"]
-dev     = ["pytest>=7", "pytest-qt"]
+dev     = ["pytest>=7", "pytest-qt", "hypothesis>=6.79.4"]
 package = ["pyinstaller>=6.11,<7; python_version >= '3.8' and python_version < '3.15'"]
 
 [project.scripts]
@@ -41,4 +41,9 @@ markers = [
     "unit: Unit tests",
     "integration: Integration tests",
     "slow: Slow-running tests",
+]
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.79.4",
 ]

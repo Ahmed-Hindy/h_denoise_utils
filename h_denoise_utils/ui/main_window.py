@@ -123,6 +123,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         self._control_shortcut_enter = None  # type: Optional[object]
         self._scan_shortcut_f5 = None  # type: Optional[object]
         self.main_splitter = None  # type: Optional[QtWidgets.QSplitter]
+        self._pre_run_enabled = {}  # type: dict
 
         self.houdini_versions = detect_houdini_versions()
         self._setup_menus()
@@ -329,6 +330,57 @@ class BaseWindow(QtWidgets.QMainWindow):
         self._apply_preset("Beauty")
         self._update_output_label()
 
+    def _lockable_widgets(self):
+        # type: () -> List[QtWidgets.QWidget]
+        """Return the ordered list of interactive widgets to lock during a run."""
+        widgets = [
+            self.path_edit,
+            self.browse_btn,
+            self.scan_btn,
+            self.files_remove_btn,
+            self.files_clear_btn,
+            self.preset_combo,
+            self.aovs_input,
+            self.overwrite_chk,
+            self.output_toggle,
+            self.advanced_toggle,
+            self.advanced_settings_toggle,
+            self.prefix_edit,
+            self.albedo_combo,
+            self.normal_combo,
+            self.motion_combo,
+            self.temporal_chk,
+            self.backend_combo,
+            self.thread_spin,
+            self.denoiser_combo,
+            self.custom_exe_btn,
+            self.exrmode_combo,
+            self.options_edit,
+            self.extra_aovs_edit,
+            self.log_filter_combo,
+        ]
+        return [w for w in widgets if w is not None]
+
+    def _apply_ui_lock(self, locked):
+        # type: (bool) -> None
+        if locked:
+            self._pre_run_enabled = {
+                w: w.isEnabled() for w in self._lockable_widgets()
+            }
+            for w in self._lockable_widgets():
+                self._set_lockable_enabled(w, False)
+        else:
+            for w, was_enabled in (self._pre_run_enabled or {}).items():
+                self._set_lockable_enabled(w, was_enabled)
+            self._pre_run_enabled = {}
+
+    def _set_lockable_enabled(self, widget, enabled):
+        # type: (QtWidgets.QWidget, bool) -> None
+        """Set enabled state without allowing lockable widgets to unlock mid-run."""
+        if self._ui_state.is_running and enabled and widget in self._lockable_widgets():
+            enabled = False
+        widget.setEnabled(enabled)
+
     # --- Signal wiring ---
     def _connect_signals(self):
         # type: () -> None
@@ -462,6 +514,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _set_drop_overlay_visible(self, visible):
         # type: (bool) -> None
+        if visible and self._ui_state.is_running:
+            visible = False
         if self.drop_overlay:
             if visible:
                 self._update_drop_overlay_geometry()
@@ -470,6 +524,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _set_path_from_drop(self, urls):
         # type: (List[QtCore.QUrl]) -> None
+        if self._ui_state.is_running:
+            return
         paths = []
         for url in urls:
             local = url.toLocalFile()
@@ -511,13 +567,13 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def dragEnterEvent(self, event):
         # type: (QtGui.QDragEnterEvent) -> None
-        if event.mimeData().hasUrls():
+        if not self._ui_state.is_running and event.mimeData().hasUrls():
             self._set_drop_overlay_visible(True)
             event.acceptProposedAction()
 
     def dragMoveEvent(self, event):
         # type: (QtGui.QDragMoveEvent) -> None
-        if event.mimeData().hasUrls():
+        if not self._ui_state.is_running and event.mimeData().hasUrls():
             self._set_drop_overlay_visible(True)
             event.acceptProposedAction()
 
@@ -528,6 +584,10 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def dropEvent(self, event):
         # type: (QtGui.QDropEvent) -> None
+        if self._ui_state.is_running:
+            self._set_drop_overlay_visible(False)
+            event.ignore()
+            return
         self._set_path_from_drop(event.mimeData().urls())
         self._set_drop_overlay_visible(False)
         event.acceptProposedAction()
@@ -536,6 +596,14 @@ class BaseWindow(QtWidgets.QMainWindow):
         # type: (QtCore.QObject, QtCore.QEvent) -> bool
 
         if obj in (self.centralWidget(), self.drop_overlay):
+            if self._ui_state.is_running and event.type() in (
+                QtCore.QEvent.DragEnter,
+                QtCore.QEvent.DragMove,
+                QtCore.QEvent.Drop,
+            ):
+                self._set_drop_overlay_visible(False)
+                event.ignore()
+                return True
             if event.type() == QtCore.QEvent.DragEnter:
                 if event.mimeData().hasUrls():
                     self._set_drop_overlay_visible(True)
@@ -613,6 +681,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _on_scan_requested(self, _checked=False):
         # type: (bool) -> None
+        if self._ui_state.is_running:
+            return
         self._analyze_input(force=True)
 
     def _on_path_text_changed(self, text):
@@ -723,7 +793,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         if self.scan_spinner:
             self.scan_spinner.setVisible(busy)
         if self.scan_btn:
-            self.scan_btn.setEnabled(not busy)
+            self._set_lockable_enabled(self.scan_btn, not busy)
 
     # --- AOV scan lifecycle ---
     def _on_aov_scan_started(self):
@@ -1189,12 +1259,12 @@ class BaseWindow(QtWidgets.QMainWindow):
             desired_checked = self.temporal_chk.isChecked()
 
         if allow_temporal:
-            self.temporal_chk.setEnabled(True)
+            self._set_lockable_enabled(self.temporal_chk, True)
             self.temporal_chk.setChecked(bool(desired_checked))
             self.temporal_chk.setToolTip(tooltips.TEMPORAL_CHK_ENABLED)
         else:
             self.temporal_chk.setChecked(False)
-            self.temporal_chk.setEnabled(False)
+            self._set_lockable_enabled(self.temporal_chk, False)
             if backend != "optix":
                 self.temporal_chk.setToolTip(
                     tooltips.temporal_backend_unsupported(
@@ -1356,6 +1426,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         self._run_start = time.time()
         self.progress_label.setText("File 0 of 0 | ETA --:--")
 
+        self._apply_ui_lock(True)
         self.worker.start()
 
     def _stop_denoise(self):
@@ -1375,6 +1446,7 @@ class BaseWindow(QtWidgets.QMainWindow):
     def _on_finished(self, summary):
         # type: (dict) -> None
         self._ui_state.is_running = False
+        self._apply_ui_lock(False)
         self.control_btn.setText("Denoise")
         self.control_btn.setIcon(self.play_icon)
         self.control_btn.setObjectName("primaryBtn")
