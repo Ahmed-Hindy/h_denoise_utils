@@ -1,0 +1,110 @@
+name: Release Variants
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release-windows:
+    name: "release / Windows variants"
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    env:
+      QT_BACKEND: pyside6
+
+    steps:
+      - name: Checkout Houdini variant
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+          path: houdini
+
+      - name: Checkout OptiX variant
+        uses: actions/checkout@v6
+        with:
+          ref: optix-bundled-denoiser
+          path: optix
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Verify matching versions
+        shell: pwsh
+        run: |
+          $houdiniVersion = (Select-String -Path "houdini/pyproject.toml" -Pattern '^version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          $optixVersion = (Select-String -Path "optix/pyproject.toml" -Pattern '^version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          if ($houdiniVersion -ne $optixVersion) {
+            throw "Variant versions differ: Houdini=$houdiniVersion OptiX=$optixVersion"
+          }
+          $tagVersion = "${{ github.ref_name }}".TrimStart("v")
+          if ($houdiniVersion -ne $tagVersion) {
+            throw "Tag version $tagVersion does not match package version $houdiniVersion"
+          }
+
+      - name: Build Houdini package
+        shell: pwsh
+        working-directory: houdini
+        run: .\tools\build_windows_package.ps1 -Variant houdini
+
+      - name: Fetch bundled OptiX denoiser
+        shell: pwsh
+        working-directory: optix
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .\tools\fetch_optix_denoiser.ps1
+
+      - name: Build OptiX package
+        shell: pwsh
+        working-directory: optix
+        run: .\tools\build_windows_package.ps1 -Variant optix
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $repo = "${{ github.repository }}"
+          $meta = & ".\houdini\tools\github_release_metadata.ps1" -Tag $tag
+          $houdiniAsset = Get-ChildItem -Path "houdini/dist" -Filter "h-denoise-houdini-windows-x64-v*.zip" | Select-Object -First 1
+          $optixAsset = Get-ChildItem -Path "optix/dist" -Filter "h-denoise-optix-windows-x64-v*.zip" | Select-Object -First 1
+          if (-not $houdiniAsset) {
+            throw "Houdini package zip not found"
+          }
+          if (-not $optixAsset) {
+            throw "OptiX package zip not found"
+          }
+
+          $houdiniSha = (& git -C houdini rev-parse HEAD).Trim()
+          $optixSha = (& git -C optix rev-parse HEAD).Trim()
+          $denoiserSha = "8893b605903f273512b750d45993bbe27a003362"
+          $variantNotes = @"
+
+          ## Windows Packages
+
+          | Package | Artifact | Behavior |
+          | --- | --- | --- |
+          | Houdini-linked | ``$($houdiniAsset.Name)`` | Default app line using Houdini ``idenoise`` with OIDN/OptiX, temporal controls, SideFX options, EXR mode, and custom executable support. |
+          | Bundled OptiX | ``$($optixAsset.Name)`` | Houdini-free app line using bundled NVIDIA OptiX multipart EXR denoising with source metadata preservation. |
+
+          ## Build SHAs
+
+          - Houdini app: ``$houdiniSha``
+          - OptiX app: ``$optixSha``
+          - Bundled OptiX denoiser: ``$denoiserSha``
+          "@
+          $notes = ($meta.Notes.Trim() + "`n" + $variantNotes.Trim()).Trim()
+
+          gh release view $tag --repo $repo *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --repo $repo --title $meta.Title --notes $notes
+          }
+          else {
+            gh release edit $tag --repo $repo --title $meta.Title --notes $notes
+          }
+          gh release upload $tag $houdiniAsset.FullName $optixAsset.FullName --repo $repo --clobber

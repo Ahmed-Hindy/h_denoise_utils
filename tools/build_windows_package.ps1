@@ -1,4 +1,18 @@
+param(
+    [string]$Variant = ""
+)
+
 $ErrorActionPreference = "Stop"
+
+if (-not $Variant) {
+    $Variant = $env:HDU_PACKAGE_VARIANT
+}
+if (-not $Variant) {
+    $Variant = "houdini"
+}
+if ($Variant -notin @("houdini", "optix")) {
+    throw "Invalid package variant '$Variant'. Expected 'houdini' or 'optix'."
+}
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Push-Location $repoRoot
@@ -9,17 +23,10 @@ try {
     }
     $version = $versionMatch.Matches[0].Groups[1].Value
 
-    if ($env:GITHUB_SHA) {
-        $shortSha = $env:GITHUB_SHA.Substring(0, 7)
-    }
-    else {
-        $shortSha = (& git rev-parse --short HEAD).Trim()
-    }
-
     $distDir = Join-Path $repoRoot "dist"
     $appDir = Join-Path $distDir "h-denoise"
     $buildDir = Join-Path $repoRoot "build"
-    $zipPath = Join-Path $distDir "h-denoise-windows-x64-v$version-$shortSha.zip"
+    $zipPath = Join-Path $distDir "h-denoise-$Variant-windows-x64-v$version.zip"
 
     if (Test-Path -LiteralPath $appDir) {
         Remove-Item -LiteralPath $appDir -Recurse -Force
@@ -27,7 +34,7 @@ try {
     if (Test-Path -LiteralPath $buildDir) {
         Remove-Item -LiteralPath $buildDir -Recurse -Force
     }
-    Get-ChildItem -Path $distDir -Filter "h-denoise-windows-x64-v*.zip" -ErrorAction SilentlyContinue |
+    Get-ChildItem -Path $distDir -Filter "h-denoise-$Variant-windows-x64-v*.zip" -ErrorAction SilentlyContinue |
         Remove-Item -Force
 
     uv run --native-tls --frozen --extra pyside6 --extra package pyinstaller --noconfirm --clean "packaging/h-denoise.spec"

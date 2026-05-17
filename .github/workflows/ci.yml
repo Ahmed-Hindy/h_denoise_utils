@@ -59,33 +59,11 @@ jobs:
 
       - name: Build portable package
         shell: pwsh
-        run: .\tools\build_windows_package.ps1
+        run: .\tools\build_windows_package.ps1 -Variant houdini
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
         with:
-          name: h-denoise-windows-x64
-          path: dist/h-denoise-windows-x64-v*.zip
+          name: h-denoise-houdini-windows-x64
+          path: dist/h-denoise-houdini-windows-x64-v*.zip
           if-no-files-found: error
-
-      - name: Upload package to GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $tag = "${{ github.ref_name }}"
-          $repo = "${{ github.repository }}"
-          $asset = Get-ChildItem -Path "dist" -Filter "h-denoise-windows-x64-v*.zip" | Select-Object -First 1
-          if (-not $asset) {
-            throw "Package zip not found"
-          }
-          $meta = & "$env:GITHUB_WORKSPACE/tools/github_release_metadata.ps1" -Tag $tag
-          gh release view $tag --repo $repo *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --repo $repo --title $meta.Title --notes $meta.Notes
-          }
-          else {
-            gh release edit $tag --repo $repo --title $meta.Title --notes $meta.Notes
-          }
-          gh release upload $tag $asset.FullName --repo $repo --clobber
