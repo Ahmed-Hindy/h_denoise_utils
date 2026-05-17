@@ -5,6 +5,8 @@ A modular package for denoising multipart EXRs with a bundled NVIDIA OptiX
 denoiser executable.
 """
 
+from ._version import __version__
+
 # Core exports
 from .core.config import (
     AOVConfig,
@@ -38,7 +40,6 @@ from .utils.file_utils import (
     compute_output_folder,
 )
 
-__version__ = "1.3.0"
 __all__ = [
     # Config
     "AOVConfig",

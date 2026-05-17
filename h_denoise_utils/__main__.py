@@ -9,7 +9,7 @@ from pathlib import Path
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from h_denoise_utils import __version__
+from h_denoise_utils._version import __version__
 
 
 def _build_parser() -> argparse.ArgumentParser:
