@@ -351,6 +351,59 @@ OptiX package:
 - If the denoiser release asset is replaced, verify `manifest.json` still reports `source_commit = 8893b605903f273512b750d45993bbe27a003362`.
 - The app release `v1.3.0` was created after `v1.2.0` already existed; do not reuse existing tags.
 
+## 2026-05-17 Release QA Follow-Up
+
+Actual downloaded `v1.3.0` release zips were tested from GitHub:
+
+- `h-denoise-houdini-windows-x64-v1.3.0.zip`
+- `h-denoise-optix-windows-x64-v1.3.0.zip`
+
+The downloaded zip SHA256 hashes matched the GitHub release asset digests:
+
+```text
+houdini zip -> 4A970786BF1934CC4822D762FBA9EF372DE6B8BAA640A7FDEA6ECC092C30237E
+optix zip   -> B9D6744456152E20D3F02DE5A14804EFCCBF8ED019451488F47AD61A56026245
+```
+
+The extracted OptiX package contained the bundled denoiser and manifest:
+
+```text
+h-denoise/_internal/h_denoise_utils/vendor/optix-denoiser/windows-x64/Denoiser.exe
+h-denoise/_internal/h_denoise_utils/vendor/optix-denoiser/windows-x64/manifest.json
+manifest source_commit -> 8893b605903f273512b750d45993bbe27a003362
+manifest exe sha256    -> 03d3bb7b488667a93c1f8b0fbcfecdc2d3db3b2e8f0639dd0d8b3e68cb265c8d
+```
+
+The actual released bundled `Denoiser.exe` passed the Canyon Run metadata preservation test:
+
+```text
+source_part_count -> 22
+output_part_count -> 22
+raw_attribute_value_diff_count -> 0
+attribute_order_diff_count -> 0
+```
+
+The direct app wrapper smoke found a release artifact concern on this workstation: running extracted `h-denoise.exe --version` from the downloaded `v1.3.0` zips hung in the Codex shell, while the bundled `Denoiser.exe` itself ran successfully and the current local package build passes. To prevent that class of issue from escaping again, `tools/build_windows_package.ps1` now:
+
+- Runs frozen executable checks with explicit timeouts.
+- Keeps `--version` lightweight by importing `h_denoise_utils._version` instead of the whole package.
+- Compresses the app.
+- Extracts the generated zip into `build/package-smoke-<variant>-<version>`.
+- Runs `h-denoise.exe --version` and `h-denoise.exe --smoke-test` from the extracted zip.
+
+Validation after this follow-up on `optix-bundled-denoiser`:
+
+```powershell
+uv run --native-tls --frozen pytest --tb=short
+# 91 passed
+
+uv run --native-tls --frozen python -m h_denoise_utils --version
+# h_denoise_utils 1.3.0
+
+.\tools\build_windows_package.ps1 -Variant optix
+# Package created: dist\h-denoise-optix-windows-x64-v1.3.0.zip
+```
+
 ## Useful Commands
 
 Run tests:

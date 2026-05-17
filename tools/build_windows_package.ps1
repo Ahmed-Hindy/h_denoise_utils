@@ -4,6 +4,74 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Invoke-FrozenExecutableCheck {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ExePath,
+        [Parameter(Mandatory = $true)]
+        [string]$CheckName,
+        [string[]]$Arguments = @(),
+        [int]$TimeoutSeconds = 60
+    )
+
+    if (-not (Test-Path -LiteralPath $ExePath)) {
+        throw "Expected executable was not found for $CheckName`: $ExePath"
+    }
+
+    $workingDirectory = Split-Path -Parent $ExePath
+    $stamp = [Guid]::NewGuid().ToString("N")
+    $stdoutPath = Join-Path ([System.IO.Path]::GetTempPath()) "hdu-$CheckName-$stamp.out"
+    $stderrPath = Join-Path ([System.IO.Path]::GetTempPath()) "hdu-$CheckName-$stamp.err"
+
+    try {
+        $process = Start-Process `
+            -FilePath $ExePath `
+            -ArgumentList $Arguments `
+            -WorkingDirectory $workingDirectory `
+            -PassThru `
+            -RedirectStandardOutput $stdoutPath `
+            -RedirectStandardError $stderrPath `
+            -WindowStyle Hidden
+
+        $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+        while (-not $process.HasExited) {
+            if ((Get-Date) -ge $deadline) {
+                try {
+                    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+                }
+                catch {
+                    # The process may have exited between the timeout check and Stop-Process.
+                }
+                throw "$CheckName timed out after $TimeoutSeconds seconds: $ExePath $($Arguments -join ' ')"
+            }
+            Start-Sleep -Milliseconds 250
+            $process.Refresh()
+        }
+
+        $stdout = ""
+        if (Test-Path -LiteralPath $stdoutPath) {
+            $stdout = [string](Get-Content -LiteralPath $stdoutPath -Raw)
+        }
+        $stderr = ""
+        if (Test-Path -LiteralPath $stderrPath) {
+            $stderr = [string](Get-Content -LiteralPath $stderrPath -Raw)
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+            Write-Host $stdout.TrimEnd()
+        }
+        if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+            Write-Host $stderr.TrimEnd()
+        }
+        if ($process.ExitCode -ne 0) {
+            throw "$CheckName failed with exit code $($process.ExitCode): $ExePath $($Arguments -join ' ')"
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
 if (-not $Variant) {
     $Variant = $env:HDU_PACKAGE_VARIANT
 }
@@ -44,20 +112,30 @@ try {
         throw "Expected executable was not created: $exePath"
     }
 
-    & $exePath --version
-    if ($LASTEXITCODE -ne 0) {
-        throw "Frozen executable version check failed with exit code $LASTEXITCODE"
-    }
-
-    & $exePath --smoke-test
-    if ($LASTEXITCODE -ne 0) {
-        throw "Frozen executable smoke test failed with exit code $LASTEXITCODE"
-    }
+    Invoke-FrozenExecutableCheck -ExePath $exePath -CheckName "dist-version" -Arguments @("--version")
+    Invoke-FrozenExecutableCheck -ExePath $exePath -CheckName "dist-smoke-test" -Arguments @("--smoke-test")
 
     Compress-Archive -Path $appDir -DestinationPath $zipPath -Force
 
     if (-not (Test-Path -LiteralPath $zipPath)) {
         throw "Expected package was not created: $zipPath"
+    }
+
+    $extractDir = Join-Path $buildDir "package-smoke-$Variant-$version"
+    if (Test-Path -LiteralPath $extractDir) {
+        Remove-Item -LiteralPath $extractDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $extractDir | Out-Null
+    try {
+        Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
+        $extractedExePath = Join-Path $extractDir "h-denoise\h-denoise.exe"
+        Invoke-FrozenExecutableCheck -ExePath $extractedExePath -CheckName "zip-version" -Arguments @("--version")
+        Invoke-FrozenExecutableCheck -ExePath $extractedExePath -CheckName "zip-smoke-test" -Arguments @("--smoke-test")
+    }
+    finally {
+        if (Test-Path -LiteralPath $extractDir) {
+            Remove-Item -LiteralPath $extractDir -Recurse -Force
+        }
     }
 
     Write-Host "Package created: $zipPath"
