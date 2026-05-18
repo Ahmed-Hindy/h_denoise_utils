@@ -512,7 +512,7 @@ uv run --native-tls --frozen pytest --tb=short
 
 .\tools\build_windows_package.ps1 -Variant optix
 # Package created: dist\h-denoise-optix-windows-x64-v1.3.0.zip
-# Zip size: 137516162 bytes
+# Zip size after final upstream release refresh: 137516504 bytes
 
 .\dist\h-denoise\h-denoise.exe --smoke-test
 $env:HDU_OPTIX_VERSION='8.1'; .\dist\h-denoise\h-denoise.exe --smoke-test

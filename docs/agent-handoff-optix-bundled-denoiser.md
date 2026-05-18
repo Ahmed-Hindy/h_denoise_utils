@@ -106,7 +106,7 @@ Latest package output:
 
 ```text
 dist/h-denoise-optix-windows-x64-v1.3.0.zip
-size: 137516162 bytes
+size: 137516504 bytes
 ```
 
 The generated zip should contain:
