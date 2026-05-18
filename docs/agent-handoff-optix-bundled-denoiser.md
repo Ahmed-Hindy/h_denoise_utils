@@ -39,7 +39,7 @@ Runtime matrix:
 | --- | --- | --- |
 | OptiX 8.1 | `50021ea0af6d41609a97777ceebbdf1e1d34efe7` | Locally validated on Canyon Run; 22 output parts; raw EXR header metadata diff count `0`. |
 | OptiX 9.0 | `fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd` | Default. Locally validated on Canyon Run; 22 output parts; raw EXR header metadata diff count `0`. |
-| OptiX 9.1 | `f1f6dd803f3159992d248178f6e09421c6eb8b6d` | Included for newer-driver compatibility. Local `optixInit` error `7801` is expected on the maintainer workstation because its NVIDIA driver is below the OptiX 9.1 runtime requirement. |
+| OptiX 9.1 | `f1f6dd803f3159992d248178f6e09421c6eb8b6d` | Locally validated on Canyon Run after upgrading the maintainer workstation to NVIDIA driver `596.49`; 22 output parts; raw EXR header metadata diff count `0`. Older driver `576.80` failed locally with `optixInit` error `7801`. |
 
 ## Runtime Entry Points
 
@@ -136,6 +136,11 @@ For the validated Canyon Run EXR sample:
 - The first planes should include `C`, `albedo`, `C_emission`, `C_light_distant_1`, and `C_light_dome_1`.
 - Denoising with the pinned bundled executable should produce a 22-part output EXR.
 - Raw source-vs-output EXR header metadata diff count should be `0`.
+
+Driver comparison notes:
+
+- `docs/optix-8-1-vs-9-0-quality-comparison.md` records the original driver `576.80` result where OptiX 8.1 and 9.0 were byte-identical.
+- `docs/optix-driver-576-80-vs-596-49-quality-comparison.md` records the follow-up after upgrading to driver `596.49`. On that driver, OptiX 8.1, 9.0, and 9.1 are byte-identical to each other, but differ from the old `576.80` output in the denoised planes only.
 
 ## Things To Keep An Eye On
 
