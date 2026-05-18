@@ -21,6 +21,9 @@ h_denoise_utils/vendor/optix-denoiser/
 # Fetched binary package assets
 h_denoise_utils/vendor/optix-denoiser/
 
+# Local comparison renders
+comparison_outputs/
+
 # Unit test / coverage reports
 .pytest_cache/
 htmlcov/
