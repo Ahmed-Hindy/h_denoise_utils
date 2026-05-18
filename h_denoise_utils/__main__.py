@@ -60,7 +60,7 @@ def _run_smoke_test() -> int:
         return 1
     try:
         resolve_bundled_denoiser(required=True)
-    except FileNotFoundError as exc:
+    except (FileNotFoundError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
 

@@ -24,7 +24,13 @@ from .core.command_builder import (
 
 # Discovery exports
 from .discovery.bundled_denoiser import (
+    DEFAULT_OPTIX_VERSION,
+    ENV_OPTIX_VERSION,
     PINNED_DENOISER_COMMIT,
+    PINNED_DENOISER_RELEASE,
+    PINNED_OPTIX_SDK_COMMITS,
+    SUPPORTED_OPTIX_VERSIONS,
+    available_bundled_denoisers,
     resolve_bundled_denoiser,
 )
 from .discovery.exr_inspector import list_exr_planes
@@ -53,7 +59,13 @@ __all__ = [
     # Command building
     "build_bundled_optix_command",
     # Discovery
+    "DEFAULT_OPTIX_VERSION",
+    "ENV_OPTIX_VERSION",
     "PINNED_DENOISER_COMMIT",
+    "PINNED_DENOISER_RELEASE",
+    "PINNED_OPTIX_SDK_COMMITS",
+    "SUPPORTED_OPTIX_VERSIONS",
+    "available_bundled_denoisers",
     "resolve_bundled_denoiser",
     "list_exr_planes",
     "validate_aov_exists",

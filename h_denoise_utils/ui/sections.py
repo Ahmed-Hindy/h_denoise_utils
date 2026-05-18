@@ -312,8 +312,16 @@ def build_extras_section(window, top_layout):
     divider.setFrameShadow(QtWidgets.QFrame.Sunken)
     advanced_settings_form.addRow(divider)
 
+    window.optix_version_combo = NoWheelComboBox()
+    for version in window.supported_optix_versions:
+        window.optix_version_combo.addItem("OptiX {}".format(version), version)
+    current_index = window.optix_version_combo.findData(window.selected_optix_version)
+    if current_index >= 0:
+        window.optix_version_combo.setCurrentIndex(current_index)
+    advanced_settings_form.addRow("OptiX Runtime:", window.optix_version_combo)
+
     window.denoiser_status_label = QtWidgets.QLabel(
-        window.bundled_denoiser_path or "Missing bundled Denoiser.exe"
+        window.bundled_denoiser_path or window._runtime_missing_text()
     )
     window.denoiser_status_label.setWordWrap(True)
     advanced_settings_form.addRow("Bundled Denoiser:", window.denoiser_status_label)

@@ -152,7 +152,9 @@ def test_settings_has_basic_and_collapsed_advanced_rows(qtbot):
     assert _has_ancestor(window.albedo_combo, window.advanced_body)
     assert _has_ancestor(window.normal_combo, window.advanced_body)
     assert not _has_ancestor(window.prefix_edit, window.advanced_settings_body)
+    assert _has_ancestor(window.optix_version_combo, window.advanced_settings_body)
     assert _has_ancestor(window.denoiser_status_label, window.advanced_settings_body)
+    assert window.optix_version_combo.currentText() == "OptiX 9.0"
 
     window._toggle_advanced_settings(True)
 

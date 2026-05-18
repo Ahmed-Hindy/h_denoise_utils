@@ -40,6 +40,7 @@ ALBEDO_COMBO = (
     "Albedo AOV name; improves quality when present"
 )
 NORMAL_COMBO = "Normal AOV name; improves quality when present"
+OPTIX_VERSION_COMBO = "Bundled OptiX runtime version"
 MOTION_COMBO = "Temporal denoising is not enabled in this bundled OptiX build"
 TEMPORAL_CHK_ENABLED = (
     "Use previous frame for temporal denoising (OptiX only)"

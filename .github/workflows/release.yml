@@ -82,7 +82,11 @@ jobs:
 
           $houdiniSha = (& git -C houdini rev-parse HEAD).Trim()
           $optixSha = (& git -C optix rev-parse HEAD).Trim()
-          $denoiserSha = "8893b605903f273512b750d45993bbe27a003362"
+          $denoiserRelease = "optix-denoiser-v2026.05.18"
+          $denoiserSha = "fc927b7eaa5f0c949226f3d23e302ebb0f4e33cf"
+          $optix81Sha = "50021ea0af6d41609a97777ceebbdf1e1d34efe7"
+          $optix90Sha = "fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd"
+          $optix91Sha = "f1f6dd803f3159992d248178f6e09421c6eb8b6d"
           $variantNotes = @"
 
           ## Windows Packages
@@ -90,13 +94,19 @@ jobs:
           | Package | Artifact | Behavior |
           | --- | --- | --- |
           | Houdini-linked | ``$($houdiniAsset.Name)`` | Default app line using Houdini ``idenoise`` with OIDN/OptiX, temporal controls, SideFX options, EXR mode, and custom executable support. |
-          | Bundled OptiX | ``$($optixAsset.Name)`` | Houdini-free app line using bundled NVIDIA OptiX multipart EXR denoising with source metadata preservation. |
+          | Bundled OptiX | ``$($optixAsset.Name)`` | Houdini-free app line bundling OptiX 8.1, 9.0, and 9.1 multipart EXR denoisers with source metadata preservation. Defaults to OptiX 9.0; users can select 8.1 or 9.1 in Settings. |
 
           ## Build SHAs
 
           - Houdini app: ``$houdiniSha``
           - OptiX app: ``$optixSha``
-          - Bundled OptiX denoiser: ``$denoiserSha``
+          - Bundled OptiX denoiser release: ``$denoiserRelease``
+          - Bundled OptiX denoiser source: ``$denoiserSha``
+          - OptiX 8.1 SDK commit: ``$optix81Sha``
+          - OptiX 9.0 SDK commit: ``$optix90Sha``
+          - OptiX 9.1 SDK commit: ``$optix91Sha``
+
+          Note: OptiX 9.1 is included for systems with a sufficiently new NVIDIA driver. Local validation on the maintainer workstation cannot run 9.1 because that driver is below the OptiX 9.1 runtime requirement.
           "@
           $notes = ($meta.Notes.Trim() + "`n" + $variantNotes.Trim()).Trim()
 

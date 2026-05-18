@@ -17,12 +17,13 @@ A Python GUI and scripting library for denoising multipart EXR sequences using a
 - Run without Houdini — Qt binding is auto-detected
 - Full GUI with dark theme, or use the scripting API headlessly
 - Preserve source OpenEXR metadata while denoising selected multipart AOVs
+- Bundle OptiX 8.1, 9.0, and 9.1 denoiser runtimes in the Windows package
 
 ---
 
 ## Setup
 
-Requires [uv](https://docs.astral.sh/uv/) for development. The Windows OptiX package bundles the denoiser executable.
+Requires [uv](https://docs.astral.sh/uv/) for development. The Windows OptiX package bundles the denoiser executables.
 
 ```bash
 git clone https://github.com/Ahmed-Hindy/h_denoise_utils.git
@@ -99,6 +100,7 @@ uv run pytest
 
 - Python 3.7+
 - Bundled OptiX Windows package, or `HDU_DENOISER_EXE` pointing at `Denoiser.exe`
+- Optional runtime selection with `HDU_OPTIX_VERSION=8.1`, `9.0`, or `9.1`; the default is `9.0`
 - One of: PySide6, PySide2, PyQt6, PyQt5 — for the GUI only
 
 ---
