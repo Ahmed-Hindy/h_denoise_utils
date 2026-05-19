@@ -16,9 +16,11 @@ Requirements: 1.1, 1.2, 2.1, 2.2, 3.3, 4.1, 5.1, 5.2
 """
 
 import pytest
-from h_denoise_utils.ui.main_window import BaseWindow
-from h_denoise_utils.ui.qt_compat import QtCore
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
+from h_denoise_utils.ui.main_window import BaseWindow
+from h_denoise_utils.ui.qt_compat import QtCore, QtWidgets
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -47,7 +49,7 @@ def test_lock_disables_all_lockable_widgets(window):
     assert lockable, "_lockable_widgets() must not be empty"
     for widget in lockable:
         assert not widget.isEnabled(), (
-            "Expected {} to be disabled after _apply_ui_lock(True)".format(widget)
+            f"Expected {widget} to be disabled after _apply_ui_lock(True)"
         )
 
 
@@ -82,7 +84,7 @@ def test_unlock_restores_original_states(window):
 
     for widget in lockable:
         assert widget.isEnabled() == pre_run_states[widget], (
-            "Widget {} enabled state not restored after unlock".format(widget)
+            f"Widget {widget} enabled state not restored after unlock"
         )
 
 
@@ -116,17 +118,13 @@ def test_unlock_without_prior_lock_is_noop(window):
     states_before = {w: w.isEnabled() for w in lockable}
 
     # Ensure _pre_run_enabled is empty (fresh window)
-    assert window._pre_run_enabled == {}, (
-        "_pre_run_enabled should be empty on a fresh window"
-    )
+    assert window._pre_run_enabled == {}, "_pre_run_enabled should be empty on a fresh window"
 
     window._apply_ui_lock(False)
 
     for widget in lockable:
         assert widget.isEnabled() == states_before[widget], (
-            "Widget {} state changed unexpectedly after unlock with no prior lock".format(
-                widget
-            )
+            f"Widget {widget} state changed unexpectedly after unlock with no prior lock"
         )
 
 
@@ -172,9 +170,7 @@ def test_scan_busy_callback_keeps_scan_button_disabled_while_running(window):
 
     window._set_scan_busy(False)
 
-    assert not window.scan_btn.isEnabled(), (
-        "scan_btn must remain disabled while is_running=True"
-    )
+    assert not window.scan_btn.isEnabled(), "scan_btn must remain disabled while is_running=True"
 
     window._ui_state.is_running = False
     window._apply_ui_lock(False)
@@ -233,10 +229,6 @@ def test_drop_input_is_ignored_while_running(window, tmp_path, monkeypatch):
 # NOTE: hypothesis @given is not compatible with the qtbot fixture directly.
 # We create the Qt window inside each test body and clean up manually.
 
-from hypothesis import given, settings
-from hypothesis import strategies as st
-from h_denoise_utils.ui.qt_compat import QtWidgets
-
 
 def _get_or_create_app():
     """Return the existing QApplication or create one if needed."""
@@ -271,7 +263,7 @@ def test_property_lock_disables_all_lockable_widgets(enabled_flags):
 
         for widget in lockable:
             assert not widget.isEnabled(), (
-                "Expected {} to be disabled after _apply_ui_lock(True)".format(widget)
+                f"Expected {widget} to be disabled after _apply_ui_lock(True)"
             )
     finally:
         w.close()
@@ -287,7 +279,8 @@ def test_property_lock_disables_all_lockable_widgets(enabled_flags):
 @settings(max_examples=100)
 @given(enabled_flags=st.lists(st.booleans(), min_size=0, max_size=100))
 def test_property_lock_unlock_roundtrip_preserves_states(enabled_flags):
-    # Feature: ui-denoising-lock, Property 2: lock/unlock round-trip preserves pre-run enabled states
+    # Feature: ui-denoising-lock, Property 2:
+    # lock/unlock round-trip preserves pre-run enabled states
     # Validates: Requirements 2.1, 2.2, 3.3
     _get_or_create_app()
     w = BaseWindow()
@@ -308,10 +301,8 @@ def test_property_lock_unlock_roundtrip_preserves_states(enabled_flags):
         # Each widget must be restored to its original state
         for widget in lockable:
             assert widget.isEnabled() == pre_lock_states[widget], (
-                "Widget {} state not restored after lock/unlock round-trip. "
-                "Expected {}, got {}".format(
-                    widget, pre_lock_states[widget], widget.isEnabled()
-                )
+                f"Widget {widget} state not restored after lock/unlock round-trip. "
+                f"Expected {pre_lock_states[widget]}, got {widget.isEnabled()}"
             )
     finally:
         w.close()
@@ -335,9 +326,7 @@ def test_property_unlock_without_prior_lock_is_noop(data):
         lockable = w._lockable_widgets()
 
         # Capture widget states on a fresh window (no prior lock)
-        assert w._pre_run_enabled == {}, (
-            "_pre_run_enabled must be empty on a fresh window"
-        )
+        assert w._pre_run_enabled == {}, "_pre_run_enabled must be empty on a fresh window"
         states_before = {widget: widget.isEnabled() for widget in lockable}
 
         # Call unlock with no prior lock — must be a no-op
@@ -345,10 +334,8 @@ def test_property_unlock_without_prior_lock_is_noop(data):
 
         for widget in lockable:
             assert widget.isEnabled() == states_before[widget], (
-                "Widget {} state changed unexpectedly after unlock with no prior lock. "
-                "Expected {}, got {}".format(
-                    widget, states_before[widget], widget.isEnabled()
-                )
+                f"Widget {widget} state changed unexpectedly after unlock with no prior lock. "
+                f"Expected {states_before[widget]}, got {widget.isEnabled()}"
             )
     finally:
         w.close()

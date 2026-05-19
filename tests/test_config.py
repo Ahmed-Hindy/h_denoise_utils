@@ -1,15 +1,16 @@
 """Tests for core.config module."""
 
 import pytest
+
 from h_denoise_utils.core.config import (
-    AOVConfig,
-    DenoiseConfig,
-    SUPPORTED_BACKENDS,
-    normalize_plane_name,
-    is_beauty_plane,
-    DEFAULT_INPUT_EXTS,
     AOVS_NEVER_DENOISE,
     BEAUTY_AOV_ALIASES,
+    DEFAULT_INPUT_EXTS,
+    SUPPORTED_BACKENDS,
+    AOVConfig,
+    DenoiseConfig,
+    is_beauty_plane,
+    normalize_plane_name,
 )
 
 

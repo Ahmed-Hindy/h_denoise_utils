@@ -4,7 +4,6 @@ import importlib.util
 import os
 import sys
 
-
 _QT_TEST_FILES = {
     "test_aov_scan_manager.py",
     "test_logging_handler.py",

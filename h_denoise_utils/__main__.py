@@ -304,9 +304,7 @@ def _run_cli_denoise(args: argparse.Namespace) -> int:
             print("Bundled OIDN Denoiser.exe was not found.", file=sys.stderr)
         else:
             print(
-                "Bundled OptiX Denoiser.exe was not found for OptiX {}.".format(
-                    optix_version
-                ),
+                f"Bundled OptiX Denoiser.exe was not found for OptiX {optix_version}.",
                 file=sys.stderr,
             )
         return 1
@@ -328,17 +326,15 @@ def _run_cli_denoise(args: argparse.Namespace) -> int:
         prep_result = denoiser.prepare()
         if prep_result.get("status") != "ready":
             print(
-                "Preparation failed: {}".format(
-                    prep_result.get("message", "Unknown error")
-                ),
+                "Preparation failed: {}".format(prep_result.get("message", "Unknown error")),
                 file=sys.stderr,
             )
             return 1
 
         file_count = prep_result["file_count"]
-        runtime_label = "OIDN" if backend == "oidn" else "OptiX {}".format(optix_version)
-        print("Using {} backend: {}".format(runtime_label, denoiser_path))
-        print("Processing {} file(s)...".format(file_count))
+        runtime_label = "OIDN" if backend == "oidn" else f"OptiX {optix_version}"
+        print(f"Using {runtime_label} backend: {denoiser_path}")
+        print(f"Processing {file_count} file(s)...")
 
         processed = 0
         skipped = 0
@@ -350,11 +346,11 @@ def _run_cli_denoise(args: argparse.Namespace) -> int:
             if result["status"] == "success":
                 processed += 1
                 prev_output = result.get("output_path")
-                print("[{}/{}] Denoised: {}".format(index + 1, file_count, file_name))
+                print(f"[{index + 1}/{file_count}] Denoised: {file_name}")
             elif result["status"] == "skipped":
                 skipped += 1
                 prev_output = result.get("output_path") or prev_output
-                print("[{}/{}] Skipped: {}".format(index + 1, file_count, file_name))
+                print(f"[{index + 1}/{file_count}] Skipped: {file_name}")
             else:
                 failed.append(file_name)
                 print(
@@ -367,14 +363,10 @@ def _run_cli_denoise(args: argparse.Namespace) -> int:
                     file=sys.stderr,
                 )
 
-        print(
-            "Finished: {} processed, {} skipped, {} failed.".format(
-                processed, skipped, len(failed)
-            )
-        )
+        print(f"Finished: {processed} processed, {skipped} skipped, {len(failed)} failed.")
         output_folder = prep_result.get("output_folder")
         if output_folder:
-            print("Output folder: {}".format(output_folder))
+            print(f"Output folder: {output_folder}")
         return 1 if failed else 0
     except Exception as exc:
         print(str(exc), file=sys.stderr)

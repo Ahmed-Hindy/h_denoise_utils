@@ -7,12 +7,7 @@ from h_denoise_utils.discovery import bundled_denoiser
 
 def _write_variant(tmp_path, version):
     exe = (
-        tmp_path
-        / "vendor"
-        / "optix-denoiser"
-        / "windows-x64"
-        / "optix-{}".format(version)
-        / "Denoiser.exe"
+        tmp_path / "vendor" / "optix-denoiser" / "windows-x64" / f"optix-{version}" / "Denoiser.exe"
     )
     exe.parent.mkdir(parents=True)
     exe.write_text("placeholder")

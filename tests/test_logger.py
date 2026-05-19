@@ -32,7 +32,7 @@ def logger_name():
 
     def _make(prefix="logger_test"):
         # type: (str) -> str
-        name = "{}_{}".format(prefix, uuid.uuid4().hex)
+        name = f"{prefix}_{uuid.uuid4().hex}"
         created.append(name)
         return name
 
@@ -61,7 +61,7 @@ def test_setup_logger_uses_env_log_dir(monkeypatch, logger_name, tmp_path):
     logger.info("hello")
     _flush_handlers(logger)
 
-    log_path = tmp_path / "{}.log".format(name)
+    log_path = tmp_path / f"{name}.log"
     assert logger_module.get_log_dir() == str(tmp_path)
     assert log_path.exists()
     assert "hello" in log_path.read_text(encoding="utf-8")

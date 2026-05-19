@@ -3,8 +3,8 @@
 import os
 
 from h_denoise_utils import __version__
-from h_denoise_utils.ui.main_window import BaseWindow
 from h_denoise_utils.ui import main_window as main_window_module
+from h_denoise_utils.ui.main_window import BaseWindow
 from h_denoise_utils.ui.sections import QWIDGETSIZE_MAX
 
 
@@ -21,7 +21,7 @@ def test_window_title_includes_version(qtbot, monkeypatch):
     monkeypatch.delenv("ENV_IS_DEV", raising=False)
     window = BaseWindow()
     qtbot.addWidget(window)
-    assert window.windowTitle() == "Denoiser {}".format(__version__)
+    assert window.windowTitle() == f"Denoiser {__version__}"
 
 
 def test_window_constructs(qtbot):
@@ -61,10 +61,7 @@ def test_about_dialog_uses_package_version(qtbot, monkeypatch):
 
     assert captured["parent"] is window
     assert captured["title"] == "About Denoiser"
-    assert (
-        "<b>Denoiser</b><br>Version {}<br><br>".format(__version__)
-        in captured["message"]
-    )
+    assert f"<b>Denoiser</b><br>Version {__version__}<br><br>" in captured["message"]
 
 
 def test_output_label_updates(qtbot, tmp_path):

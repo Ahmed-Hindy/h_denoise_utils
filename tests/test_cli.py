@@ -39,7 +39,7 @@ class FakeDenoiser:
             return {"status": "error", "message": "boom"}
         return {
             "status": "success",
-            "output_path": "out/{}".format(self.files[index]),
+            "output_path": f"out/{self.files[index]}",
         }
 
     def cleanup(self):
