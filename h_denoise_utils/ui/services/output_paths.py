@@ -3,8 +3,7 @@
 import os
 
 
-def preview_output_path(input_path, selected_root):
-    # type: (str, str) -> str
+def preview_output_path(input_path: str, selected_root: str) -> str:
     """Compute the preview directory where denoised images will be saved.
 
     Args:

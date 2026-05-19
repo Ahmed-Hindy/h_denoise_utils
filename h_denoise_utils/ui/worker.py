@@ -1,8 +1,10 @@
 """Worker thread for background denoising."""
 
-from .qt_compat import QtCore, Signal
+from __future__ import annotations
 
+from ..core.config import AOVConfig, DenoiseConfig
 from ..core.denoiser import Denoiser
+from .qt_compat import QtCore, Signal
 
 
 class DenoiseWorker(QtCore.QThread):
@@ -15,16 +17,15 @@ class DenoiseWorker(QtCore.QThread):
 
     def __init__(
         self,
-        input_path,  # type: str
-        denoise_config,  # type: DenoiseConfig
-        aov_config,  # type: AOVConfig
-        denoiser_path,  # type: str
-        extensions=None,  # type: Optional[List[str]]
-        file_list=None,  # type: Optional[List[str]]
-        parent=None,  # type: Optional[QtCore.QObject]
-    ):
-        # type: (...) -> None
-        super(DenoiseWorker, self).__init__(parent)
+        input_path: str,
+        denoise_config: DenoiseConfig,
+        aov_config: AOVConfig,
+        denoiser_path: str,
+        extensions: list[str] | None = None,
+        file_list: list[str] | None = None,
+        parent: QtCore.QObject | None = None,
+    ) -> None:
+        super().__init__(parent)
         self.input_path = input_path
         self.denoise_config = denoise_config
         self.aov_config = aov_config
@@ -33,13 +34,11 @@ class DenoiseWorker(QtCore.QThread):
         self.file_list = file_list
         self._stop_requested = False
 
-    def request_stop(self):
-        # type: () -> None
+    def request_stop(self) -> None:
         """Request the worker to stop."""
         self._stop_requested = True
 
-    def run(self):
-        # type: () -> None
+    def run(self) -> None:
         """Run the denoising process."""
         try:
             # Create denoiser
@@ -58,16 +57,14 @@ class DenoiseWorker(QtCore.QThread):
 
             if prep_result["status"] != "ready":
                 self.log_message.emit(
-                    "Preparation failed: {}".format(
-                        prep_result.get("message", "Unknown error")
-                    ),
+                    "Preparation failed: {}".format(prep_result.get("message", "Unknown error")),
                     "error",
                 )
                 self.finished.emit({"processed": 0, "skipped": 0, "failed": []})
                 return
 
             file_count = prep_result["file_count"]
-            self.log_message.emit("Processing {} files...".format(file_count), "info")
+            self.log_message.emit(f"Processing {file_count} files...", "info")
 
             # Process files
             processed = 0
@@ -87,18 +84,14 @@ class DenoiseWorker(QtCore.QThread):
                     processed += 1
                     prev_output = result.get("output_path")
                     self.log_message.emit(
-                        "[{}/{}] Denoised: {}".format(
-                            i + 1, file_count, denoiser.files[i]
-                        ),
+                        f"[{i + 1}/{file_count}] Denoised: {denoiser.files[i]}",
                         "success",
                     )
                 elif result["status"] == "skipped":
                     skipped += 1
                     prev_output = result.get("output_path") or prev_output
                     self.log_message.emit(
-                        "[{}/{}] Skipped: {}".format(
-                            i + 1, file_count, denoiser.files[i]
-                        ),
+                        f"[{i + 1}/{file_count}] Skipped: {denoiser.files[i]}",
                         "info",
                     )
                 else:
@@ -126,14 +119,10 @@ class DenoiseWorker(QtCore.QThread):
             self.finished.emit(summary)
 
             if failed:
-                self.log_message.emit(
-                    "Completed with {} errors".format(len(failed)), "warning"
-                )
+                self.log_message.emit(f"Completed with {len(failed)} errors", "warning")
             else:
-                self.log_message.emit(
-                    "Successfully processed {} files".format(processed), "success"
-                )
+                self.log_message.emit(f"Successfully processed {processed} files", "success")
 
         except Exception as e:
-            self.log_message.emit("Error: {}".format(str(e)), "error")
+            self.log_message.emit(f"Error: {str(e)}", "error")
             self.finished.emit({"processed": 0, "skipped": 0, "failed": []})

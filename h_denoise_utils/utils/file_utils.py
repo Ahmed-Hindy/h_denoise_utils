@@ -1,11 +1,12 @@
 """File operation utilities."""
 
+from __future__ import annotations
+
 import os
 import re
 
 
-def natural_sort_key(name):
-    # type: (str) -> List
+def natural_sort_key(name: str) -> list:
     """Generate a natural sort key (so '2' < '10').
 
     Args:
@@ -18,8 +19,7 @@ def natural_sort_key(name):
     return [int(t) if t.isdigit() else t.lower() for t in num_re.split(name)]
 
 
-def is_image_file(name, extensions):
-    # type: (str, List[str]) -> bool
+def is_image_file(name: str, extensions: list[str]) -> bool:
     """Check if filename has one of the allowed extensions.
 
     Args:
@@ -36,8 +36,7 @@ def is_image_file(name, extensions):
     return any(name_lower.endswith(ext) for ext in extensions)
 
 
-def scan_images(folder, extensions):
-    # type: (str, List[str]) -> List[str]
+def scan_images(folder: str, extensions: list[str]) -> list[str]:
     """List image filenames in a folder.
 
     Args:
@@ -47,7 +46,7 @@ def scan_images(folder, extensions):
     Returns:
         List of image filenames (not full paths)
     """
-    items = []  # type: List[str]
+    items: list[str] = []
     try:
         for entry in os.scandir(folder):
             if entry.is_file() and is_image_file(entry.name, extensions):
@@ -57,8 +56,7 @@ def scan_images(folder, extensions):
     return items
 
 
-def build_output_path(src_full, out_folder, prefix):
-    # type: (str, str, str) -> str
+def build_output_path(src_full: str, out_folder: str, prefix: str) -> str:
     """Build output path by prepending prefix to filename.
 
     Args:
@@ -73,7 +71,7 @@ def build_output_path(src_full, out_folder, prefix):
         ValueError: If output path would escape output folder
     """
     base = os.path.basename(src_full)
-    dst_name = "{}{}".format(prefix, base)
+    dst_name = f"{prefix}{base}"
 
     # Security: validate output path doesn't escape output folder
     output_path = os.path.normpath(os.path.join(out_folder, dst_name))
@@ -85,20 +83,15 @@ def build_output_path(src_full, out_folder, prefix):
     try:
         common = os.path.commonpath([output_path_abs, out_folder_abs])
     except ValueError:
-        raise ValueError(
-            "Output path {} would escape output folder".format(output_path)
-        )
+        raise ValueError(f"Output path {output_path} would escape output folder")
 
     if common != out_folder_abs:
-        raise ValueError(
-            "Output path {} would escape output folder".format(output_path)
-        )
+        raise ValueError(f"Output path {output_path} would escape output folder")
 
     return output_path
 
 
-def compute_output_folder(in_path, extensions):
-    # type: (str, List[str]) -> str
+def compute_output_folder(in_path: str, extensions: list[str]) -> str:
     """Compute output folder as 'denoised' subfolder next to input.
 
     Args:
@@ -108,9 +101,7 @@ def compute_output_folder(in_path, extensions):
     Returns:
         Path to output folder
     """
-    base_dir = (
-        in_path if os.path.isdir(in_path) else (os.path.dirname(in_path) or os.getcwd())
-    )
+    base_dir = in_path if os.path.isdir(in_path) else (os.path.dirname(in_path) or os.getcwd())
     out = os.path.join(base_dir, "denoised")
     os.makedirs(out, exist_ok=True)
     return out.replace("\\", "/")

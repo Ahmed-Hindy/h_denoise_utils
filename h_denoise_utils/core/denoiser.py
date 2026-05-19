@@ -1,31 +1,34 @@
 """Batch denoising orchestration."""
 
+from __future__ import annotations
+
 import logging
 import os
 import shutil
 import tempfile
+from typing import Any
 
-from .config import (
-    AOVConfig,
-    DenoiseConfig,
-    DEFAULT_INPUT_EXTS,
-    AOVS_NEVER_DENOISE,
-    normalize_plane_name,
-    is_beauty_plane,
-)
-from .command_builder import build_bundled_multipart_command
+from ..discovery.aov_validator import filter_existing_aovs
 from ..discovery.bundled_denoiser import resolve_bundled_denoiser
 from ..discovery.bundled_oidn import resolve_bundled_oidn_denoiser
 from ..discovery.exr_inspector import list_exr_planes
-from ..discovery.aov_validator import filter_existing_aovs
 from ..utils.file_utils import (
-    scan_images,
-    natural_sort_key,
-    is_image_file,
     build_output_path,
     compute_output_folder,
+    is_image_file,
+    natural_sort_key,
+    scan_images,
 )
 from ..utils.process_utils import run_subprocess
+from .command_builder import build_bundled_multipart_command
+from .config import (
+    AOVS_NEVER_DENOISE,
+    DEFAULT_INPUT_EXTS,
+    AOVConfig,
+    DenoiseConfig,
+    is_beauty_plane,
+    normalize_plane_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,15 +38,14 @@ class Denoiser:
 
     def __init__(
         self,
-        input_path,  # type: str
-        denoise_config=None,  # type: Optional[DenoiseConfig]
-        aov_config=None,  # type: Optional[AOVConfig]
-        denoiser_path=None,  # type: Optional[str]
-        output_folder=None,  # type: Optional[str]
-        extensions=None,  # type: Optional[List[str]]
-        file_list=None,  # type: Optional[List[str]]
-    ):
-        # type: (...) -> None
+        input_path: str,
+        denoise_config: DenoiseConfig | None = None,
+        aov_config: AOVConfig | None = None,
+        denoiser_path: str | None = None,
+        output_folder: str | None = None,
+        extensions: list[str] | None = None,
+        file_list: list[str] | None = None,
+    ) -> None:
         """Initialize denoiser.
 
         Args:
@@ -67,24 +69,20 @@ class Denoiser:
         self.extensions = DEFAULT_INPUT_EXTS if extensions is None else extensions
         self.file_list = file_list
 
-        self.temp_root = None  # type: Optional[str]
-        self.files = []  # type: List[str]
-        self.base_folder = ""  # type: str
-        self.dest_folder = ""  # type: str
+        self.temp_root: str | None = None
+        self.files: list[str] = []
+        self.base_folder: str = ""
+        self.dest_folder: str = ""
 
-    def prepare(self):
-        # type: () -> Dict[str, Any]
+    def prepare(self) -> dict[str, Any]:
         """Prepare for denoising (validate inputs, create temp dirs).
 
         Returns:
             Dict with preparation results
         """
         if not self.denoiser_path or not os.path.isfile(self.denoiser_path):
-            raise FileNotFoundError(
-                "Could not locate bundled {} denoiser executable".format(
-                    self.denoise_config.backend.upper()
-                )
-            )
+            backend_upper = self.denoise_config.backend.upper()
+            raise FileNotFoundError(f"Could not locate bundled {backend_upper} denoiser executable")
         if self.denoise_config.backend not in ("optix", "oidn"):
             raise ValueError("The bundled denoiser branch only supports OptiX and OIDN")
         if self.denoise_config.temporal:
@@ -124,12 +122,10 @@ class Denoiser:
             files_with_names = [(os.path.basename(f), f) for f in valid_files]
             files_with_names.sort(key=lambda pair: natural_sort_key(pair[0]))
             self.files = [name for name, _ in files_with_names]
-            self.dest_folder = self.output_folder or compute_output_folder(
-                self.base_folder, exts
-            )
+            self.dest_folder = self.output_folder or compute_output_folder(self.base_folder, exts)
         else:
             if not os.path.exists(self.input_path):
-                raise FileNotFoundError("Input not found: {}".format(self.input_path))
+                raise FileNotFoundError(f"Input not found: {self.input_path}")
             if os.path.isdir(self.input_path):
                 self.base_folder = self.input_path
                 self.files = scan_images(self.input_path, exts)
@@ -144,7 +140,7 @@ class Denoiser:
                 if not is_image_file(self.input_path, exts):
                     return {
                         "status": "unsupported",
-                        "message": "Unsupported file type: {}".format(self.input_path),
+                        "message": f"Unsupported file type: {self.input_path}",
                     }
                 self.files = [os.path.basename(self.input_path)]
                 self.dest_folder = self.output_folder or compute_output_folder(
@@ -175,8 +171,7 @@ class Denoiser:
             "output_folder": self.dest_folder,
         }
 
-    def _validate_aovs(self, probe_file):
-        # type: (str) -> None
+    def _validate_aovs(self, probe_file: str) -> None:
         """Validate and filter AOVs based on what exists in the EXR."""
         aovs_to_denoise = self.aov_config.aovs_to_denoise
 
@@ -225,8 +220,7 @@ class Denoiser:
             extra_aovs=validated.get("extra_aovs"),
         )
 
-    def denoise_one(self, index, prev_output=None):
-        # type: (int, Optional[str]) -> Dict[str, Any]
+    def denoise_one(self, index: int, prev_output: str | None = None) -> dict[str, Any]:
         """Denoise a single file.
 
         Args:
@@ -244,17 +238,15 @@ class Denoiser:
         temp_out = os.path.join(self.temp_root, "out")
 
         src = os.path.join(temp_in, fname)
-        dst = os.path.join(temp_out, "{}{}".format(self.denoise_config.prefix, fname))
+        dst = os.path.join(temp_out, f"{self.denoise_config.prefix}{fname}")
         orig_src = os.path.join(self.base_folder, fname)
-        final_dst = build_output_path(
-            orig_src, self.dest_folder, self.denoise_config.prefix
-        )
+        final_dst = build_output_path(orig_src, self.dest_folder, self.denoise_config.prefix)
 
         # Check if already exists
         if os.path.exists(final_dst) and not self.denoise_config.overwrite:
             return {
                 "status": "skipped",
-                "message": "Output exists: {}".format(final_dst),
+                "message": f"Output exists: {final_dst}",
                 "output_path": final_dst,
             }
 
@@ -279,12 +271,11 @@ class Denoiser:
                 os.remove(final_dst)
             shutil.copy2(dst, final_dst)
         except Exception as e:
-            return {"status": "error", "message": "Copy failed: {}".format(e)}
+            return {"status": "error", "message": f"Copy failed: {e}"}
 
         return {"status": "success", "output_path": final_dst}
 
-    def cleanup(self):
-        # type: () -> None
+    def cleanup(self) -> None:
         """Clean up temporary files."""
         if self.temp_root and os.path.exists(self.temp_root):
             try:

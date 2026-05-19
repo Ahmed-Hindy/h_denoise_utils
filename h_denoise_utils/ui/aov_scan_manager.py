@@ -1,5 +1,7 @@
 """AOV scan worker manager for the UI."""
 
+from __future__ import annotations
+
 from .qt_compat import QtCore, Signal
 from .services.aov_inspector import analyze_aovs
 
@@ -9,8 +11,9 @@ class AovAnalyzeWorker(QtCore.QThread):
 
     completed = Signal(dict)
 
-    def __init__(self, path, selected_files, parent=None):
-        # type: (str, List[str], Optional[QtCore.QObject]) -> None
+    def __init__(
+        self, path: str, selected_files: list[str], parent: QtCore.QObject | None = None
+    ) -> None:
         """Initialize the background AOV analysis worker.
 
         Args:
@@ -18,12 +21,11 @@ class AovAnalyzeWorker(QtCore.QThread):
             selected_files: List of selected file names.
             parent: Optional parent QObject.
         """
-        super(AovAnalyzeWorker, self).__init__(parent)
+        super().__init__(parent)
         self._path = path
         self._selected_files = list(selected_files or [])
 
-    def run(self):
-        # type: () -> None
+    def run(self) -> None:
         """Execute the AOV analysis in the background thread."""
         if self.isInterruptionRequested():
             return
@@ -40,24 +42,22 @@ class AovScanManager(QtCore.QObject):
     completed = Signal(dict)
     timed_out = Signal()
 
-    def __init__(self, timeout_ms=10000, parent=None):
-        # type: (int, Optional[QtCore.QObject]) -> None
+    def __init__(self, timeout_ms: int = 10000, parent: QtCore.QObject | None = None) -> None:
         """Initialize the AOV scan manager.
 
         Args:
             timeout_ms: Timeout duration in milliseconds for the background scan.
             parent: Optional parent QObject.
         """
-        super(AovScanManager, self).__init__(parent)
+        super().__init__(parent)
         self._timeout_ms = timeout_ms
-        self._worker = None  # type: Optional[AovAnalyzeWorker]
+        self._worker: AovAnalyzeWorker | None = None
         self._token = 0
         self._timer = QtCore.QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._on_timeout)
 
-    def start(self, path, selected_files):
-        # type: (str, List[str]) -> None
+    def start(self, path: str, selected_files: list[str]) -> None:
         """Start a new AOV scan background worker.
 
         Cancels any ongoing scan and invalidates stale results.
@@ -76,13 +76,11 @@ class AovScanManager(QtCore.QObject):
         self.started.emit()
         worker.start()
 
-    def cancel(self):
-        # type: () -> None
+    def cancel(self) -> None:
         """Cancel the current AOV scan."""
         self._stop_current(invalidate=True)
 
-    def _stop_current(self, invalidate):
-        # type: (bool) -> None
+    def _stop_current(self, invalidate: bool) -> None:
         """Stop the currently running background worker and timer.
 
         Args:
@@ -97,16 +95,14 @@ class AovScanManager(QtCore.QObject):
         if invalidate:
             self._token += 1
 
-    def _on_timeout(self):
-        # type: () -> None
+    def _on_timeout(self) -> None:
         """Handle scan timeout by stopping the worker and emitting timed_out."""
         if not self._worker or not self._worker.isRunning():
             return
         self._stop_current(invalidate=True)
         self.timed_out.emit()
 
-    def _on_complete(self, token, result):
-        # type: (int, dict) -> None
+    def _on_complete(self, token: int, result: dict) -> None:
         """Handle completion of background scan if token matches.
 
         Args:

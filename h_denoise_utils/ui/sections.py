@@ -8,6 +8,8 @@ references back onto the window instance (`window.path_edit`,
 `BaseWindow` rather than constructing a standalone section object.
 """
 
+from __future__ import annotations
+
 from ..core.config import PRESETS
 from .qt_compat import QtCore, QtWidgets
 from .widgets import (
@@ -19,8 +21,7 @@ from .widgets import (
 QWIDGETSIZE_MAX = 16777215
 
 
-def build_config_scroll(window, top_layout):
-    # type: (object, QtWidgets.QVBoxLayout) -> QtWidgets.QVBoxLayout
+def build_config_scroll(window: object, top_layout: QtWidgets.QVBoxLayout) -> QtWidgets.QVBoxLayout:
     """Build the configuration scroll area and add it to the top layout.
 
     Args:
@@ -51,8 +52,7 @@ def build_config_scroll(window, top_layout):
     return config_layout
 
 
-def build_source_section(window, top_layout):
-    # type: (object, QtWidgets.QVBoxLayout) -> None
+def build_source_section(window: object, top_layout: QtWidgets.QVBoxLayout) -> None:
     """Build the Source input section card and widgets.
 
     Args:
@@ -82,18 +82,14 @@ def build_source_section(window, top_layout):
     input_header_row.addWidget(window.path_edit, 1)
 
     window.browse_btn = QtWidgets.QToolButton()
-    window.browse_btn.setIcon(
-        window.app_style.standardIcon(QtWidgets.QStyle.SP_DirOpenIcon)
-    )
+    window.browse_btn.setIcon(window.app_style.standardIcon(QtWidgets.QStyle.SP_DirOpenIcon))
     window.browse_btn.setAutoRaise(True)
     window.browse_btn.setIconSize(QtCore.QSize(16, 16))
     window.browse_btn.setFixedSize(26, 26)
     input_header_row.addWidget(window.browse_btn)
 
     window.scan_btn = QtWidgets.QToolButton()
-    window.scan_btn.setIcon(
-        window.app_style.standardIcon(QtWidgets.QStyle.SP_BrowserReload)
-    )
+    window.scan_btn.setIcon(window.app_style.standardIcon(QtWidgets.QStyle.SP_BrowserReload))
     window.scan_btn.setAutoRaise(True)
     window.scan_btn.setIconSize(QtCore.QSize(16, 16))
     window.scan_btn.setFixedSize(26, 26)
@@ -145,9 +141,7 @@ def build_source_section(window, top_layout):
     window.files_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
     window.files_list.setUniformItemSizes(True)
     window.files_list.setMaximumHeight(96)
-    window.files_list.setSizePolicy(
-        QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
-    )
+    window.files_list.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
     files_layout.addLayout(files_header)
     files_layout.addWidget(window.files_list)
     window.files_panel.setVisible(False)
@@ -160,8 +154,7 @@ def build_source_section(window, top_layout):
     top_layout.addWidget(window.input_section)
 
 
-def build_destination_section(window, top_layout):
-    # type: (object, QtWidgets.QVBoxLayout) -> None
+def build_destination_section(window: object, top_layout: QtWidgets.QVBoxLayout) -> None:
     """Build the Destination output section card and widgets.
 
     Args:
@@ -184,9 +177,7 @@ def build_destination_section(window, top_layout):
     window.output_toggle.setAutoRaise(True)
     output_header_row.addWidget(window.output_toggle)
     if window._input_header_spacer:
-        window._input_header_spacer.setFixedWidth(
-            window.output_toggle.sizeHint().width()
-        )
+        window._input_header_spacer.setFixedWidth(window.output_toggle.sizeHint().width())
     output_header = QtWidgets.QLabel("Destination")
     output_header.setObjectName("sectionTitle")
     output_header_row.addWidget(output_header)
@@ -234,8 +225,7 @@ def build_destination_section(window, top_layout):
     top_layout.addWidget(window.output_section)
 
 
-def build_extras_section(window, top_layout):
-    # type: (object, QtWidgets.QVBoxLayout) -> None
+def build_extras_section(window: object, top_layout: QtWidgets.QVBoxLayout) -> None:
     """Build the settings / extras collapsible card and nested controls.
 
     Args:
@@ -295,37 +285,27 @@ def build_extras_section(window, top_layout):
     settings_form.setFieldGrowthPolicy(QtWidgets.QFormLayout.ExpandingFieldsGrow)
 
     advanced_settings_form = QtWidgets.QFormLayout()
-    advanced_settings_form.setLabelAlignment(
-        QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter
-    )
+    advanced_settings_form.setLabelAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
     advanced_settings_form.setFormAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
     advanced_settings_form.setContentsMargins(0, 6, 0, 0)
     advanced_settings_form.setHorizontalSpacing(8)
     advanced_settings_form.setVerticalSpacing(4)
-    advanced_settings_form.setFieldGrowthPolicy(
-        QtWidgets.QFormLayout.ExpandingFieldsGrow
-    )
+    advanced_settings_form.setFieldGrowthPolicy(QtWidgets.QFormLayout.ExpandingFieldsGrow)
 
     window.beauty_combo = NoWheelComboBox()
     window.beauty_combo.setEditable(True)
     window.beauty_combo.lineEdit().setPlaceholderText("e.g. C")
-    window.beauty_combo.setSizePolicy(
-        QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
-    )
+    window.beauty_combo.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
 
     window.albedo_combo = NoWheelComboBox()
     window.albedo_combo.setEditable(True)
     window.albedo_combo.lineEdit().setPlaceholderText("e.g. albedo")
-    window.albedo_combo.setSizePolicy(
-        QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
-    )
+    window.albedo_combo.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
 
     window.normal_combo = NoWheelComboBox()
     window.normal_combo.setEditable(True)
     window.normal_combo.lineEdit().setPlaceholderText("e.g. N")
-    window.normal_combo.setSizePolicy(
-        QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
-    )
+    window.normal_combo.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
 
     window.prefix_edit = QtWidgets.QLineEdit("den_")
     window.prefix_edit.setMaxLength(32)
@@ -346,7 +326,7 @@ def build_extras_section(window, top_layout):
 
     window.optix_version_combo = NoWheelComboBox()
     for version in window.supported_optix_versions:
-        window.optix_version_combo.addItem("OptiX {}".format(version), version)
+        window.optix_version_combo.addItem(f"OptiX {version}", version)
     current_index = window.optix_version_combo.findData(window.selected_optix_version)
     if current_index >= 0:
         window.optix_version_combo.setCurrentIndex(current_index)
@@ -398,8 +378,7 @@ def build_extras_section(window, top_layout):
     top_layout.addWidget(window.advanced_section)
 
 
-def build_action_bar(window, top_layout):
-    # type: (object, QtWidgets.QVBoxLayout) -> None
+def build_action_bar(window: object, top_layout: QtWidgets.QVBoxLayout) -> None:
     """Build the action/execution control bar widgets.
 
     Args:
@@ -428,18 +407,14 @@ def build_action_bar(window, top_layout):
     progress_row.setSpacing(8)
 
     window.progress = QtWidgets.QProgressBar()
-    window.progress.setSizePolicy(
-        QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
-    )
+    window.progress.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
     window.progress.setMinimumHeight(16)
     window.progress_label = QtWidgets.QLabel("File 0 of 0 | ETA --:--")
     window.progress_label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
     progress_row.addWidget(window.progress)
     progress_row.addWidget(window.progress_label)
     window.open_output_btn = QtWidgets.QToolButton()
-    window.open_output_btn.setIcon(
-        window.app_style.standardIcon(QtWidgets.QStyle.SP_DirIcon)
-    )
+    window.open_output_btn.setIcon(window.app_style.standardIcon(QtWidgets.QStyle.SP_DirIcon))
     window.open_output_btn.setAutoRaise(True)
     window.open_output_btn.setIconSize(QtCore.QSize(16, 16))
     window.open_output_btn.setFixedSize(26, 26)
@@ -454,8 +429,7 @@ def build_action_bar(window, top_layout):
     top_layout.addWidget(action_bar)
 
 
-def build_logs_section(window, logs_layout):
-    # type: (object, QtWidgets.QVBoxLayout) -> None
+def build_logs_section(window: object, logs_layout: QtWidgets.QVBoxLayout) -> None:
     """Build the log console section showing tabular logs.
 
     Args:

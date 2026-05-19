@@ -26,9 +26,7 @@ if isUIAvailable:
 elif QT_BACKEND:
     if QT_BACKEND not in _BACKEND_MODULES:
         raise ValueError(
-            "Invalid QT_BACKEND: {}. Must be one of: pyside6, pyside2, pyqt6, pyqt5".format(
-                QT_BACKEND
-            )
+            f"Invalid QT_BACKEND: {QT_BACKEND}. Must be one of: pyside6, pyside2, pyqt6, pyqt5"
         )
     _backend = QT_BACKEND
 else:
@@ -47,9 +45,9 @@ if _backend is None:
     )
 
 _module = _BACKEND_MODULES[_backend]
-QtCore = importlib.import_module("{}.QtCore".format(_module))
-QtGui = importlib.import_module("{}.QtGui".format(_module))
-QtWidgets = importlib.import_module("{}.QtWidgets".format(_module))
+QtCore = importlib.import_module(f"{_module}.QtCore")
+QtGui = importlib.import_module(f"{_module}.QtGui")
+QtWidgets = importlib.import_module(f"{_module}.QtWidgets")
 
 if not hasattr(QtWidgets, "QAction") and hasattr(QtGui, "QAction"):
     QtWidgets.QAction = QtGui.QAction
@@ -61,8 +59,7 @@ QtAction = QtWidgets.QAction
 QT_BACKEND_NAME = _backend
 
 
-def get_qt_backend():
-    # type: () -> str
+def get_qt_backend() -> str:
     """Get the active Qt backend name."""
     return QT_BACKEND_NAME
 

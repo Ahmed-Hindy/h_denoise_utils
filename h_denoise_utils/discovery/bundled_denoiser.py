@@ -161,13 +161,11 @@ def resolve_bundled_denoiser(
             else f"Default OptiX {DEFAULT_OPTIX_VERSION} was selected. "
         )
         expected = ", ".join(
-            str(_denoiser_base_dir() / f"optix-{v}" / _exe_name())
-            for v in SUPPORTED_OPTIX_VERSIONS
+            str(_denoiser_base_dir() / f"optix-{v}" / _exe_name()) for v in SUPPORTED_OPTIX_VERSIONS
         )
         if os.name != "nt":
             raise FileNotFoundError(
-                "Bundled OptiX denoising is currently available only in the "
-                "Windows package."
+                "Bundled OptiX denoising is currently available only in the Windows package."
             )
         location = getattr(sys, "_MEIPASS", None) or str(_package_root())
         raise FileNotFoundError(
