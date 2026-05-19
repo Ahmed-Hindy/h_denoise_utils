@@ -46,6 +46,12 @@ uv run h-denoise
 python -m h_denoise_utils
 ```
 
+**CLI batch denoise:**
+```bash
+uv run h-denoise /path/to/renders --backend optix --optix-version 9.0
+uv run h-denoise /path/to/input.exr --backend oidn --beauty-name C --albedo-name albedo --normal-name N --aov-name directdiffuse --aov-name indirectdiffuse
+```
+
 **Scripting:**
 ```python
 from h_denoise_utils.core.denoiser import Denoiser
