@@ -33,8 +33,6 @@ This branch is the Houdini-free OptiX release line. Keep `main` as the Houdini-l
   - `h_denoise_utils/vendor/optix-denoiser/windows-x64/optix-9.1/Denoiser.exe`
 - Default runtime: OptiX 9.0
 - Runtime selector: Settings -> Bundled Runtime -> OptiX Runtime
-- Runtime environment override: `HDU_OPTIX_VERSION=8.1`, `9.0`, or `9.1`
-- Development override: `HDU_DENOISER_EXE`
 
 The vendor directory is ignored by Git and should be populated before package builds.
 
@@ -48,7 +46,7 @@ Runtime matrix:
 
 ## Runtime Entry Points
 
-- `h_denoise_utils/discovery/bundled_denoiser.py` resolves the bundled executable selected by the UI, `HDU_OPTIX_VERSION`, or `HDU_DENOISER_EXE`.
+- `h_denoise_utils/discovery/bundled_denoiser.py` resolves the bundled executable selected by the UI.
 - `h_denoise_utils/core/command_builder.py` builds the bundled command:
   - `Denoiser.exe -v 1 -multipart input.exr -o output.exr -beauty-name C ...`
 - `h_denoise_utils/discovery/exr_inspector.py` performs pure Python EXR header parsing for multipart names and layered channel stems.
@@ -129,8 +127,6 @@ Frozen app smoke checks passed for the default runtime and explicit alternate ru
 
 ```powershell
 .\dist\h-denoise\h-denoise.exe --smoke-test
-$env:HDU_OPTIX_VERSION='8.1'; .\dist\h-denoise\h-denoise.exe --smoke-test
-$env:HDU_OPTIX_VERSION='9.1'; .\dist\h-denoise\h-denoise.exe --smoke-test
 ```
 
 ## Manual Canyon Run Expectations

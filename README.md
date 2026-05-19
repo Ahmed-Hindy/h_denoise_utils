@@ -102,8 +102,7 @@ uv run pytest
 ## Requirements
 
 - Python 3.7+
-- Bundled Windows package, or `HDU_DENOISER_EXE` / `HDU_OIDN_DENOISER_EXE` pointing at custom `Denoiser.exe` builds for development
-- Optional runtime selection with `HDU_OPTIX_VERSION=8.1`, `9.0`, or `9.1`; the default is `9.0`
+- Bundled Windows package containing the OptiX and OIDN runtimes
 - One of: PySide6, PySide2, PyQt6, PyQt5 — for the GUI only
 
 ---

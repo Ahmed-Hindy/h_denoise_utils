@@ -19,17 +19,7 @@ def _write_variant(tmp_path, version):
     return exe
 
 
-def test_resolve_uses_env_override(monkeypatch, tmp_path):
-    exe = tmp_path / "Denoiser.exe"
-    exe.write_text("placeholder")
-    monkeypatch.setenv(bundled_denoiser.ENV_DENOISER_EXE, str(exe))
-
-    assert bundled_denoiser.resolve_bundled_denoiser() == str(exe)
-
-
 def test_resolve_default_uses_optix_9(monkeypatch, tmp_path):
-    monkeypatch.delenv(bundled_denoiser.ENV_DENOISER_EXE, raising=False)
-    monkeypatch.delenv(bundled_denoiser.ENV_OPTIX_VERSION, raising=False)
     monkeypatch.setattr(bundled_denoiser, "_package_root", lambda: tmp_path)
     exe = _write_variant(tmp_path, "9.0")
 
@@ -37,45 +27,28 @@ def test_resolve_default_uses_optix_9(monkeypatch, tmp_path):
 
 
 def test_resolve_uses_selected_optix_version(monkeypatch, tmp_path):
-    monkeypatch.delenv(bundled_denoiser.ENV_DENOISER_EXE, raising=False)
     monkeypatch.setattr(bundled_denoiser, "_package_root", lambda: tmp_path)
     exe = _write_variant(tmp_path, "8.1")
-    monkeypatch.setenv(bundled_denoiser.ENV_OPTIX_VERSION, "8.1")
 
-    assert bundled_denoiser.resolve_bundled_denoiser() == str(exe)
+    assert bundled_denoiser.resolve_bundled_denoiser(optix_version="8.1") == str(exe)
 
 
 def test_resolve_falls_back_when_default_missing(monkeypatch, tmp_path):
-    monkeypatch.delenv(bundled_denoiser.ENV_DENOISER_EXE, raising=False)
-    monkeypatch.delenv(bundled_denoiser.ENV_OPTIX_VERSION, raising=False)
     monkeypatch.setattr(bundled_denoiser, "_package_root", lambda: tmp_path)
     exe = _write_variant(tmp_path, "8.1")
 
     assert bundled_denoiser.resolve_bundled_denoiser() == str(exe)
 
 
-def test_resolve_invalid_optix_version_raises(monkeypatch):
-    monkeypatch.delenv(bundled_denoiser.ENV_DENOISER_EXE, raising=False)
-    monkeypatch.setenv(bundled_denoiser.ENV_OPTIX_VERSION, "7.0")
-
+def test_resolve_invalid_optix_version_raises():
     with pytest.raises(ValueError, match="Unsupported OptiX runtime"):
-        bundled_denoiser.resolve_bundled_denoiser()
+        bundled_denoiser.resolve_bundled_denoiser(optix_version="7.0")
 
 
 def test_resolve_missing_optional_returns_none(monkeypatch, tmp_path):
-    monkeypatch.delenv(bundled_denoiser.ENV_DENOISER_EXE, raising=False)
-    monkeypatch.delenv(bundled_denoiser.ENV_OPTIX_VERSION, raising=False)
     monkeypatch.setattr(bundled_denoiser, "_package_root", lambda: tmp_path)
 
     assert bundled_denoiser.resolve_bundled_denoiser(required=False) is None
-
-
-def test_resolve_missing_env_override_raises(monkeypatch, tmp_path):
-    missing = tmp_path / "missing.exe"
-    monkeypatch.setenv(bundled_denoiser.ENV_DENOISER_EXE, str(missing))
-
-    with pytest.raises(FileNotFoundError, match="missing.exe"):
-        bundled_denoiser.resolve_bundled_denoiser()
 
 
 def test_available_bundled_denoisers(monkeypatch, tmp_path):

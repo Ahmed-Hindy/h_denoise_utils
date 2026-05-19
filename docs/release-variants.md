@@ -38,10 +38,7 @@ Runtime matrix:
 | OptiX 9.1 | SDK commit `f1f6dd803f3159992d248178f6e09421c6eb8b6d` | Included for newer-driver compatibility and validated on NVIDIA driver `596.49`. |
 | OIDN | Intel Open Image Denoise `2.4.1` | Canyon Run multipart denoise passed; 22 parts; raw EXR header metadata diff count `0`. |
 
-For command-line/development OptiX runtime selection, set
-`HDU_OPTIX_VERSION=8.1`, `HDU_OPTIX_VERSION=9.0`, or `HDU_OPTIX_VERSION=9.1`.
-`HDU_DENOISER_EXE` and `HDU_OIDN_DENOISER_EXE` remain development overrides
-for the executable paths.
+
 
 ## Supported Workflow
 

@@ -5,7 +5,6 @@
 - Run `.\tools\fetch_optix_denoiser.ps1` from the repo root.
 - Confirm `h_denoise_utils/vendor/optix-denoiser/windows-x64/optix-9.0/Denoiser.exe`
   exists.
-- For development, set `HDU_DENOISER_EXE` to a specific OptiX `Denoiser.exe`.
 
 ## No bundled OIDN denoiser found
 
@@ -15,8 +14,6 @@
   `-Tag vX.Y.Z` if you need a specific release.
 - Confirm `h_denoise_utils/vendor/oidn-denoiser/windows-x64/oidn-2.4.1/Denoiser.exe`
   exists.
-- For development, set `HDU_OIDN_DENOISER_EXE` to a specific custom OIDN
-  `Denoiser.exe` or `HDU_OIDN_ROOT` to the wrapper bundle root.
 
 ## No EXR planes detected
 
