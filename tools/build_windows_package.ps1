@@ -78,8 +78,8 @@ if (-not $Variant) {
 if (-not $Variant) {
     $Variant = "houdini"
 }
-if ($Variant -notin @("houdini", "optix")) {
-    throw "Invalid package variant '$Variant'. Expected 'houdini' or 'optix'."
+if ($Variant -notin @("houdini", "optix", "oidn")) {
+    throw "Invalid package variant '$Variant'. Expected 'houdini', 'optix', or 'oidn'."
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -95,6 +95,16 @@ try {
     $appDir = Join-Path $distDir "h-denoise"
     $buildDir = Join-Path $repoRoot "build"
     $zipPath = Join-Path $distDir "h-denoise-$Variant-windows-x64-v$version.zip"
+    $smokeRuntime = if ($Variant -eq "oidn") { "oidn" } else { "optix" }
+    $smokeArgs = @("--smoke-test", "--smoke-runtime", $smokeRuntime)
+    $env:HDU_PACKAGE_VARIANT = $Variant
+
+    if ($Variant -eq "oidn") {
+        $oidnDenoiser = Join-Path $repoRoot "h_denoise_utils\vendor\oidn-denoiser\windows-x64\oidn-2.4.1\Denoiser.exe"
+        if (-not (Test-Path -LiteralPath $oidnDenoiser)) {
+            throw "OIDN package variant requires the custom OIDN Denoiser.exe. Expected: $oidnDenoiser"
+        }
+    }
 
     if (Test-Path -LiteralPath $appDir) {
         Remove-Item -LiteralPath $appDir -Recurse -Force
@@ -113,7 +123,7 @@ try {
     }
 
     Invoke-FrozenExecutableCheck -ExePath $exePath -CheckName "dist-version" -Arguments @("--version")
-    Invoke-FrozenExecutableCheck -ExePath $exePath -CheckName "dist-smoke-test" -Arguments @("--smoke-test")
+    Invoke-FrozenExecutableCheck -ExePath $exePath -CheckName "dist-smoke-test" -Arguments $smokeArgs
 
     Compress-Archive -Path $appDir -DestinationPath $zipPath -Force
 
@@ -130,7 +140,7 @@ try {
         Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
         $extractedExePath = Join-Path $extractDir "h-denoise\h-denoise.exe"
         Invoke-FrozenExecutableCheck -ExePath $extractedExePath -CheckName "zip-version" -Arguments @("--version")
-        Invoke-FrozenExecutableCheck -ExePath $extractedExePath -CheckName "zip-smoke-test" -Arguments @("--smoke-test")
+        Invoke-FrozenExecutableCheck -ExePath $extractedExePath -CheckName "zip-smoke-test" -Arguments $smokeArgs
     }
     finally {
         if (Test-Path -LiteralPath $extractDir) {

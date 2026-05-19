@@ -4,6 +4,7 @@ import pytest
 from h_denoise_utils.core.config import (
     AOVConfig,
     DenoiseConfig,
+    SUPPORTED_BACKENDS,
     normalize_plane_name,
     is_beauty_plane,
     DEFAULT_INPUT_EXTS,
@@ -75,13 +76,14 @@ class TestDenoiseConfig:
         assert config.prefix == "den_"
 
     def test_valid_backend(self):
-        """Test that the bundled OptiX backend is accepted."""
-        config1 = DenoiseConfig(backend="optix")
-        assert config1.backend == "optix"
+        """Test that known backend names are accepted."""
+        for backend in SUPPORTED_BACKENDS:
+            config = DenoiseConfig(backend=backend)
+            assert config.backend == backend
 
     def test_invalid_backend_raises_error(self):
         """Test that invalid backend raises ValueError."""
-        for backend in ["invalid", "oidn"]:
+        for backend in ["invalid", "cycles"]:
             with pytest.raises(ValueError, match="Invalid backend"):
                 DenoiseConfig(backend=backend)
 

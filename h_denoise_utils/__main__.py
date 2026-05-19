@@ -24,6 +24,12 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Validate Qt startup and bundled UI assets without showing the GUI.",
     )
+    parser.add_argument(
+        "--smoke-runtime",
+        choices=("optix", "oidn", "none"),
+        default="optix",
+        help="Runtime bundle to validate during --smoke-test.",
+    )
     return parser
 
 
@@ -49,8 +55,9 @@ def _ui_asset_paths() -> list[Path]:
     ]
 
 
-def _run_smoke_test() -> int:
+def _run_smoke_test(runtime: str = "optix") -> int:
     from h_denoise_utils.discovery.bundled_denoiser import resolve_bundled_denoiser
+    from h_denoise_utils.discovery.bundled_oidn import resolve_bundled_oidn_denoiser
     from h_denoise_utils.ui.qt_compat import QtWidgets
 
     missing = [path for path in _ui_asset_paths() if not path.is_file()]
@@ -58,11 +65,18 @@ def _run_smoke_test() -> int:
         missing_list = ", ".join(str(path) for path in missing)
         print(f"Missing bundled UI asset(s): {missing_list}", file=sys.stderr)
         return 1
-    try:
-        resolve_bundled_denoiser(required=True)
-    except (FileNotFoundError, ValueError) as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
+    if runtime == "optix":
+        try:
+            resolve_bundled_denoiser(required=True)
+        except (FileNotFoundError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+    elif runtime == "oidn":
+        try:
+            resolve_bundled_oidn_denoiser(required=True)
+        except (FileNotFoundError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
 
     app = QtWidgets.QApplication.instance()
     if app is None:
@@ -109,7 +123,7 @@ def main(argv: list[str] | None = None):
         return 0
 
     if args.smoke_test:
-        return _run_smoke_test()
+        return _run_smoke_test(args.smoke_runtime)
 
     app_args = sys.argv if argv is None else ["h-denoise", *argv]
     return _launch_gui(app_args)

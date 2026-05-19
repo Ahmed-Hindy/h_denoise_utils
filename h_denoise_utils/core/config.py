@@ -3,8 +3,11 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set
 
-# File extensions supported by the bundled OptiX multipart path.
+# File extensions supported by the bundled multipart denoiser path.
 DEFAULT_INPUT_EXTS = [".exr"]
+
+# Backends known to the public configuration surface.
+SUPPORTED_BACKENDS = ("optix", "oidn")
 
 # AOVs that should never be denoised (auxiliary data)
 AOVS_NEVER_DENOISE: Set[str] = {"albedo", "normal", "n", "velocity", "motionvectors"}
@@ -69,9 +72,11 @@ class DenoiseConfig:
 
     def __post_init__(self):
         """Validate configuration after initialization."""
-        if self.backend != "optix":
+        if self.backend not in SUPPORTED_BACKENDS:
             raise ValueError(
-                f"Invalid backend: {self.backend}. Must be 'optix'"
+                "Invalid backend: {}. Must be one of: {}".format(
+                    self.backend, ", ".join(SUPPORTED_BACKENDS)
+                )
             )
         if self.exrmode is not None and self.exrmode not in (-1, 0, 1):
             raise ValueError(f"Invalid exrmode: {self.exrmode}. Must be -1, 0, or 1")

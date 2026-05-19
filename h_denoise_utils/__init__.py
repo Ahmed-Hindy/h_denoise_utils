@@ -1,8 +1,8 @@
 """
-h_denoise_utils - Bundled OptiX Image Denoising Utilities
+h_denoise_utils - Bundled Image Denoising Utilities
 
-A modular package for denoising multipart EXRs with a bundled NVIDIA OptiX
-denoiser executable.
+A modular package for denoising multipart EXRs with bundled OptiX and OIDN
+Denoiser.exe runtimes.
 """
 
 from ._version import __version__
@@ -11,6 +11,7 @@ from ._version import __version__
 from .core.config import (
     AOVConfig,
     DenoiseConfig,
+    SUPPORTED_BACKENDS,
     normalize_plane_name,
     is_beauty_plane,
     DEFAULT_INPUT_EXTS,
@@ -19,7 +20,9 @@ from .core.config import (
     PRESETS,
 )
 from .core.command_builder import (
+    build_bundled_multipart_command,
     build_bundled_optix_command,
+    build_oidn_denoise_command,
 )
 
 # Discovery exports
@@ -32,6 +35,22 @@ from .discovery.bundled_denoiser import (
     SUPPORTED_OPTIX_VERSIONS,
     available_bundled_denoisers,
     resolve_bundled_denoiser,
+)
+from .discovery.bundled_oidn import (
+    DEFAULT_OIDN_PLATFORM,
+    ENV_OIDN_DENOISER_EXE,
+    ENV_OIDN_ROOT,
+    PINNED_OIDN_RELEASE,
+    PINNED_OIDN_DENOISER_RELEASE,
+    PINNED_OIDN_VERSION,
+    PINNED_OIDN_WINDOWS_ASSET,
+    SUPPORTED_OIDN_PLATFORMS,
+    available_bundled_oidn_runtimes,
+    bundled_oidn_denoise_path,
+    bundled_oidn_denoiser_path,
+    bundled_oidn_root,
+    resolve_bundled_oidn_denoise,
+    resolve_bundled_oidn_denoiser,
 )
 from .discovery.exr_inspector import list_exr_planes
 from .discovery.aov_validator import validate_aov_exists, filter_existing_aovs
@@ -50,6 +69,7 @@ __all__ = [
     # Config
     "AOVConfig",
     "DenoiseConfig",
+    "SUPPORTED_BACKENDS",
     "normalize_plane_name",
     "is_beauty_plane",
     "DEFAULT_INPUT_EXTS",
@@ -57,7 +77,9 @@ __all__ = [
     "BEAUTY_AOV_ALIASES",
     "PRESETS",
     # Command building
+    "build_bundled_multipart_command",
     "build_bundled_optix_command",
+    "build_oidn_denoise_command",
     # Discovery
     "DEFAULT_OPTIX_VERSION",
     "ENV_OPTIX_VERSION",
@@ -67,6 +89,20 @@ __all__ = [
     "SUPPORTED_OPTIX_VERSIONS",
     "available_bundled_denoisers",
     "resolve_bundled_denoiser",
+    "DEFAULT_OIDN_PLATFORM",
+    "ENV_OIDN_DENOISER_EXE",
+    "ENV_OIDN_ROOT",
+    "PINNED_OIDN_RELEASE",
+    "PINNED_OIDN_DENOISER_RELEASE",
+    "PINNED_OIDN_VERSION",
+    "PINNED_OIDN_WINDOWS_ASSET",
+    "SUPPORTED_OIDN_PLATFORMS",
+    "available_bundled_oidn_runtimes",
+    "bundled_oidn_denoise_path",
+    "bundled_oidn_denoiser_path",
+    "bundled_oidn_root",
+    "resolve_bundled_oidn_denoise",
+    "resolve_bundled_oidn_denoiser",
     "list_exr_planes",
     "validate_aov_exists",
     "filter_existing_aovs",

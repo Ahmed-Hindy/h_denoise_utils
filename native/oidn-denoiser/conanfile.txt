@@ -1,0 +1,14 @@
+[requires]
+openimageio/[>=2.4 <4]
+openexr/[>=3.2.3 <4]
+imath/[>3.1.9 <4]
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[layout]
+cmake_layout
+
+[options]
+openimageio/*:shared=False

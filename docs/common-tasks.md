@@ -27,6 +27,26 @@
 3) Update `ui/main_window.py` to collect the UI value.
 4) Add tests in `tests/test_command_builder.py`.
 
+## Fetch bundled runtimes
+
+Fetch OptiX:
+
+```powershell
+.\tools\fetch_optix_denoiser.ps1
+```
+
+Fetch the official OIDN SDK/runtime used to build the custom wrapper:
+
+```powershell
+.\tools\fetch_oidn.ps1
+```
+
+Fetch a released custom OIDN wrapper:
+
+```powershell
+.\tools\fetch_oidn_denoiser.ps1
+```
+
 ## Run a headless smoke test
 
 Use the scripting API directly:
@@ -37,7 +57,7 @@ from h_denoise_utils.core.denoiser import Denoiser
 
 denoiser = Denoiser(
     input_path="/path/to/images",
-    denoise_config=DenoiseConfig(backend="oidn"),
+    denoise_config=DenoiseConfig(backend="optix"),
     aov_config=AOVConfig(),
 )
 prep = denoiser.prepare()
@@ -46,3 +66,9 @@ if prep["status"] == "ready":
     denoiser.cleanup()
 ```
 
+Use `DenoiseConfig(backend="oidn")` to run the custom OIDN wrapper once the
+wrapper bundle is present. For OIDN bundle validation only, use:
+
+```powershell
+uv run h-denoise --smoke-test --smoke-runtime oidn
+```

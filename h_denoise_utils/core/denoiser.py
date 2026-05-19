@@ -13,8 +13,9 @@ from .config import (
     normalize_plane_name,
     is_beauty_plane,
 )
-from .command_builder import build_bundled_optix_command
+from .command_builder import build_bundled_multipart_command
 from ..discovery.bundled_denoiser import resolve_bundled_denoiser
+from ..discovery.bundled_oidn import resolve_bundled_oidn_denoiser
 from ..discovery.exr_inspector import list_exr_planes
 from ..discovery.aov_validator import filter_existing_aovs
 from ..utils.file_utils import (
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class Denoiser:
-    """Batch image denoiser using the bundled OptiX multipart executable."""
+    """Batch image denoiser using bundled multipart Denoiser.exe backends."""
 
     def __init__(
         self,
@@ -49,14 +50,19 @@ class Denoiser:
             input_path: Path to file or folder
             denoise_config: Denoising configuration
             aov_config: AOV configuration
-            denoiser_path: Optional path to bundled OptiX denoiser executable
+            denoiser_path: Optional path to bundled denoiser executable
             output_folder: Output directory
             extensions: File extensions to process (empty or None = no filtering)
         """
         self.input_path = input_path
         self.denoise_config = denoise_config or DenoiseConfig()
         self.aov_config = aov_config or AOVConfig()
-        self.denoiser_path = denoiser_path or resolve_bundled_denoiser(required=False)
+        if denoiser_path:
+            self.denoiser_path = denoiser_path
+        elif self.denoise_config.backend == "oidn":
+            self.denoiser_path = resolve_bundled_oidn_denoiser(required=False)
+        else:
+            self.denoiser_path = resolve_bundled_denoiser(required=False)
         self.output_folder = output_folder
         self.extensions = DEFAULT_INPUT_EXTS if extensions is None else extensions
         self.file_list = file_list
@@ -74,21 +80,25 @@ class Denoiser:
             Dict with preparation results
         """
         if not self.denoiser_path or not os.path.isfile(self.denoiser_path):
-            raise FileNotFoundError("Could not locate bundled OptiX denoiser executable")
-        if self.denoise_config.backend != "optix":
-            raise ValueError("The bundled denoiser branch only supports OptiX")
+            raise FileNotFoundError(
+                "Could not locate bundled {} denoiser executable".format(
+                    self.denoise_config.backend.upper()
+                )
+            )
+        if self.denoise_config.backend not in ("optix", "oidn"):
+            raise ValueError("The bundled denoiser branch only supports OptiX and OIDN")
         if self.denoise_config.temporal:
-            raise ValueError("Temporal denoising is not validated in the bundled OptiX branch")
+            raise ValueError("Temporal denoising is not validated in the bundled denoiser branch")
         if self.denoise_config.threads:
-            raise ValueError("CPU thread count does not apply to the bundled OptiX denoiser")
+            raise ValueError("CPU thread count is not exposed by the bundled denoiser v1")
         if self.denoise_config.exrmode is not None:
-            raise ValueError("Legacy EXR mode does not apply to the bundled OptiX denoiser")
+            raise ValueError("Legacy EXR mode does not apply to the bundled denoiser")
         if self.denoise_config.options_json:
-            raise ValueError("Legacy JSON options are not supported by the bundled OptiX denoiser")
+            raise ValueError("Legacy JSON options are not supported by the bundled denoiser")
         if self.aov_config.motionvectors_plane:
-            raise ValueError("Motion vectors are not used by the bundled OptiX denoiser v1")
+            raise ValueError("Motion vectors are not used by the bundled denoiser v1")
         if self.aov_config.extra_aovs:
-            raise ValueError("Extra reference AOVs are not supported by the bundled OptiX denoiser v1")
+            raise ValueError("Extra reference AOVs are not supported by the bundled denoiser v1")
 
         # Normalize extensions
         exts = None
@@ -142,7 +152,7 @@ class Denoiser:
                 )
 
         # Create temp workspace
-        self.temp_root = tempfile.mkdtemp(prefix="optix_denoise_")
+        self.temp_root = tempfile.mkdtemp(prefix="hdu_denoise_")
         temp_in = os.path.join(self.temp_root, "in")
         temp_out = os.path.join(self.temp_root, "out")
         os.makedirs(temp_in, exist_ok=True)
@@ -248,7 +258,7 @@ class Denoiser:
                 "output_path": final_dst,
             }
 
-        cmd = build_bundled_optix_command(
+        cmd = build_bundled_multipart_command(
             denoiser_exe=self.denoiser_path,
             input_path=src,
             output_path=dst,

@@ -8,7 +8,6 @@ __pycache__/
 dist/
 build/
 .eggs/
-h_denoise_utils/vendor/optix-denoiser/
 
 # uv
 .venv/
@@ -20,6 +19,8 @@ h_denoise_utils/vendor/optix-denoiser/
 
 # Fetched binary package assets
 h_denoise_utils/vendor/optix-denoiser/
+h_denoise_utils/vendor/oidn/
+h_denoise_utils/vendor/oidn-denoiser/
 
 # Local comparison renders
 comparison_outputs/

@@ -12,6 +12,8 @@ use this list as a navigation aid.
 ## Discovery Modules
 
 - `h_denoise_utils.discovery.houdini`
+- `h_denoise_utils.discovery.bundled_denoiser`
+- `h_denoise_utils.discovery.bundled_oidn`
 - `h_denoise_utils.discovery.exr_inspector`
 - `h_denoise_utils.discovery.aov_validator`
 
@@ -25,4 +27,3 @@ use this list as a navigation aid.
 - `h_denoise_utils.ui.main_window`
 - `h_denoise_utils.ui.worker`
 - `h_denoise_utils.ui.widgets`
-

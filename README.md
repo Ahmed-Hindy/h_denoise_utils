@@ -1,6 +1,6 @@
 # h_denoise_utils
 
-A Python GUI and scripting library for denoising multipart EXR sequences using a bundled NVIDIA OptiX denoiser.
+A Python GUI and scripting library for denoising multipart EXR sequences using bundled OptiX or OIDN denoiser runtimes.
 
 [![CI](https://github.com/Ahmed-Hindy/h_denoise_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Ahmed-Hindy/h_denoise_utils/actions)
 [![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
@@ -18,12 +18,14 @@ A Python GUI and scripting library for denoising multipart EXR sequences using a
 - Full GUI with dark theme, or use the scripting API headlessly
 - Preserve source OpenEXR metadata while denoising selected multipart AOVs
 - Bundle OptiX 8.1, 9.0, and 9.1 denoiser runtimes in the Windows package
+- Bundle a custom Intel OIDN 2.4.1 multipart wrapper with the same `Denoiser.exe`
+  CLI contract as OptiX
 
 ---
 
 ## Setup
 
-Requires [uv](https://docs.astral.sh/uv/) for development. The Windows OptiX package bundles the denoiser executables.
+Requires [uv](https://docs.astral.sh/uv/) for development. The Windows OptiX and OIDN packages bundle their denoiser executables.
 
 ```bash
 git clone https://github.com/Ahmed-Hindy/h_denoise_utils.git
@@ -71,6 +73,7 @@ if prep["status"] == "ready":
 - [Architecture](docs/architecture.md)
 - [Common tasks](docs/common-tasks.md)
 - [Troubleshooting](docs/troubleshooting.md)
+- [OIDN bundling notes](docs/oidn-bundling.md)
 
 ---
 
@@ -99,7 +102,8 @@ uv run pytest
 ## Requirements
 
 - Python 3.7+
-- Bundled OptiX Windows package, or `HDU_DENOISER_EXE` pointing at `Denoiser.exe`
+- Bundled OptiX Windows package, or `HDU_DENOISER_EXE` pointing at an OptiX `Denoiser.exe`
+- Bundled OIDN Windows package, or `HDU_OIDN_DENOISER_EXE` pointing at the custom OIDN `Denoiser.exe`
 - Optional runtime selection with `HDU_OPTIX_VERSION=8.1`, `9.0`, or `9.1`; the default is `9.0`
 - One of: PySide6, PySide2, PyQt6, PyQt5 — for the GUI only
 
