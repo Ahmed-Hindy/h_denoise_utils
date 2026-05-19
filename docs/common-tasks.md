@@ -20,7 +20,7 @@
 2) Ensure `ui/aov_scan_manager.py` remains unchanged (thread wrapper only).
 3) Add a unit test in `tests/test_aov_inspector.py`.
 
-## Add an option to idenoise
+## Add a bundled denoiser option
 
 1) Extend `DenoiseConfig` in `core/config.py`.
 2) Update `core/command_builder.py` to pass the option.
@@ -47,6 +47,16 @@ Fetch a released custom OIDN wrapper:
 .\tools\fetch_oidn_denoiser.ps1
 ```
 
+## Build the bundled package
+
+After both runtimes are present:
+
+```powershell
+.\tools\build_windows_package.ps1 -Variant bundled
+```
+
+The package smoke test validates both bundled runtime families.
+
 ## Run a headless smoke test
 
 Use the scripting API directly:
@@ -67,8 +77,8 @@ if prep["status"] == "ready":
 ```
 
 Use `DenoiseConfig(backend="oidn")` to run the custom OIDN wrapper once the
-wrapper bundle is present. For OIDN bundle validation only, use:
+wrapper bundle is present. Validate both bundled runtimes with:
 
 ```powershell
-uv run h-denoise --smoke-test --smoke-runtime oidn
+uv run h-denoise --smoke-test --smoke-runtime all
 ```

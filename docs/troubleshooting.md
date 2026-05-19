@@ -1,9 +1,11 @@
 # Troubleshooting
 
-## No idenoise executable found
+## No bundled OptiX denoiser found
 
-- Verify Houdini is installed and `idenoise` exists in the Houdini `bin`.
-- In the UI, use the custom EXE picker to point at `idenoise.exe`.
+- Run `.\tools\fetch_optix_denoiser.ps1` from the repo root.
+- Confirm `h_denoise_utils/vendor/optix-denoiser/windows-x64/optix-9.0/Denoiser.exe`
+  exists.
+- For development, set `HDU_DENOISER_EXE` to a specific OptiX `Denoiser.exe`.
 
 ## No bundled OIDN denoiser found
 

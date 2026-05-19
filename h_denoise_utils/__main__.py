@@ -26,8 +26,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--smoke-runtime",
-        choices=("optix", "oidn", "none"),
-        default="optix",
+        choices=("optix", "oidn", "all", "none"),
+        default="all",
         help="Runtime bundle to validate during --smoke-test.",
     )
     return parser
@@ -65,13 +65,13 @@ def _run_smoke_test(runtime: str = "optix") -> int:
         missing_list = ", ".join(str(path) for path in missing)
         print(f"Missing bundled UI asset(s): {missing_list}", file=sys.stderr)
         return 1
-    if runtime == "optix":
+    if runtime in ("optix", "all"):
         try:
             resolve_bundled_denoiser(required=True)
         except (FileNotFoundError, ValueError) as exc:
             print(str(exc), file=sys.stderr)
             return 1
-    elif runtime == "oidn":
+    if runtime in ("oidn", "all"):
         try:
             resolve_bundled_oidn_denoiser(required=True)
         except (FileNotFoundError, ValueError) as exc:

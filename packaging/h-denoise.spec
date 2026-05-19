@@ -20,7 +20,7 @@ datas.extend(
     for path in ICONS_DIR.iterdir()
     if path.is_file()
 )
-if VENDOR_DENOISER_DIR.exists() and PACKAGE_VARIANT in ("", "optix"):
+if VENDOR_DENOISER_DIR.exists() and PACKAGE_VARIANT in ("", "bundled"):
     datas.extend(
         (
             str(path),
@@ -29,7 +29,7 @@ if VENDOR_DENOISER_DIR.exists() and PACKAGE_VARIANT in ("", "optix"):
         for path in VENDOR_DENOISER_DIR.rglob("*")
         if path.is_file()
     )
-if VENDOR_OIDN_DENOISER_DIR.exists() and PACKAGE_VARIANT in ("", "oidn"):
+if VENDOR_OIDN_DENOISER_DIR.exists() and PACKAGE_VARIANT in ("", "bundled"):
     datas.extend(
         (
             str(path),

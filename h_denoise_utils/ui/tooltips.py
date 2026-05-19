@@ -33,7 +33,7 @@ ACTION_DESTINATION = "→ {}"
 ADVANCED_TOGGLE = "Show or hide denoise settings"
 ADVANCED_SETTINGS_TOGGLE = "Show or hide bundled denoiser details"
 BEAUTY_COMBO = "Beauty subimage name to denoise; usually C"
-BACKEND_COMBO = "Bundled OptiX GPU denoising"
+BACKEND_COMBO = "Choose the bundled denoiser backend"
 THREAD_SPIN = "Not used by the bundled OptiX denoiser"
 PREFIX_EDIT = "Prefix added to output filenames"
 ALBEDO_COMBO = (
@@ -51,7 +51,7 @@ TEMPORAL_CHK_BACKEND_UNSUPPORTED = (
 TEMPORAL_CHK_NO_MOTION = (
     "Requires motion vectors AOV to enable temporal denoising"
 )
-DENOISER_COMBO = "Bundled OptiX denoiser executable"
+DENOISER_COMBO = "Bundled denoiser executable"
 CUSTOM_EXE_BTN = "Custom executables are not used by this bundled OptiX build"
 EXRMODE_COMBO = (
     "HOUDINI_OIIO_EXR read mode (-1, 0, or 1); default uses env var"

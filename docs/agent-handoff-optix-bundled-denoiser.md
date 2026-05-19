@@ -2,6 +2,11 @@
 
 Last updated: 2026-05-18
 
+> Historical note: this handoff describes the earlier standalone OptiX branch
+> strategy. The current release plan is a combined bundled-runtime app that
+> includes both OptiX and OIDN, with users choosing the backend in the UI.
+> Prefer `docs/release-variants.md` for current release/package instructions.
+
 ## Goal
 
 This branch is the Houdini-free OptiX release line. Keep `main` as the Houdini-linked default app and keep `optix-bundled-denoiser` as the long-running bundled OptiX branch until the two-variant release strategy is intentionally retired.

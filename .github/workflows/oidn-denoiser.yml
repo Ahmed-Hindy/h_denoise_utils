@@ -51,9 +51,15 @@ jobs:
       - name: Install packaging dependencies
         run: uv sync --frozen --extra pyside6 --extra package
 
-      - name: Build OIDN portable package
+      - name: Fetch bundled OptiX denoiser
         shell: pwsh
-        run: .\tools\build_windows_package.ps1 -Variant oidn
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .\tools\fetch_optix_denoiser.ps1
+
+      - name: Build bundled portable package
+        shell: pwsh
+        run: .\tools\build_windows_package.ps1 -Variant bundled
 
       - name: Upload OIDN denoiser bundle artifact
         uses: actions/upload-artifact@v7
@@ -64,9 +70,9 @@ jobs:
             dist/oidn-denoiser-windows-x64-oidn-${{ env.OIDN_VERSION }}-*.zip
           if-no-files-found: error
 
-      - name: Upload OIDN app package artifact
+      - name: Upload bundled app package artifact
         uses: actions/upload-artifact@v7
         with:
-          name: h-denoise-oidn-windows-x64
-          path: dist/h-denoise-oidn-windows-x64-v*.zip
+          name: h-denoise-bundled-windows-x64
+          path: dist/h-denoise-bundled-windows-x64-v*.zip
           if-no-files-found: error

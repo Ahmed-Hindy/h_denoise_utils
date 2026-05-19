@@ -312,6 +312,11 @@ def build_extras_section(window, top_layout):
     divider.setFrameShadow(QtWidgets.QFrame.Sunken)
     advanced_settings_form.addRow(divider)
 
+    window.backend_combo = NoWheelComboBox()
+    window.backend_combo.addItem("OptiX", "optix")
+    window.backend_combo.addItem("OIDN", "oidn")
+    advanced_settings_form.addRow("Backend:", window.backend_combo)
+
     window.optix_version_combo = NoWheelComboBox()
     for version in window.supported_optix_versions:
         window.optix_version_combo.addItem("OptiX {}".format(version), version)

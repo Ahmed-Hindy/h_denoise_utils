@@ -152,13 +152,84 @@ def test_settings_has_basic_and_collapsed_advanced_rows(qtbot):
     assert _has_ancestor(window.albedo_combo, window.advanced_body)
     assert _has_ancestor(window.normal_combo, window.advanced_body)
     assert not _has_ancestor(window.prefix_edit, window.advanced_settings_body)
+    assert _has_ancestor(window.backend_combo, window.advanced_settings_body)
     assert _has_ancestor(window.optix_version_combo, window.advanced_settings_body)
     assert _has_ancestor(window.denoiser_status_label, window.advanced_settings_body)
+    assert window.backend_combo.currentText() == "OptiX"
     assert window.optix_version_combo.currentText() == "OptiX 9.0"
 
     window._toggle_advanced_settings(True)
 
     assert not window.advanced_settings_body.isHidden()
+
+
+def test_backend_selector_switches_summary_and_optix_runtime_state(qtbot):
+    window = BaseWindow()
+    qtbot.addWidget(window)
+
+    assert window._backend_key() == "optix"
+    assert window.summary_motion.text() == "Mode: OptiX 9.0"
+    assert window.optix_version_combo.isEnabled()
+
+    window.backend_combo.setCurrentText("OIDN")
+
+    assert window._backend_key() == "oidn"
+    assert window.summary_motion.text() == "Mode: OIDN"
+    assert not window.optix_version_combo.isEnabled()
+
+
+def test_oidn_backend_start_uses_oidn_resolver_and_config(qtbot, tmp_path, monkeypatch):
+    input_file = tmp_path / "input.exr"
+    input_file.write_bytes(b"placeholder")
+    exe = tmp_path / "Denoiser.exe"
+    exe.write_text("placeholder")
+    captured = {}
+
+    class FakeSignal:
+        def connect(self, callback):
+            pass
+
+    class FakeWorker:
+        def __init__(
+            self,
+            input_path,
+            denoise_config,
+            aov_config,
+            denoiser_path,
+            extensions=None,
+            file_list=None,
+        ):
+            captured["input_path"] = input_path
+            captured["denoise_config"] = denoise_config
+            captured["aov_config"] = aov_config
+            captured["denoiser_path"] = denoiser_path
+            captured["extensions"] = extensions
+            captured["file_list"] = file_list
+            self.progress = FakeSignal()
+            self.log_message = FakeSignal()
+            self.finished = FakeSignal()
+
+        def start(self):
+            captured["started"] = True
+
+    monkeypatch.setattr(
+        main_window_module,
+        "resolve_bundled_oidn_denoiser",
+        lambda required=False: str(exe),
+    )
+    monkeypatch.setattr(main_window_module, "DenoiseWorker", FakeWorker)
+
+    window = BaseWindow()
+    qtbot.addWidget(window)
+    window.backend_combo.setCurrentText("OIDN")
+    window._set_path_text(str(input_file), analyze=False)
+
+    window._start_denoise()
+
+    assert captured["started"] is True
+    assert captured["input_path"] == str(input_file)
+    assert captured["denoise_config"].backend == "oidn"
+    assert captured["denoiser_path"] == str(exe)
 
 
 def test_f5_triggers_scan(qtbot, tmp_path):
@@ -210,7 +281,7 @@ def test_legacy_houdini_controls_are_not_present(qtbot):
     window = BaseWindow()
     qtbot.addWidget(window)
 
-    assert not hasattr(window, "backend_combo")
+    assert hasattr(window, "backend_combo")
     assert not hasattr(window, "thread_spin")
     assert not hasattr(window, "denoiser_combo")
     assert not hasattr(window, "exrmode_combo")

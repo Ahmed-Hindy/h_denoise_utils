@@ -40,17 +40,18 @@ Fetch a released wrapper asset with:
 .\tools\fetch_oidn_denoiser.ps1
 ```
 
-Build an OIDN-named portable app package after the wrapper is present:
+Build the bundled portable app package after both OptiX and OIDN runtimes are
+present:
 
 ```powershell
-.\tools\build_windows_package.ps1 -Variant oidn
+.\tools\build_windows_package.ps1 -Variant bundled
 ```
 
-The OIDN smoke check validates that the custom `Denoiser.exe` and the UI assets
+The bundled smoke check validates that both runtime families and the UI assets
 are present:
 
 ```powershell
-.\dist\h-denoise\h-denoise.exe --smoke-test --smoke-runtime oidn
+.\dist\h-denoise\h-denoise.exe --smoke-test --smoke-runtime all
 ```
 
 ## Wrapper contract

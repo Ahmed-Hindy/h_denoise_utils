@@ -25,7 +25,7 @@ A Python GUI and scripting library for denoising multipart EXR sequences using b
 
 ## Setup
 
-Requires [uv](https://docs.astral.sh/uv/) for development. The Windows OptiX and OIDN packages bundle their denoiser executables.
+Requires [uv](https://docs.astral.sh/uv/) for development. The Windows bundled package includes the OptiX and OIDN denoiser executables.
 
 ```bash
 git clone https://github.com/Ahmed-Hindy/h_denoise_utils.git
@@ -102,8 +102,7 @@ uv run pytest
 ## Requirements
 
 - Python 3.7+
-- Bundled OptiX Windows package, or `HDU_DENOISER_EXE` pointing at an OptiX `Denoiser.exe`
-- Bundled OIDN Windows package, or `HDU_OIDN_DENOISER_EXE` pointing at the custom OIDN `Denoiser.exe`
+- Bundled Windows package, or `HDU_DENOISER_EXE` / `HDU_OIDN_DENOISER_EXE` pointing at custom `Denoiser.exe` builds for development
 - Optional runtime selection with `HDU_OPTIX_VERSION=8.1`, `9.0`, or `9.1`; the default is `9.0`
 - One of: PySide6, PySide2, PyQt6, PyQt5 — for the GUI only
 

@@ -6,7 +6,7 @@ This page gets a developer from zero to running the UI and tests.
 
 - Python 3.7+.
 - `uv` installed (recommended).
-- Houdini `idenoise` available on the machine for real denoise runs.
+- Bundled OptiX and OIDN runtimes available for real denoise runs.
 
 ## Install deps (local venv)
 
@@ -42,4 +42,3 @@ uv run pytest --tb=short -v
 - The UI opens without exceptions.
 - A test EXR folder scans AOVs without timing out.
 - Clicking Denoise starts a run (use a small folder first).
-

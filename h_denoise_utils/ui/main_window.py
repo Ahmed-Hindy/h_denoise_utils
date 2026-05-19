@@ -23,6 +23,7 @@ from ..discovery.bundled_denoiser import (
     SUPPORTED_OPTIX_VERSIONS,
     resolve_bundled_denoiser,
 )
+from ..discovery.bundled_oidn import resolve_bundled_oidn_denoiser
 from .aov_scan_manager import AovScanManager
 from . import tooltips
 from .services.output_paths import preview_output_path
@@ -114,6 +115,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.advanced_settings_body = None  # type: Optional[QtWidgets.QWidget]
         self.advanced_settings_toggle = None  # type: Optional[QtWidgets.QToolButton]
         self.beauty_combo = None  # type: Optional[QtWidgets.QComboBox]
+        self.backend_combo = None  # type: Optional[QtWidgets.QComboBox]
         self.optix_version_combo = None  # type: Optional[QtWidgets.QComboBox]
         self.denoiser_status_label = None  # type: Optional[QtWidgets.QLabel]
         self.motion_label = None  # type: Optional[QtWidgets.QLabel]
@@ -133,6 +135,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         self._pre_run_enabled = {}  # type: dict
 
         self.supported_optix_versions = SUPPORTED_OPTIX_VERSIONS
+        self.selected_backend = "optix"
         self.selected_optix_version = self._initial_optix_version()
         self.bundled_denoiser_path = self._resolve_selected_denoiser_path()
         self._setup_menus()
@@ -206,7 +209,7 @@ class BaseWindow(QtWidgets.QMainWindow):
             "About Denoiser",
             (
                 "<b>Denoiser</b><br>Version {}<br><br>"
-                "Denoises multipart EXRs with the bundled NVIDIA OptiX denoiser, "
+                "Denoises multipart EXRs with bundled OptiX or OIDN denoisers, "
                 "with smart AOV detection and source metadata preservation."
             ).format(__version__),
         )
@@ -358,6 +361,7 @@ class BaseWindow(QtWidgets.QMainWindow):
             self.beauty_combo,
             self.albedo_combo,
             self.normal_combo,
+            self.backend_combo,
             self.optix_version_combo,
             self.log_filter_combo,
         ]
@@ -403,6 +407,8 @@ class BaseWindow(QtWidgets.QMainWindow):
     def _resolve_selected_denoiser_path(self):
         # type: () -> str
         try:
+            if self._backend_key() == "oidn":
+                return resolve_bundled_oidn_denoiser(required=False) or ""
             return (
                 resolve_bundled_denoiser(
                     required=False,
@@ -415,9 +421,19 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _runtime_missing_text(self):
         # type: () -> str
+        if self._backend_key() == "oidn":
+            return "Missing bundled OIDN Denoiser.exe"
         return "Missing bundled Denoiser.exe for OptiX {}".format(
             self.selected_optix_version
         )
+
+    def _sync_backend_controls(self):
+        # type: () -> None
+        is_optix = self._backend_key() == "optix"
+        if self.optix_version_combo:
+            self.optix_version_combo.setEnabled(is_optix)
+        self._refresh_denoiser_status()
+        self._update_summary_strip()
 
     def _refresh_denoiser_status(self):
         # type: () -> None
@@ -430,8 +446,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         # type: (str) -> None
         self.selected_optix_version = self._optix_version_key()
         self.bundled_denoiser_path = self._resolve_selected_denoiser_path()
-        self._refresh_denoiser_status()
-        self._update_summary_strip()
+        self._sync_backend_controls()
 
     # --- Signal wiring ---
     def _connect_signals(self):
@@ -465,6 +480,8 @@ class BaseWindow(QtWidgets.QMainWindow):
             self.optix_version_combo.currentTextChanged.connect(
                 self._on_optix_version_changed
             )
+        if self.backend_combo:
+            self.backend_combo.currentTextChanged.connect(self._on_backend_changed)
         self.preset_combo.currentTextChanged.connect(self._on_preset_changed)
         self.log_filter_combo.currentTextChanged.connect(self._refresh_log_view)
         self.log_table.customContextMenuRequested.connect(self._show_log_context_menu)
@@ -518,6 +535,8 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.normal_combo.setToolTip(tooltips.NORMAL_COMBO)
         if self.optix_version_combo:
             self.optix_version_combo.setToolTip(tooltips.OPTIX_VERSION_COMBO)
+        if self.backend_combo:
+            self.backend_combo.setToolTip(tooltips.BACKEND_COMBO)
         if self.denoiser_status_label:
             self.denoiser_status_label.setToolTip(tooltips.DENOISER_COMBO)
 
@@ -1119,9 +1138,12 @@ class BaseWindow(QtWidgets.QMainWindow):
 
         self.summary_files.setText(files_text)
         self.summary_planes.setText("AOVs: {}".format(planes_count))
-        self.summary_motion.setText(
-            "Mode: OptiX {}".format(self.selected_optix_version)
-        )
+        if self._backend_key() == "oidn":
+            self.summary_motion.setText("Mode: OIDN")
+        else:
+            self.summary_motion.setText(
+                "Mode: OptiX {}".format(self.selected_optix_version)
+            )
 
         if has_files:
             files_chip = "summaryChipOk"
@@ -1209,14 +1231,18 @@ class BaseWindow(QtWidgets.QMainWindow):
         # type: (str) -> str
         key = (backend_key or "").strip().lower()
         if key == "oidn":
-            return "Oidn"
+            return "OIDN"
         if key == "optix":
-            return "Optix"
+            return "OptiX"
         return backend_key
 
     def _backend_key(self):
         # type: () -> str
-        return "optix"
+        if self.backend_combo:
+            data = self.backend_combo.currentData()
+            if data:
+                return str(data).strip().lower()
+        return self.selected_backend or "optix"
 
     def _apply_preset(self, preset_name):
         # type: (str) -> None
@@ -1278,6 +1304,9 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _on_backend_changed(self, backend):
         # type: (str) -> None
+        self.selected_backend = self._backend_key()
+        self.bundled_denoiser_path = self._resolve_selected_denoiser_path()
+        self._sync_backend_controls()
         self._update_temporal_state()
 
     def _on_motion_changed(self, _):
@@ -1321,24 +1350,37 @@ class BaseWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, "Error", "Invalid input path")
             return
 
+        self.selected_backend = self._backend_key()
         self.selected_optix_version = self._optix_version_key()
-        denoiser_path = resolve_bundled_denoiser(
-            required=False,
-            optix_version=self.selected_optix_version,
-        )
+        if self.selected_backend == "oidn":
+            denoiser_path = resolve_bundled_oidn_denoiser(required=False)
+        else:
+            denoiser_path = resolve_bundled_denoiser(
+                required=False,
+                optix_version=self.selected_optix_version,
+            )
         if not denoiser_path:
+            if self.selected_backend == "oidn":
+                message = (
+                    "Bundled OIDN Denoiser.exe was not found. Reinstall the bundled "
+                    "runtime package or set HDU_OIDN_DENOISER_EXE for development."
+                )
+            else:
+                message = (
+                    "Bundled OptiX Denoiser.exe was not found for OptiX {}. "
+                    "Reinstall the bundled runtime package or set HDU_DENOISER_EXE "
+                    "for development."
+                ).format(self.selected_optix_version)
             QtWidgets.QMessageBox.warning(
                 self,
                 "Error",
-                "Bundled OptiX Denoiser.exe was not found for OptiX {}. "
-                "Reinstall the OptiX package or set HDU_DENOISER_EXE for "
-                "development.".format(self.selected_optix_version),
+                message,
             )
             return
 
         self.bundled_denoiser_path = denoiser_path
         self._refresh_denoiser_status()
-        self._denoise_state.backend = self._backend_key()
+        self._denoise_state.backend = self.selected_backend
         self._denoise_state.denoiser_path = denoiser_path
         self._denoise_state.threads = 0
         self._denoise_state.overwrite = self.overwrite_chk.isChecked()

@@ -14,6 +14,7 @@ def test_static_tooltips_applied_on_init(qtbot):
     assert window.log_filter_combo.toolTip() == tooltips.LOG_FILTER_COMBO
     assert window.aovs_input.toolTip() == tooltips.AOVS_INPUT
     assert window.aovs_input.custom_input.toolTip() == tooltips.AOVS_CUSTOM_INPUT
+    assert window.backend_combo.toolTip() == tooltips.BACKEND_COMBO
     assert window.optix_version_combo.toolTip() == tooltips.OPTIX_VERSION_COMBO
     assert window.denoiser_status_label.toolTip() == tooltips.DENOISER_COMBO
 

@@ -63,13 +63,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: .\tools\fetch_optix_denoiser.ps1
 
+      - name: Build bundled OIDN denoiser
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .\tools\build_oidn_denoiser.ps1
+
       - name: Build portable package
         shell: pwsh
-        run: .\tools\build_windows_package.ps1 -Variant optix
+        run: .\tools\build_windows_package.ps1 -Variant bundled
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
         with:
-          name: h-denoise-optix-windows-x64
-          path: dist/h-denoise-optix-windows-x64-v*.zip
+          name: h-denoise-bundled-windows-x64
+          path: dist/h-denoise-bundled-windows-x64-v*.zip
           if-no-files-found: error
