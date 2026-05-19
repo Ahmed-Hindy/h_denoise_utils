@@ -21,6 +21,15 @@ QWIDGETSIZE_MAX = 16777215
 
 def build_config_scroll(window, top_layout):
     # type: (object, QtWidgets.QVBoxLayout) -> QtWidgets.QVBoxLayout
+    """Build the configuration scroll area and add it to the top layout.
+
+    Args:
+        window: The main window instance to attach widget references to.
+        top_layout: The top-level layout of the window.
+
+    Returns:
+        QtWidgets.QVBoxLayout: The layout for the scroll area body widgets.
+    """
     window.config_scroll = QtWidgets.QScrollArea()
     window.config_scroll.setObjectName("configScroll")
     window.config_scroll.setWidgetResizable(True)
@@ -44,6 +53,12 @@ def build_config_scroll(window, top_layout):
 
 def build_source_section(window, top_layout):
     # type: (object, QtWidgets.QVBoxLayout) -> None
+    """Build the Source input section card and widgets.
+
+    Args:
+        window: The main window instance to attach widget references to.
+        top_layout: Layout to add the source card frame to.
+    """
     window.input_section = QtWidgets.QFrame()
     window.input_section.setObjectName("sectionCard")
     window.input_section.setMaximumSize(960, 200)
@@ -147,6 +162,12 @@ def build_source_section(window, top_layout):
 
 def build_destination_section(window, top_layout):
     # type: (object, QtWidgets.QVBoxLayout) -> None
+    """Build the Destination output section card and widgets.
+
+    Args:
+        window: The main window instance to attach widget references to.
+        top_layout: Layout to add the destination card frame to.
+    """
     window.output_section = QtWidgets.QFrame()
     window.output_section.setObjectName("sectionCard")
     window.output_section.setMaximumSize(960, 200)
@@ -215,6 +236,12 @@ def build_destination_section(window, top_layout):
 
 def build_extras_section(window, top_layout):
     # type: (object, QtWidgets.QVBoxLayout) -> None
+    """Build the settings / extras collapsible card and nested controls.
+
+    Args:
+        window: The main window instance to attach widget references to.
+        top_layout: Layout to add the settings card frame to.
+    """
     # Dummy out removed variables so main_window signals don't crash
     window.aov_section = None
     window.aov_body = None
@@ -373,6 +400,12 @@ def build_extras_section(window, top_layout):
 
 def build_action_bar(window, top_layout):
     # type: (object, QtWidgets.QVBoxLayout) -> None
+    """Build the action/execution control bar widgets.
+
+    Args:
+        window: The main window instance to attach widget references to.
+        top_layout: Layout to add the action bar frame to.
+    """
     action_bar = QtWidgets.QFrame()
     action_bar.setObjectName("actionBar")
     action_bar.setMaximumSize(960, 72)
@@ -423,6 +456,12 @@ def build_action_bar(window, top_layout):
 
 def build_logs_section(window, logs_layout):
     # type: (object, QtWidgets.QVBoxLayout) -> None
+    """Build the log console section showing tabular logs.
+
+    Args:
+        window: The main window instance to attach widget references to.
+        logs_layout: Layout to add the logs frame to.
+    """
     logs_section = QtWidgets.QFrame()
     logs_section.setObjectName("sectionCard")
     logs_section.setMaximumSize(960, 260)

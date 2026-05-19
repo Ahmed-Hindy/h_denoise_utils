@@ -67,6 +67,12 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def __init__(self, parent=None, initial_path=None):
         # type: (Optional[QtWidgets.QWidget], Optional[str]) -> None
+        """Initialize the base window instance and UI elements.
+
+        Args:
+            parent: Optional parent widget.
+            initial_path: Optional initial path to load on startup.
+        """
         super(BaseWindow, self).__init__(parent)
         self.app_style = self.style()
         self.setAcceptDrops(True)
@@ -160,6 +166,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def closeEvent(self, event):
         # type: (QtGui.QCloseEvent) -> None
+        """Clean up active resources and save settings when the window is closed.
+
+        Args:
+            event: The window close event payload.
+        """
         if self._package_logger and self.log_handler:
             self._package_logger.removeHandler(self.log_handler)
             self.log_handler.close()
@@ -170,6 +181,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _load_stylesheet(self):
         # type: () -> None
+        """Load and apply the CSS/QSS stylesheet for window styling.
+        """
         ui_dir = os.path.dirname(__file__)
         icons_dir = os.path.join(ui_dir, "icons")
         if os.path.isdir(icons_dir):
@@ -183,6 +196,8 @@ class BaseWindow(QtWidgets.QMainWindow):
     # --- Menu & window setup ---
     def _setup_menus(self):
         # type: () -> None
+        """Initialize and build the menu bar actions and help menus.
+        """
         menubar = self.menuBar()
         file_menu = menubar.addMenu("&File")
         exit_act = QtAction("E&xit", self)
@@ -203,6 +218,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _show_about(self):
         # type: () -> None
+        """Display the About dialog containing app name, version, and details.
+        """
         QtWidgets.QMessageBox.about(
             self,
             "About Denoiser",
@@ -215,6 +232,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _show_shortcuts(self):
         # type: () -> None
+        """Display a dialog box listing the available keyboard shortcuts.
+        """
         message = (
             "Shortcuts:\n\n"
             "Ctrl+Enter: Denoise / Stop\n"
@@ -225,10 +244,17 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _log_folder_path(self):
         # type: () -> str
+        """Get the directory path where log files are stored.
+
+        Returns:
+            str: Path to the logs folder.
+        """
         return get_log_dir()
 
     def _open_logs_folder(self):
         # type: () -> None
+        """Open the application logs folder in the system file explorer.
+        """
         path = self._log_folder_path()
         if not os.path.exists(path):
             try:
@@ -246,6 +272,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _setup_ui(self):
         # type: () -> None
+        """Construct and arrange all sections, layout frames, and widgets.
+        """
         ENV_IS_DEV = str(os.environ.get("ENV_IS_DEV", "")).lower() == "true"
         title = (
             "Denoiser {} {}".format("(DEV)" if ENV_IS_DEV else "", __version__)
@@ -313,30 +341,65 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _build_source_section(self, top_layout):
         # type: (QtWidgets.QVBoxLayout) -> None
+        """Add the Source section widgets to the main vertical layout.
+
+        Args:
+            top_layout: The top-level QVBoxLayout of the main window.
+        """
         build_source_section(self, top_layout)
 
     def _build_config_scroll(self, top_layout):
         # type: (QtWidgets.QVBoxLayout) -> QtWidgets.QVBoxLayout
+        """Create the configuration scroll area and append to top layout.
+
+        Args:
+            top_layout: The top-level QVBoxLayout of the main window.
+
+        Returns:
+            QtWidgets.QVBoxLayout: The internal body layout inside the scroll area.
+        """
         return build_config_scroll(self, top_layout)
 
     def _build_destination_section(self, top_layout):
         # type: (QtWidgets.QVBoxLayout) -> None
+        """Add the Destination configuration card to the scroll layout.
+
+        Args:
+            top_layout: The scroll area's configuration QVBoxLayout.
+        """
         build_destination_section(self, top_layout)
 
     def _build_extras_section(self, top_layout):
         # type: (QtWidgets.QVBoxLayout) -> None
+        """Add settings and runtime selection cards to the scroll layout.
+
+        Args:
+            top_layout: The scroll area's configuration QVBoxLayout.
+        """
         build_extras_section(self, top_layout)
 
     def _build_action_bar(self, top_layout):
         # type: (QtWidgets.QVBoxLayout) -> None
+        """Add execution triggers, progress bar, and path labels to layout.
+
+        Args:
+            top_layout: The top-level QVBoxLayout of the main window.
+        """
         build_action_bar(self, top_layout)
 
     def _build_logs_section(self, logs_layout):
         # type: (QtWidgets.QVBoxLayout) -> None
+        """Add log table and level filtering combo box to the layout.
+
+        Args:
+            logs_layout: The QVBoxLayout of the logs pane widget.
+        """
         build_logs_section(self, logs_layout)
 
     def _set_init_widget_values(self):
         # type: () -> None
+        """Set initial values and preset selections for widgets on launch.
+        """
         self.preset_combo.setCurrentText("Beauty")
         self._apply_preset("Beauty")
         self._update_output_label()
@@ -368,6 +431,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _apply_ui_lock(self, locked):
         # type: (bool) -> None
+        """Enable or disable interaction with UI widgets during denoiser execution.
+
+        Args:
+            locked: Whether to lock the widgets (True) or restore them (False).
+        """
         if locked:
             self._pre_run_enabled = {
                 w: w.isEnabled() for w in self._lockable_widgets()
@@ -388,10 +456,20 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _initial_optix_version(self):
         # type: () -> str
+        """Determine the initial OptiX runtime version from environment variable or default.
+
+        Returns:
+            str: Selected initial OptiX version string.
+        """
         return DEFAULT_OPTIX_VERSION
 
     def _optix_version_key(self):
         # type: () -> str
+        """Retrieve the selected OptiX version identifier from combo box data.
+
+        Returns:
+            str: OptiX version key identifier.
+        """
         if self.optix_version_combo:
             data = self.optix_version_combo.currentData()
             if data:
@@ -400,6 +478,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _resolve_selected_denoiser_path(self):
         # type: () -> str
+        """Locate the executable path of the selected backend denoiser runtime.
+
+        Returns:
+            str: Path to the executable binary, or empty string if missing.
+        """
         try:
             if self._backend_key() == "oidn":
                 return resolve_bundled_oidn_denoiser(required=False) or ""
@@ -415,6 +498,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _runtime_missing_text(self):
         # type: () -> str
+        """Construct appropriate warning text for missing backend executables.
+
+        Returns:
+            str: Path resolution failure alert string.
+        """
         if self._backend_key() == "oidn":
             return "Missing bundled OIDN Denoiser.exe"
         return "Missing bundled Denoiser.exe for OptiX {}".format(
@@ -423,6 +511,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _sync_backend_controls(self):
         # type: () -> None
+        """Enable or disable options based on the chosen backend (OptiX vs OIDN).
+        """
         is_optix = self._backend_key() == "optix"
         if self.optix_version_combo:
             self.optix_version_combo.setEnabled(is_optix)
@@ -431,6 +521,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _refresh_denoiser_status(self):
         # type: () -> None
+        """Update the Status label with the resolved path of the denoiser binary.
+        """
         if self.denoiser_status_label:
             self.denoiser_status_label.setText(
                 self.bundled_denoiser_path or self._runtime_missing_text()
@@ -438,6 +530,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _on_optix_version_changed(self, _text):
         # type: (str) -> None
+        """Trigger path resolution and UI updates when the OptiX version changes.
+
+        Args:
+            _text: The new selected text value from the combo box.
+        """
         self.selected_optix_version = self._optix_version_key()
         self.bundled_denoiser_path = self._resolve_selected_denoiser_path()
         self._sync_backend_controls()
@@ -445,6 +542,8 @@ class BaseWindow(QtWidgets.QMainWindow):
     # --- Signal wiring ---
     def _connect_signals(self):
         # type: () -> None
+        """Connect signals of all interactive controls to their corresponding slots.
+        """
         self.browse_btn.clicked.connect(self._browse)
         self.scan_btn.clicked.connect(self._on_scan_requested)
         self.open_output_btn.clicked.connect(self._open_output_folder)
@@ -492,6 +591,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _connect_aov_scan(self):
         # type: () -> None
+        """Connect signals of the background AovScanManager instance to slot methods.
+        """
         if not self._aov_scan:
             return
         self._aov_scan.started.connect(self._on_aov_scan_started)
@@ -500,6 +601,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _set_tooltips(self):
         # type: () -> None
+        """Apply tooltip text descriptions to all control elements.
+        """
         self.path_edit.setToolTip(tooltips.PATH_EDIT)
         self.browse_btn.setToolTip(tooltips.BROWSE_BTN)
         self.scan_btn.setToolTip(tooltips.SCAN_BTN)
@@ -545,12 +648,16 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _browse(self):
         # type: () -> None
+        """Open a QFileDialog directory selector to populate the path input.
+        """
         path = QtWidgets.QFileDialog.getExistingDirectory(self, "Select Folder")
         if path:
             self._set_path_text(path, analyze=True, clear_selected=True)
 
     def _open_output_folder(self):
         # type: () -> None
+        """Open the destination folder of the active input path in file manager.
+        """
         path = self._effective_input_path()
         if not path:
             QtWidgets.QMessageBox.information(
@@ -567,6 +674,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _update_drop_overlay_geometry(self):
         # type: () -> None
+        """Match the size of the drag-and-drop overlay to its parent widget.
+        """
         if self.drop_overlay:
             parent = self.drop_overlay.parentWidget()
             if parent:
@@ -574,6 +683,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _set_drop_overlay_visible(self, visible):
         # type: (bool) -> None
+        """Toggle visual visibility of the drag-and-drop landing helper.
+
+        Args:
+            visible: Whether the overlay should be shown.
+        """
         if visible and self._ui_state.is_running:
             visible = False
         if self.drop_overlay:
@@ -584,6 +698,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _set_path_from_drop(self, urls):
         # type: (List[QtCore.QUrl]) -> None
+        """Receive dropped URLs, classify paths, and populate the input field.
+
+        Args:
+            urls: List of QUrl objects dropped on the UI.
+        """
         if self._ui_state.is_running:
             return
         paths = []
@@ -627,23 +746,43 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def dragEnterEvent(self, event):
         # type: (QtGui.QDragEnterEvent) -> None
+        """Filter and accept drag event if content matches files or folders.
+
+        Args:
+            event: The QDragEnterEvent object.
+        """
         if not self._ui_state.is_running and event.mimeData().hasUrls():
             self._set_drop_overlay_visible(True)
             event.acceptProposedAction()
 
     def dragMoveEvent(self, event):
         # type: (QtGui.QDragMoveEvent) -> None
+        """Accept drag move event to maintain drop overlay state.
+
+        Args:
+            event: The QDragMoveEvent object.
+        """
         if not self._ui_state.is_running and event.mimeData().hasUrls():
             self._set_drop_overlay_visible(True)
             event.acceptProposedAction()
 
     def dragLeaveEvent(self, event):
         # type: (QtGui.QDragLeaveEvent) -> None
+        """Hide the drop overlay when the drag cursor leaves window area.
+
+        Args:
+            event: The QDragLeaveEvent object.
+        """
         self._set_drop_overlay_visible(False)
         event.accept()
 
     def dropEvent(self, event):
         # type: (QtGui.QDropEvent) -> None
+        """Retrieve URLs from the drop payload and parse them into the input state.
+
+        Args:
+            event: The QDropEvent object.
+        """
         if self._ui_state.is_running:
             self._set_drop_overlay_visible(False)
             event.ignore()
@@ -655,6 +794,15 @@ class BaseWindow(QtWidgets.QMainWindow):
     def eventFilter(self, obj, event):
         # type: (QtCore.QObject, QtCore.QEvent) -> bool
 
+        """Handle resize and drag action monitoring on central container widgets.
+
+        Args:
+            obj: The monitored object.
+            event: The event payload.
+
+        Returns:
+            bool: True if event was captured and consumed, False to propagate.
+        """
         if obj in (self.centralWidget(), self.drop_overlay):
             if self._ui_state.is_running and event.type() in (
                 QtCore.QEvent.DragEnter,
@@ -688,6 +836,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _restore_splitter_state(self):
         # type: () -> None
+        """Restore splitter layout dimensions from persistent settings storage.
+        """
         if not self.main_splitter:
             return
         state = self._settings.value("ui/main_splitter_state")
@@ -696,6 +846,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _save_splitter_state(self):
         # type: () -> None
+        """Persist the splitter layout dimensions to settings storage.
+        """
         if not self.main_splitter:
             return
         self._settings.setValue(
@@ -704,16 +856,22 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _load_recent_paths(self):
         # type: () -> None
+        """Load the list of recently loaded paths from QSettings.
+        """
         self._recent_paths = load_recent_paths(self._settings)
         self._refresh_recent_paths()
 
     def _save_recent_paths(self):
         # type: () -> None
+        """Save the list of recently loaded paths to QSettings.
+        """
         save_recent_paths(self._settings, self._recent_paths)
 
     # --- Input/path state ---
     def _refresh_recent_paths(self):
         # type: () -> None
+        """Populate the path combo box dropdown selection with history items.
+        """
         current = self.path_edit.currentText()
         self.path_edit.blockSignals(True)
         self.path_edit.clear()
@@ -724,12 +882,24 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _set_input_path_state(self, path):
         # type: (str) -> None
+        """Update the internal input state value and update summary fields.
+
+        Args:
+            path: The source path string value.
+        """
         self._input_state.path = (path or "").strip()
         self._update_output_label()
         self._update_summary_strip()
 
     def _set_path_text(self, path, analyze=False, clear_selected=False):
         # type: (str, bool, bool) -> None
+        """Set path edit text and optionally trigger asynchronous analysis.
+
+        Args:
+            path: The path string.
+            analyze: Whether to run an AOV scan.
+            clear_selected: Whether to empty individual file selections.
+        """
         if clear_selected:
             self._clear_selected_files()
         self.path_edit.blockSignals(True)
@@ -741,12 +911,22 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _on_scan_requested(self, _checked=False):
         # type: (bool) -> None
+        """Force trigger a re-analysis scan of the effective input path.
+
+        Args:
+            _checked: The checked state if triggered from action button.
+        """
         if self._ui_state.is_running:
             return
         self._analyze_input(force=True)
 
     def _on_path_text_changed(self, text):
         # type: (str) -> None
+        """Respond to changes in input text by triggering a deferred path scan.
+
+        Args:
+            text: The new input path string.
+        """
         self._set_input_path_state(text)
         path = (text or "").strip()
         if path and os.path.isdir(path):
@@ -756,10 +936,20 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _current_input_path(self):
         # type: () -> str
+        """Get the current string text of the input path field.
+
+        Returns:
+            str: The current text value.
+        """
         return self._input_state.path.strip()
 
     def _effective_input_path(self):
         # type: () -> str
+        """Get the absolute folder or selected file path to run commands against.
+
+        Returns:
+            str: The path to denoise.
+        """
         path = self._current_input_path()
         if self._input_state.selected_files:
             return self._input_state.selected_root or path
@@ -767,12 +957,22 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _remember_path(self, path):
         # type: (str) -> None
+        """Add path to history and save persistent settings.
+
+        Args:
+            path: The directory path to add.
+        """
         self._recent_paths = remember_path(self._recent_paths, path, max_items=10)
         self._save_recent_paths()
         self._refresh_recent_paths()
 
     def _set_selected_files(self, files):
         # type: (List[str]) -> None
+        """Populate individual files panel and update file list selection.
+
+        Args:
+            files: List of selected file path strings.
+        """
         selected_files = [f for f in files if f]
         self._input_state.selected_files = selected_files
         self._input_state.selected_root = ""
@@ -808,6 +1008,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _clear_selected_files(self):
         # type: () -> None
+        """Clear all files from manual selection with user confirmation.
+        """
         selected_count = len(self._input_state.selected_files)
         if selected_count > 3 and self.sender() is self.files_clear_btn:
             response = QtWidgets.QMessageBox.question(
@@ -831,6 +1033,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _remove_selected_files(self):
         # type: () -> None
+        """Remove specific selected file rows from the file list widget.
+        """
         selected_rows = {item.row() for item in self.files_list.selectedIndexes()}
         if not selected_rows:
             return
@@ -843,12 +1047,22 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _on_path_selected(self, index):
         # type: (int) -> None
+        """Respond to history item selection in combo box.
+
+        Args:
+            index: The chosen combo box index.
+        """
         path = self.path_edit.itemText(index)
         if path:
             self._set_path_text(path, analyze=True, clear_selected=True)
 
     def _set_scan_busy(self, busy):
         # type: (bool) -> None
+        """Show or hide the scanning spinner and disable refresh triggers.
+
+        Args:
+            busy: Whether a scan is in progress.
+        """
         self._ui_state.scan_busy = busy
         if self.scan_spinner:
             self.scan_spinner.setVisible(busy)
@@ -858,16 +1072,25 @@ class BaseWindow(QtWidgets.QMainWindow):
     # --- AOV scan lifecycle ---
     def _on_aov_scan_started(self):
         # type: () -> None
+        """Handle the start of an AOV scan by setting busy state.
+        """
         self._set_scan_busy(True)
 
     def _on_aov_analysis_timeout(self):
         # type: () -> None
+        """Handle scan timeouts by resetting state and clearing results.
+        """
         self._set_scan_busy(False)
         self._log("AOV analysis timed out.", "warning")
         self._apply_planes([])
 
     def _on_aov_analysis_complete(self, result):
         # type: (dict) -> None
+        """Handle completed scans and apply detected channels to UI widgets.
+
+        Args:
+            result: Analysis result dictionary from the scan thread.
+        """
         self._set_scan_busy(False)
 
         status = result.get("status")
@@ -898,8 +1121,24 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _aov_scan_key(self, path):
         # type: (str) -> tuple
+        """Construct cache signature for folder and selected file parameters.
+
+        Args:
+            path: The directory path.
+
+        Returns:
+            tuple: Cache signature containing path metadata.
+        """
         def normalize(value):
             # type: (str) -> str
+            """Normalize a path for caching consistency.
+
+            Args:
+                value: A folder or file path string.
+
+            Returns:
+                str: Normalized path string.
+            """
             return os.path.normcase(os.path.abspath(os.path.normpath(value)))
 
         return (
@@ -930,6 +1169,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _auto_select_preset(self, planes):
         # type: (List[str]) -> None
+        """Apply basic presets automatically based on detected channel names.
+
+        Args:
+            planes: List of available channel/AOV names.
+        """
         if not self._auto_preset_enabled:
             return
         if self.preset_combo.currentText() == self._custom_preset:
@@ -945,6 +1189,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _apply_planes(self, planes):
         # type: (List[str]) -> None
+        """Configure available channel list dropdowns and target controls.
+
+        Args:
+            planes: List of available channel/AOV names.
+        """
         if not planes:
             self._aov_state.planes = []
             self._update_planes_panel([])
@@ -987,6 +1236,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _update_planes_panel(self, planes):
         # type: (List[str]) -> None
+        """Populate detected AOV labels and layout chips.
+
+        Args:
+            planes: List of AOV channel names.
+        """
         self._clear_planes_flow()
         for plane in planes:
             chip = QtWidgets.QLabel(plane)
@@ -1010,6 +1264,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _toggle_planes_panel(self, checked):
         # type: (bool) -> None
+        """Toggle display layout showing detected AOV chips.
+
+        Args:
+            checked: True to show, False to hide.
+        """
         self.planes_body.setVisible(checked)
         self.planes_toggle.setArrowType(
             QtCore.Qt.DownArrow if checked else QtCore.Qt.RightArrow
@@ -1019,6 +1278,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _toggle_output_body(self, checked):
         # type: (bool) -> None
+        """Toggle visibility of destination setup controls.
+
+        Args:
+            checked: True to show, False to hide.
+        """
         if not self.output_body or not self.output_section:
             return
         self.output_body.setVisible(checked)
@@ -1030,6 +1294,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _toggle_denoise_body(self, checked):
         # type: (bool) -> None
+        """Toggle visibility of denoise setup controls.
+
+        Args:
+            checked: True to show, False to hide.
+        """
         if not self.denoise_body or not self.denoise_section:
             return
         self.denoise_body.setVisible(checked)
@@ -1041,6 +1310,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _toggle_advanced(self, checked):
         # type: (bool) -> None
+        """Toggle visibility of options settings panel.
+
+        Args:
+            checked: True to show, False to hide.
+        """
         if not self.advanced_section or not self.advanced_body:
             return
         self.advanced_body.setVisible(checked)
@@ -1052,6 +1326,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _toggle_advanced_settings(self, checked):
         # type: (bool) -> None
+        """Toggle visibility of runtime selection controls.
+
+        Args:
+            checked: True to show, False to hide.
+        """
         if not self.advanced_settings_body:
             return
         self.advanced_settings_body.setVisible(checked)
@@ -1062,6 +1341,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _toggle_aov_body(self, checked):
         # type: (bool) -> None
+        """Toggle visibility of AOV scan panel controls.
+
+        Args:
+            checked: True to show, False to hide.
+        """
         if not self.aov_body or not self.aov_section:
             return
         self.aov_body.setVisible(checked)
@@ -1073,6 +1357,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _clear_planes_flow(self):
         # type: () -> None
+        """Remove all AOV chip labels from layout widgets.
+        """
         while self.planes_flow_layout.count():
             item = self.planes_flow_layout.takeAt(0)
             if item and item.widget():
@@ -1080,11 +1366,18 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _output_preview_path(self):
         # type: () -> str
+        """Obtain output path template for filename display.
+
+        Returns:
+            str: The output path template preview.
+        """
         selected_root = self._input_state.selected_root
         return preview_output_path(self._current_input_path(), selected_root)
 
     def _update_output_label(self):
         # type: () -> None
+        """Refresh all destination path preview labels.
+        """
         if not self.output_path_label:
             return
         preview = self._output_preview_path()
@@ -1099,11 +1392,19 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _update_summary_strip(self):
         # type: () -> None
+        """Evaluate values and adjust chip background status colors.
+        """
         if not self.summary_files or not self.summary_planes or not self.summary_motion:
             return
 
         def _apply_chip_state(chip, object_name):
             # type: (QtWidgets.QLabel, str) -> None
+            """Update the stylesheet property class of a summary label chip.
+
+            Args:
+                chip: The label chip widget.
+                object_name: Target style class name.
+            """
             if chip.objectName() == object_name:
                 return
             chip.setObjectName(object_name)
@@ -1161,6 +1462,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _flash_summary_planes(self):
         # type: () -> None
+        """Briefly change colors of AOV summary chip to highlight refresh.
+        """
         if not self.summary_planes:
             return
         if not self._summary_planes_flash_timer.isActive():
@@ -1170,6 +1473,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _clear_summary_planes_flash(self):
         # type: () -> None
+        """Restore original stylesheet of AOV summary chip.
+        """
         if not self.summary_planes:
             return
         self.summary_planes.setStyleSheet(
@@ -1182,6 +1487,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _set_planes_preview(self, planes):
         # type: (List[str]) -> None
+        """Set text preview containing names of detected AOVs.
+
+        Args:
+            planes: List of channel name strings.
+        """
         if not planes:
             self.planes_preview.setText("")
             return
@@ -1216,6 +1526,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _set_preset_text(self, preset_name):
         # type: (str) -> None
+        """Set preset combo text while blocking recursive signal fires.
+
+        Args:
+            preset_name: Preset value string.
+        """
         self.preset_combo.blockSignals(True)
         self.preset_combo.setCurrentText(preset_name)
         self.preset_combo.blockSignals(False)
@@ -1223,6 +1538,14 @@ class BaseWindow(QtWidgets.QMainWindow):
     @staticmethod
     def _backend_display(backend_key):
         # type: (str) -> str
+        """Convert backend identifier strings to clean titles.
+
+        Args:
+            backend_key: Backend key (optix or oidn).
+
+        Returns:
+            str: Human-readable backend name.
+        """
         key = (backend_key or "").strip().lower()
         if key == "oidn":
             return "OIDN"
@@ -1232,6 +1555,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _backend_key(self):
         # type: () -> str
+        """Get normalized lowercase backend selection.
+
+        Returns:
+            str: Active backend identifier.
+        """
         if self.backend_combo:
             data = self.backend_combo.currentData()
             if data:
@@ -1240,6 +1568,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _apply_preset(self, preset_name):
         # type: (str) -> None
+        """Configure UI settings and combo defaults configured by preset.
+
+        Args:
+            preset_name: Preset name value.
+        """
         if preset_name not in PRESETS:
             return
         preset = PRESETS[preset_name]
@@ -1253,6 +1586,12 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _apply_preset_plane(self, combo, preset_value):
         # type: (QtWidgets.QComboBox, Optional[str]) -> None
+        """Auto-select the best matching channel suffix in target combo box.
+
+        Args:
+            combo: Combo box widget.
+            preset_value: Expected channel suffix.
+        """
         if not preset_value:
             combo.setCurrentText("")
             return
@@ -1277,6 +1616,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _mark_custom(self):
         # type: () -> None
+        """De-activate preset flags and mark active configuration as Custom.
+        """
         if self._suppress_custom_changes:
             return
         self._auto_preset_enabled = False
@@ -1285,19 +1626,39 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _motion_vectors_available(self):
         # type: () -> bool
+        """Check if temporal inputs are present.
+
+        Returns:
+            bool: Always False.
+        """
         return False
 
     def _update_temporal_state(self, desired_checked=None):
         # type: (Optional[bool]) -> bool
+        """Evaluate temporal parameters and adjust configurations.
+
+        Args:
+            desired_checked: Optional override value.
+
+        Returns:
+            bool: Always False.
+        """
         self._update_summary_strip()
         return False
 
     def _pick_custom_exe(self):
         # type: () -> None
+        """Open selection dialog for custom runtime binaries.
+        """
         return
 
     def _on_backend_changed(self, backend):
         # type: (str) -> None
+        """Sync backend configs and paths when backend changes.
+
+        Args:
+            backend: Selected backend identifier.
+        """
         self.selected_backend = self._backend_key()
         self.bundled_denoiser_path = self._resolve_selected_denoiser_path()
         self._sync_backend_controls()
@@ -1305,11 +1666,21 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _on_motion_changed(self, _):
         # type: (str) -> None
+        """Update configs when temporal checkbox selection changes.
+
+        Args:
+            _: Checkbox state value.
+        """
         self._update_temporal_state()
         self._mark_custom()
 
     def _on_preset_changed(self, preset_name):
         # type: (str) -> None
+        """Switch preset profiles and update channel combobox options.
+
+        Args:
+            preset_name: Selected preset option name.
+        """
         if preset_name == self._custom_preset:
             self._auto_preset_enabled = False
             return
@@ -1320,6 +1691,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _on_control(self):
         # type: () -> None
+        """Respond to Primary Action Button execution clicks (Start/Stop).
+        """
         if self._ui_state.is_running:
             self._stop_denoise()
         else:
@@ -1327,15 +1700,27 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _on_options_edit_finished(self):
         # type: () -> None
+        """Validate manual configuration JSON modifications.
+        """
         self._validate_options_json(show_message=False)
 
     def _validate_options_json(self, show_message=False):
         # type: (bool) -> bool
+        """Verify formatting of configuration inputs.
+
+        Args:
+            show_message: Whether to display warning dialogs.
+
+        Returns:
+            bool: Always True.
+        """
         return True
 
     # --- Denoise workflow ---
     def _start_denoise(self):
         # type: () -> None
+        """Resolve execution details and spin up background worker thread.
+        """
         input_path = self._effective_input_path()
         selected_files = self._input_state.selected_files
         if selected_files and not input_path:
@@ -1432,12 +1817,20 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _stop_denoise(self):
         # type: () -> None
+        """Signal background execution thread to abort execution.
+        """
         if self.worker:
             self.worker.request_stop()
             self._log("Stopping...", "warning")
 
     def _on_progress(self, current, total):
         # type: (int, int) -> None
+        """Update progress indicators with current worker stats.
+
+        Args:
+            current: Current file index.
+            total: Total files count.
+        """
         self._ui_state.progress_current = current
         self._ui_state.progress_total = total
         self.progress.setMaximum(total)
@@ -1446,6 +1839,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _on_finished(self, summary):
         # type: (dict) -> None
+        """Handle completion of the background processing thread.
+
+        Args:
+            summary: Metrics dictionary with processing results.
+        """
         self._ui_state.is_running = False
         self._apply_ui_lock(False)
         self.control_btn.setText("Denoise")
@@ -1472,6 +1870,12 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _update_progress_label(self, current, total):
         # type: (int, int) -> None
+        """Compute ETA values and update progress display text.
+
+        Args:
+            current: Processed file index.
+            total: Total files count.
+        """
         if total <= 0:
             self.progress_label.setText("File 0 of 0 | ETA --:--")
             return
@@ -1491,6 +1895,14 @@ class BaseWindow(QtWidgets.QMainWindow):
     @staticmethod
     def _format_eta(seconds):
         # type: (float) -> str
+        """Convert integer duration in seconds to descriptive timestamp.
+
+        Args:
+            seconds: Duration in seconds.
+
+        Returns:
+            str: Descriptive timestamp representation.
+        """
         secs = max(0, int(seconds + 0.5))
         mins, sec = divmod(secs, 60)
         hours, mins = divmod(mins, 60)
@@ -1532,6 +1944,14 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _log_level_icon(self, level):
         # type: (str) -> Optional[QtGui.QIcon]
+        """Resolve system icons matching specific message severities.
+
+        Args:
+            level: Severity value string.
+
+        Returns:
+            Optional[QtGui.QIcon]: Status icon object, or None.
+        """
         icon_map = {
             "error": QtWidgets.QStyle.SP_MessageBoxCritical,
             "warning": QtWidgets.QStyle.SP_MessageBoxWarning,
@@ -1547,6 +1967,14 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _log_filter_allows(self, level):
         # type: (str) -> bool
+        """Filter logs based on severity levels.
+
+        Args:
+            level: Severity value string.
+
+        Returns:
+            bool: True if allowed to be logged.
+        """
         mode = self.log_filter_combo.currentText()
         level = level.lower()
         if mode == "All":
@@ -1563,6 +1991,8 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _refresh_log_view(self):
         # type: () -> None
+        """Rebuild log console table content using active level filters.
+        """
         self.log_table.setRowCount(0)
         self._visible_log_records = []
         for record in self.log_records:
@@ -1589,6 +2019,12 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _add_log_item(self, record, scroll):
         # type: (dict, bool) -> None
+        """Add a single log record row to the table layout.
+
+        Args:
+            record: Log record dictionary.
+            scroll: True to scroll to bottom.
+        """
         row = self.log_table.rowCount()
         self.log_table.insertRow(row)
         timestamp = record["timestamp"].toString("HH:mm:ss.zzz")
@@ -1607,6 +2043,11 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _show_log_context_menu(self, pos):
         # type: (QtCore.QPoint) -> None
+        """Render the context menu for copying logs.
+
+        Args:
+            pos: Trigger mouse coordinate point.
+        """
         selected_rows = self.log_table.selectionModel().selectedRows()
         selected_row = selected_rows[0].row() if selected_rows else -1
         message_item = (
@@ -1642,11 +2083,24 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _get_exrmode(self):
         # type: () -> Optional[int]
+        """Read target EXR output specifications.
+
+        Returns:
+            Optional[int]: Always None.
+        """
         return None
 
     @staticmethod
     def _parse_space_list(text):
         # type: (str) -> Optional[List[str]]
+        """Tokenize a string by comma or white space.
+
+        Args:
+            text: Raw text to split.
+
+        Returns:
+            Optional[List[str]]: List of tokens, or None.
+        """
         if not text or not text.strip():
             return None
         parts = re.split(r"[,\s]+", text.strip())

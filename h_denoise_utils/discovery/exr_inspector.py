@@ -12,6 +12,18 @@ OPENEXR_MULTIPART_FLAG = 0x1000
 
 
 def _read_cstring(stream, first_byte=b""):
+    """Read a null-terminated C-string from a binary stream.
+
+    Args:
+        stream: The file-like binary stream.
+        first_byte: Optional initial byte to prepend to the result.
+
+    Returns:
+        bytes: The read bytes, excluding the null terminator.
+
+    Raises:
+        EOFError: If EOF is reached before a null terminator.
+    """
     data = bytearray(first_byte)
     while True:
         b = stream.read(1)
@@ -23,6 +35,20 @@ def _read_cstring(stream, first_byte=b""):
 
 
 def _read_header(stream, first_name_byte=b""):
+    """Read a single EXR header part/attribute block from the stream.
+
+    Args:
+        stream: The file-like binary stream.
+        first_name_byte: Optional initial byte of the first attribute name.
+
+    Returns:
+        Tuple[Dict[str, Tuple[str, bytes]], List[str]]: A tuple containing:
+            - A dictionary mapping attribute names to their type and raw bytes.
+            - A list of attribute names in their original order.
+
+    Raises:
+        EOFError: If EOF is reached while reading sizes or values.
+    """
     attrs = {}  # type: Dict[str, Tuple[str, bytes]]
     order = []  # type: List[str]
     while True:
@@ -45,6 +71,15 @@ def _read_header(stream, first_name_byte=b""):
 
 
 def _read_headers(path):
+    """Read all headers from an EXR file (supporting multipart files).
+
+    Args:
+        path: Path to the EXR file.
+
+    Returns:
+        List[Tuple[Dict[str, Tuple[str, bytes]], List[str]]]: A list of headers,
+            where each header is a tuple of (attributes, order).
+    """
     headers = []
     with open(path, "rb") as stream:
         magic = stream.read(4)
@@ -67,6 +102,15 @@ def _read_headers(path):
 
 
 def _string_attr(attrs, key):
+    """Helper to extract a string attribute value.
+
+    Args:
+        attrs: Dictionary of EXR attributes.
+        key: The key of the attribute to extract.
+
+    Returns:
+        str: The string value, or empty string if not found or not a string type.
+    """
     attr = attrs.get(key)
     if not attr:
         return ""
@@ -77,6 +121,14 @@ def _string_attr(attrs, key):
 
 
 def _channel_names(attrs):
+    """Extract list of channel names from the 'channels' attribute.
+
+    Args:
+        attrs: Dictionary of EXR attributes.
+
+    Returns:
+        List[str]: A list of channel names.
+    """
     attr = attrs.get("channels")
     if not attr:
         return []
@@ -100,6 +152,14 @@ def _channel_names(attrs):
 
 
 def _layer_names_from_channels(channels):
+    """Deduce layer/AOV names from a flat list of channel names.
+
+    Args:
+        channels: List of channel name strings.
+
+    Returns:
+        List[str]: Deduced layer/AOV names.
+    """
     stems = []
     seen = set()
     for channel in channels:

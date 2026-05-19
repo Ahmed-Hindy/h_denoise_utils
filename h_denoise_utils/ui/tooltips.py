@@ -75,21 +75,54 @@ LOG_FILTER_COMBO = "Filter log messages by severity"
 
 def planes_toggle(count, timestamp):
     # type: (int, str) -> str
+    """Format tooltip for the AOV planes toggle button.
+
+    Args:
+        count: Number of planes detected.
+        timestamp: Time when the scan occurred.
+
+    Returns:
+        str: Formatted tooltip text.
+    """
     return PLANES_TOGGLE.format(count, timestamp)
 
 
 def temporal_backend_unsupported(backend_display):
     # type: (str) -> str
+    """Format tooltip for temporal denoising when the current backend is unsupported.
+
+    Args:
+        backend_display: Name of the active backend.
+
+    Returns:
+        str: Formatted tooltip text.
+    """
     return TEMPORAL_CHK_BACKEND_UNSUPPORTED.format(backend_display)
 
 
 def options_invalid_json(exc):
     # type: (object) -> str
+    """Format tooltip warning for invalid JSON configuration.
+
+    Args:
+        exc: Exception details or error string.
+
+    Returns:
+        str: Formatted tooltip text.
+    """
     return OPTIONS_INVALID_JSON.format(exc)
 
 
 def output_destination_label(preview_path):
     # type: (str) -> str
+    """Format label displaying the output destination directory.
+
+    Args:
+        preview_path: The calculated destination folder path.
+
+    Returns:
+        str: Formatted label string.
+    """
     if preview_path:
         return OUTPUT_DESTINATION.format(preview_path)
     return OUTPUT_DESTINATION_EMPTY
@@ -97,4 +130,12 @@ def output_destination_label(preview_path):
 
 def action_destination_label(preview_path):
     # type: (str) -> str
+    """Format shorthand destination indicator label.
+
+    Args:
+        preview_path: The calculated destination folder path.
+
+    Returns:
+        str: Formatted shorthand label.
+    """
     return ACTION_DESTINATION.format(preview_path if preview_path else "-")
