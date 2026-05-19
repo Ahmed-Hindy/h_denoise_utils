@@ -5,6 +5,16 @@ import os
 
 def preview_output_path(input_path, selected_root):
     # type: (str, str) -> str
+    """Compute the preview directory where denoised images will be saved.
+
+    Args:
+        input_path: Path of the input directory or file.
+        selected_root: Optional user-override output directory root.
+
+    Returns:
+        str: Normalized path to the output directory, or empty string if input
+            is invalid.
+    """
     path = selected_root or (input_path or "").strip()
     if not path:
         return ""

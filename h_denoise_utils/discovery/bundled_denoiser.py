@@ -23,18 +23,44 @@ PREFERRED_OPTIX_VERSIONS = (
 
 
 def _package_root() -> Path:
+    """Retrieve the root directory of the package.
+
+    Returns:
+        Path: The package root path.
+    """
     return Path(__file__).resolve().parents[1]
 
 
 def _denoiser_base_dir() -> Path:
+    """Get the base vendor directory for the OptiX denoiser.
+
+    Returns:
+        Path: Path to the base vendor directory.
+    """
     return _package_root() / "vendor" / "optix-denoiser" / "windows-x64"
 
 
 def _exe_name() -> str:
+    """Get the executable filename for the denoiser.
+
+    Returns:
+        str: The executable name.
+    """
     return "Denoiser.exe"
 
 
 def _normalize_optix_version(optix_version: str) -> str:
+    """Normalize the OptiX version string and validate it.
+
+    Args:
+        optix_version: The version string to normalize.
+
+    Returns:
+        str: Normalized version string (e.g., "9.0").
+
+    Raises:
+        ValueError: If the version is not supported.
+    """
     value = optix_version.strip()
     if value.lower().startswith("optix-"):
         value = value[6:]
@@ -47,6 +73,15 @@ def _normalize_optix_version(optix_version: str) -> str:
 
 
 def _requested_optix_version(optix_version: Optional[str]) -> Tuple[str, bool]:
+    """Determine the requested OptiX version and if it was explicitly specified.
+
+    Args:
+        optix_version: Optional explicit version override.
+
+    Returns:
+        Tuple[str, bool]: A tuple containing the version string and a boolean
+            indicating whether the version was explicitly requested.
+    """
     if optix_version is not None:
         return _normalize_optix_version(optix_version), True
 
@@ -59,11 +94,24 @@ def legacy_bundled_denoiser_path() -> Path:
 
 
 def bundled_denoiser_path(optix_version: Optional[str] = None) -> Path:
+    """Get the path to the bundled denoiser for a specific OptiX version.
+
+    Args:
+        optix_version: The OptiX version to get the path for.
+
+    Returns:
+        Path: Path to the bundled denoiser executable.
+    """
     version, _explicit = _requested_optix_version(optix_version)
     return _denoiser_base_dir() / f"optix-{version}" / _exe_name()
 
 
 def available_bundled_denoisers() -> Dict[str, Path]:
+    """List all available bundled OptiX denoiser executables.
+
+    Returns:
+        Dict[str, Path]: A dictionary mapping available OptiX versions to their paths.
+    """
     available = {}
     for version in SUPPORTED_OPTIX_VERSIONS:
         candidate = bundled_denoiser_path(version)
@@ -76,6 +124,19 @@ def resolve_bundled_denoiser(
     required: bool = True,
     optix_version: Optional[str] = None,
 ) -> Optional[str]:
+    """Resolve the path to the bundled OptiX denoiser.
+
+    Args:
+        required: Whether to raise an error if no denoiser is found.
+        optix_version: Optional specific OptiX version to resolve.
+
+    Returns:
+        Optional[str]: Path to the resolved denoiser executable, or None if not found
+            and not required.
+
+    Raises:
+        FileNotFoundError: If the denoiser is required but not found.
+    """
     version, explicit_version = _requested_optix_version(optix_version)
     candidate = bundled_denoiser_path(version)
     if candidate.is_file():

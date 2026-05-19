@@ -8,6 +8,15 @@ from ...utils.file_utils import scan_images
 
 def find_first_exr(path, selected_files=None):
     # type: (str, Optional[List[str]]) -> Optional[str]
+    """Find the first EXR file from selected files, a file path, or directory.
+
+    Args:
+        path: Path to the target directory or file.
+        selected_files: List of selected filenames.
+
+    Returns:
+        Optional[str]: Path to the resolved EXR file, or None if not found.
+    """
     if selected_files:
         for fname in selected_files:
             if fname.lower().endswith(".exr"):
@@ -24,6 +33,16 @@ def find_first_exr(path, selected_files=None):
 
 def analyze_aovs(path, selected_files=None):
     # type: (str, Optional[List[str]]) -> Dict[str, object]
+    """Analyze AOV planes from the first resolved EXR file.
+
+    Args:
+        path: Target folder or file path.
+        selected_files: Optional list of selected files.
+
+    Returns:
+        Dict[str, object]: Dictionary containing resolution status, first EXR file,
+            plane list, and error string if any.
+    """
     result = {"status": "ok", "exr_file": None, "planes": [], "error": None}
     exr_file = find_first_exr(path, selected_files)
     result["exr_file"] = exr_file
