@@ -6,24 +6,25 @@ Denoiser.exe runtimes.
 """
 
 from ._version import __version__
-
-# Core exports
-from .core.config import (
-    AOVConfig,
-    DenoiseConfig,
-    SUPPORTED_BACKENDS,
-    normalize_plane_name,
-    is_beauty_plane,
-    DEFAULT_INPUT_EXTS,
-    AOVS_NEVER_DENOISE,
-    BEAUTY_AOV_ALIASES,
-    PRESETS,
-)
 from .core.command_builder import (
     build_bundled_multipart_command,
     build_bundled_optix_command,
     build_oidn_denoise_command,
 )
+
+# Core exports
+from .core.config import (
+    AOVS_NEVER_DENOISE,
+    BEAUTY_AOV_ALIASES,
+    DEFAULT_INPUT_EXTS,
+    PRESETS,
+    SUPPORTED_BACKENDS,
+    AOVConfig,
+    DenoiseConfig,
+    is_beauty_plane,
+    normalize_plane_name,
+)
+from .discovery.aov_validator import filter_existing_aovs, validate_aov_exists
 
 # Discovery exports
 from .discovery.bundled_denoiser import (
@@ -37,8 +38,8 @@ from .discovery.bundled_denoiser import (
 )
 from .discovery.bundled_oidn import (
     DEFAULT_OIDN_PLATFORM,
-    PINNED_OIDN_RELEASE,
     PINNED_OIDN_DENOISER_RELEASE,
+    PINNED_OIDN_RELEASE,
     PINNED_OIDN_VERSION,
     PINNED_OIDN_WINDOWS_ASSET,
     SUPPORTED_OIDN_PLATFORMS,
@@ -50,19 +51,19 @@ from .discovery.bundled_oidn import (
     resolve_bundled_oidn_denoiser,
 )
 from .discovery.exr_inspector import list_exr_planes
-from .discovery.aov_validator import validate_aov_exists, filter_existing_aovs
+from .utils.file_utils import (
+    build_output_path,
+    compute_output_folder,
+    is_image_file,
+    natural_sort_key,
+    scan_images,
+)
 
 # Utils exports
 from .utils.process_utils import get_subprocess_config, run_subprocess
-from .utils.file_utils import (
-    natural_sort_key,
-    is_image_file,
-    scan_images,
-    build_output_path,
-    compute_output_folder,
-)
 
 __all__ = [
+    "__version__",
     # Config
     "AOVConfig",
     "DenoiseConfig",

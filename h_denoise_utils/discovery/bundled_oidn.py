@@ -48,9 +48,7 @@ def _normalize_platform(platform: Optional[str] = None) -> str:
     if value not in SUPPORTED_OIDN_PLATFORMS:
         allowed = ", ".join(SUPPORTED_OIDN_PLATFORMS)
         raise ValueError(
-            "Unsupported OIDN runtime platform '{}'. Expected one of: {}.".format(
-                platform, allowed
-            )
+            f"Unsupported OIDN runtime platform '{platform}'. Expected one of: {allowed}."
         )
     return value
 
@@ -65,7 +63,7 @@ def bundled_oidn_root(platform: Optional[str] = None) -> Path:
         Path: Path to the bundled OIDN root folder.
     """
     platform_key = _normalize_platform(platform)
-    return _oidn_vendor_dir() / platform_key / "oidn-{}".format(PINNED_OIDN_VERSION)
+    return _oidn_vendor_dir() / platform_key / f"oidn-{PINNED_OIDN_VERSION}"
 
 
 def bundled_oidn_denoiser_path(platform: Optional[str] = None) -> Path:
@@ -141,16 +139,13 @@ def resolve_bundled_oidn_denoiser(
     if required:
         if os.name != "nt":
             raise FileNotFoundError(
-                "Bundled OIDN discovery is currently pinned to the official "
-                "Windows x64 package."
+                "Bundled OIDN discovery is currently pinned to the official Windows x64 package."
             )
         location = getattr(sys, "_MEIPASS", None) or str(_package_root())
         raise FileNotFoundError(
-            "Bundled OIDN Denoiser.exe was not found. Expected: {}. "
+            f"Bundled OIDN Denoiser.exe was not found. Expected: {candidate}. "
             "Run tools/fetch_oidn_denoiser.ps1 or tools/build_oidn_denoiser.ps1 first. "
-            "Package root: {}".format(
-                candidate, location
-            )
+            f"Package root: {location}"
         )
     return None
 

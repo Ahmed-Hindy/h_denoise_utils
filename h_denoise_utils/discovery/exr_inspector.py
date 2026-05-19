@@ -1,9 +1,10 @@
 """Pure Python EXR file inspection."""
 
+from __future__ import annotations
+
 import logging
 import os
 import struct
-from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +50,8 @@ def _read_header(stream, first_name_byte=b""):
     Raises:
         EOFError: If EOF is reached while reading sizes or values.
     """
-    attrs = {}  # type: Dict[str, Tuple[str, bytes]]
-    order = []  # type: List[str]
+    attrs: dict[str, tuple[str, bytes]] = {}
+    order: list[str] = []
     while True:
         name = _read_cstring(stream, first_name_byte)
         first_name_byte = b""
@@ -180,8 +181,7 @@ def _layer_names_from_channels(channels):
     return []
 
 
-def list_exr_planes(exr_path, oiiotool_path=None):
-    # type: (str, Optional[str]) -> List[str]
+def list_exr_planes(exr_path: str, oiiotool_path: str | None = None) -> list[str]:
     """List all plane/AOV names in an EXR file without Houdini or oiiotool."""
     _ = oiiotool_path
     if not os.path.isfile(exr_path):
@@ -194,7 +194,7 @@ def list_exr_planes(exr_path, oiiotool_path=None):
         logger.warning("Unable to inspect EXR %s: %s", exr_path, exc)
         return []
 
-    planes = {}  # type: Dict[str, None]
+    planes: dict[str, None] = {}
     for attrs, _order in headers:
         part_name = _string_attr(attrs, "name")
         if part_name:

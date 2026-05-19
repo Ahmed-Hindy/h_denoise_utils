@@ -1,10 +1,11 @@
 """Recent paths persistence helpers."""
 
+from __future__ import annotations
+
 import os
 
 
-def load_recent_paths(settings):
-    # type: (object) -> List[str]
+def load_recent_paths(settings: object) -> list[str]:
     """Load the list of recently opened directory paths from settings.
 
     Args:
@@ -23,8 +24,7 @@ def load_recent_paths(settings):
     return [os.path.normpath(p) for p in paths if p]
 
 
-def save_recent_paths(settings, paths):
-    # type: (object, List[str]) -> None
+def save_recent_paths(settings: object, paths: list[str]) -> None:
     """Save the list of recently opened directory paths to settings.
 
     Args:
@@ -34,8 +34,7 @@ def save_recent_paths(settings, paths):
     settings.setValue("recent_paths", list(paths))
 
 
-def remember_path(paths, path, max_items=10):
-    # type: (List[str], str, int) -> List[str]
+def remember_path(paths: list[str], path: str, max_items: int = 10) -> list[str]:
     """Add a new path to the list of recent paths, maintaining constraints.
 
     Deduplicates the path, validates it exists, and limits the list size.

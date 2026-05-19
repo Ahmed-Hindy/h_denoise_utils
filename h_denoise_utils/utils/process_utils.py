@@ -1,16 +1,17 @@
 """Process execution utilities."""
 
+from __future__ import annotations
+
 import subprocess
 
 
-def get_subprocess_config():
-    # type: () -> Tuple[Optional[subprocess.STARTUPINFO], int]
+def get_subprocess_config() -> tuple[subprocess.STARTUPINFO | None, int]:
     """Get subprocess configuration to hide console on Windows.
 
     Returns:
         Tuple of (startupinfo, creation_flags) for subprocess.run()
     """
-    startupinfo = None  # type: Optional[subprocess.STARTUPINFO]
+    startupinfo: subprocess.STARTUPINFO | None = None
     creation_flags = 0
 
     import os
@@ -23,8 +24,7 @@ def get_subprocess_config():
     return startupinfo, creation_flags
 
 
-def run_subprocess(cmd, timeout=300):
-    # type: (list, int) -> Tuple[bool, str]
+def run_subprocess(cmd: list, timeout: int = 300) -> tuple[bool, str]:
     """Run a subprocess and return success status and error message.
 
     Args:
@@ -48,6 +48,6 @@ def run_subprocess(cmd, timeout=300):
             return True, ""
         return False, (proc.stderr or proc.stdout or "").strip()
     except subprocess.TimeoutExpired:
-        return False, "Process timeout after {}s".format(timeout)
+        return False, f"Process timeout after {timeout}s"
     except Exception as e:
-        return False, "Execution error: {}".format(e)
+        return False, f"Execution error: {e}"

@@ -10,7 +10,6 @@ import os
 from logging.handlers import RotatingFileHandler
 from typing import Optional
 
-
 _LOG_DIR_ENV = "H_DENOISE_LOG_DIR"
 _DEFAULT_MAX_BYTES = 2 * 1024 * 1024  # 2 MB
 _DEFAULT_BACKUP_COUNT = 3
@@ -81,7 +80,7 @@ def setup_logger(
     target_dir = get_log_dir(log_dir)
     try:
         os.makedirs(target_dir, exist_ok=True)
-        log_path = os.path.join(target_dir, "{}.log".format(name))
+        log_path = os.path.join(target_dir, f"{name}.log")
         file_handler = RotatingFileHandler(
             log_path,
             maxBytes=max_bytes,

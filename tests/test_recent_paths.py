@@ -5,7 +5,7 @@ import os
 from h_denoise_utils.ui.services import recent_paths
 
 
-class _DummySettings(object):
+class _DummySettings:
     def __init__(self, value=None):
         self._value = value
         self.saved = None

@@ -1,5 +1,7 @@
 """Custom Qt widgets."""
 
+from __future__ import annotations
+
 from .qt_compat import QtCore, QtGui, QtWidgets, Signal
 
 
@@ -13,7 +15,7 @@ class NoWheelComboBox(QtWidgets.QComboBox):
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
         """
-        super(NoWheelComboBox, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
     def wheelEvent(self, event):
@@ -25,7 +27,7 @@ class NoWheelComboBox(QtWidgets.QComboBox):
         if not self.hasFocus():
             event.ignore()
             return
-        super(NoWheelComboBox, self).wheelEvent(event)
+        super().wheelEvent(event)
 
 
 class NoWheelSpinBox(QtWidgets.QSpinBox):
@@ -38,7 +40,7 @@ class NoWheelSpinBox(QtWidgets.QSpinBox):
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
         """
-        super(NoWheelSpinBox, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
     def wheelEvent(self, event):
@@ -50,14 +52,15 @@ class NoWheelSpinBox(QtWidgets.QSpinBox):
         if not self.hasFocus():
             event.ignore()
             return
-        super(NoWheelSpinBox, self).wheelEvent(event)
+        super().wheelEvent(event)
 
 
 class FlowLayout(QtWidgets.QLayout):
     """Simple flow layout that wraps items."""
 
-    def __init__(self, parent=None, margin=0, spacing=-1):
-        # type: (Optional[QtWidgets.QWidget], int, int) -> None
+    def __init__(
+        self, parent: QtWidgets.QWidget | None = None, margin: int = 0, spacing: int = -1
+    ) -> None:
         """Initialize the flow layout.
 
         Args:
@@ -65,13 +68,12 @@ class FlowLayout(QtWidgets.QLayout):
             margin: Outer margin size.
             spacing: Layout spacing between elements.
         """
-        super(FlowLayout, self).__init__(parent)
+        super().__init__(parent)
         self._item_list = []
         self.setContentsMargins(margin, margin, margin, margin)
         self.setSpacing(spacing)
 
-    def addItem(self, item):
-        # type: (QtWidgets.QLayoutItem) -> None
+    def addItem(self, item: QtWidgets.QLayoutItem) -> None:
         """Add a layout item to the flow list.
 
         Args:
@@ -79,8 +81,7 @@ class FlowLayout(QtWidgets.QLayout):
         """
         self._item_list.append(item)
 
-    def count(self):
-        # type: () -> int
+    def count(self) -> int:
         """Retrieve the number of items in the layout.
 
         Returns:
@@ -88,8 +89,7 @@ class FlowLayout(QtWidgets.QLayout):
         """
         return len(self._item_list)
 
-    def itemAt(self, index):
-        # type: (int) -> Optional[QtWidgets.QLayoutItem]
+    def itemAt(self, index: int) -> QtWidgets.QLayoutItem | None:
         """Get the layout item at the specified index.
 
         Args:
@@ -102,8 +102,7 @@ class FlowLayout(QtWidgets.QLayout):
             return self._item_list[index]
         return None
 
-    def takeAt(self, index):
-        # type: (int) -> Optional[QtWidgets.QLayoutItem]
+    def takeAt(self, index: int) -> QtWidgets.QLayoutItem | None:
         """Remove and return the layout item at the specified index.
 
         Args:
@@ -116,8 +115,7 @@ class FlowLayout(QtWidgets.QLayout):
             return self._item_list.pop(index)
         return None
 
-    def expandingDirections(self):
-        # type: () -> QtCore.Qt.Orientations
+    def expandingDirections(self) -> QtCore.Qt.Orientations:
         """Get the expanding directions of the layout.
 
         Returns:
@@ -125,8 +123,7 @@ class FlowLayout(QtWidgets.QLayout):
         """
         return QtCore.Qt.Orientations(0)
 
-    def hasHeightForWidth(self):
-        # type: () -> bool
+    def hasHeightForWidth(self) -> bool:
         """Determine if height depends on width.
 
         Returns:
@@ -134,8 +131,7 @@ class FlowLayout(QtWidgets.QLayout):
         """
         return True
 
-    def heightForWidth(self, width):
-        # type: (int) -> int
+    def heightForWidth(self, width: int) -> int:
         """Calculate the height for the given layout width.
 
         Args:
@@ -146,18 +142,16 @@ class FlowLayout(QtWidgets.QLayout):
         """
         return self._do_layout(QtCore.QRect(0, 0, width, 0), True)
 
-    def setGeometry(self, rect):
-        # type: (QtCore.QRect) -> None
+    def setGeometry(self, rect: QtCore.QRect) -> None:
         """Arrange elements inside the layout rectangle.
 
         Args:
             rect: The bounding rectangle geometry.
         """
-        super(FlowLayout, self).setGeometry(rect)
+        super().setGeometry(rect)
         self._do_layout(rect, False)
 
-    def sizeHint(self):
-        # type: () -> QtCore.QSize
+    def sizeHint(self) -> QtCore.QSize:
         """Get the size hint for the layout.
 
         Returns:
@@ -165,8 +159,7 @@ class FlowLayout(QtWidgets.QLayout):
         """
         return self.minimumSize()
 
-    def minimumSize(self):
-        # type: () -> QtCore.QSize
+    def minimumSize(self) -> QtCore.QSize:
         """Calculate the minimum bounding size of the layout.
 
         Returns:
@@ -176,13 +169,10 @@ class FlowLayout(QtWidgets.QLayout):
         for item in self._item_list:
             size = size.expandedTo(item.minimumSize())
         margins = self.contentsMargins()
-        size += QtCore.QSize(
-            margins.left() + margins.right(), margins.top() + margins.bottom()
-        )
+        size += QtCore.QSize(margins.left() + margins.right(), margins.top() + margins.bottom())
         return size
 
-    def _do_layout(self, rect, test_only):
-        # type: (QtCore.QRect, bool) -> int
+    def _do_layout(self, rect: QtCore.QRect, test_only: bool) -> int:
         """Calculate wrapping layout positions or perform the actual layout.
 
         Args:
@@ -234,19 +224,17 @@ class FlowLayout(QtWidgets.QLayout):
 class CheckableComboBox(NoWheelComboBox):
     """A combobox with checkable items."""
 
-    def __init__(self, parent=None):
-        # type: (QtWidgets.QWidget) -> None
+    def __init__(self, parent: QtWidgets.QWidget = None) -> None:
         """Initialize the checkable combobox.
 
         Args:
             parent: Optional parent QWidget.
         """
-        super(CheckableComboBox, self).__init__(parent)
+        super().__init__(parent)
         self.view().pressed.connect(self.handle_item_pressed)
         self.setModel(QtGui.QStandardItemModel(self))
 
-    def handle_item_pressed(self, index):
-        # type: (QtCore.QModelIndex) -> None
+    def handle_item_pressed(self, index: QtCore.QModelIndex) -> None:
         """Toggle the check state of an item when pressed.
 
         Args:
@@ -255,9 +243,7 @@ class CheckableComboBox(NoWheelComboBox):
         try:
             item = self.model().itemFromIndex(index)
             item.setCheckState(
-                QtCore.Qt.Unchecked
-                if item.checkState() == QtCore.Qt.Checked
-                else QtCore.Qt.Checked
+                QtCore.Qt.Unchecked if item.checkState() == QtCore.Qt.Checked else QtCore.Qt.Checked
             )
         except Exception:
             pass
@@ -268,15 +254,14 @@ class Chip(QtWidgets.QFrame):
 
     removed = Signal(str)
 
-    def __init__(self, text, parent=None):
-        # type: (str, Optional[QtWidgets.QWidget]) -> None
+    def __init__(self, text: str, parent: QtWidgets.QWidget | None = None) -> None:
         """Initialize the chip widget.
 
         Args:
             text: Display text for the chip.
             parent: Optional parent QWidget.
         """
-        super(Chip, self).__init__(parent)
+        super().__init__(parent)
         self._text = text
         self.setObjectName("chip")
         self.setFrameShape(QtWidgets.QFrame.StyledPanel)
@@ -294,8 +279,7 @@ class Chip(QtWidgets.QFrame):
         layout.addWidget(label)
         layout.addWidget(close_btn)
 
-    def _on_remove(self):
-        # type: () -> None
+    def _on_remove(self) -> None:
         """Emit the removed signal containing the chip's text."""
         self.removed.emit(self._text)
 
@@ -305,31 +289,29 @@ class ChipListWidget(QtWidgets.QScrollArea):
 
     chip_removed = Signal(str)
 
-    def __init__(self, parent=None):
-        # type: (Optional[QtWidgets.QWidget]) -> None
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         """Initialize the chip list container.
 
         Args:
             parent: Optional parent QWidget.
         """
-        super(ChipListWidget, self).__init__(parent)
+        super().__init__(parent)
         self.setWidgetResizable(True)
         self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         self.setFrameShape(QtWidgets.QFrame.NoFrame)
 
-        self._chips = []  # type: List[str]
-        self._chip_map = {}  # type: Dict[str, str]
-        self._chip_widgets = {}  # type: Dict[str, Chip]
-        self._available = None  # type: Optional[Set[str]]
+        self._chips: list[str] = []
+        self._chip_map: dict[str, str] = {}
+        self._chip_widgets: dict[str, Chip] = {}
+        self._available: set[str] | None = None
 
         self._container = QtWidgets.QWidget()
         self._layout = FlowLayout(self._container, margin=4, spacing=6)
 
         self.setWidget(self._container)
 
-    def set_available(self, planes):
-        # type: (Optional[List[str]]) -> None
+    def set_available(self, planes: list[str] | None) -> None:
         """Configure the set of available/allowed plane names for the list.
 
         Args:
@@ -340,8 +322,7 @@ class ChipListWidget(QtWidgets.QScrollArea):
         else:
             self._available = {p.lower() for p in planes if p}
 
-    def chips(self):
-        # type: () -> List[str]
+    def chips(self) -> list[str]:
         """Get list of active chip labels.
 
         Returns:
@@ -349,14 +330,12 @@ class ChipListWidget(QtWidgets.QScrollArea):
         """
         return [self._chip_map[key] for key in self._chips]
 
-    def clear_chips(self):
-        # type: () -> None
+    def clear_chips(self) -> None:
         """Remove all chips from the list."""
         for key in list(self._chip_widgets.keys()):
             self._remove_chip_by_key(key, emit=False)
 
-    def add_chip(self, text):
-        # type: (str) -> None
+    def add_chip(self, text: str) -> None:
         """Create and add a new chip to the layout.
 
         Args:
@@ -381,8 +360,7 @@ class ChipListWidget(QtWidgets.QScrollArea):
         self._chip_widgets[key] = chip
         self._chips.append(key)
 
-    def remove_chip(self, text):
-        # type: (str) -> None
+    def remove_chip(self, text: str) -> None:
         """Remove a chip matching the text identifier.
 
         Args:
@@ -393,8 +371,7 @@ class ChipListWidget(QtWidgets.QScrollArea):
         key = str(text).strip().lower()
         self._remove_chip_by_key(key, emit=True)
 
-    def prune_unavailable(self):
-        # type: () -> None
+    def prune_unavailable(self) -> None:
         """Remove chips whose names are no longer in the set of available planes."""
         if self._available is None:
             return
@@ -402,8 +379,7 @@ class ChipListWidget(QtWidgets.QScrollArea):
             if key not in self._available:
                 self._remove_chip_by_key(key, emit=False)
 
-    def _on_chip_removed(self, text):
-        # type: (str) -> None
+    def _on_chip_removed(self, text: str) -> None:
         """Callback triggered when a child Chip is closed.
 
         Args:
@@ -411,8 +387,7 @@ class ChipListWidget(QtWidgets.QScrollArea):
         """
         self.remove_chip(text)
 
-    def _remove_chip_by_key(self, key, emit):
-        # type: (str, bool) -> None
+    def _remove_chip_by_key(self, key: str, emit: bool) -> None:
         """Internal helper to remove chip by lowercase key and clean up.
 
         Args:
@@ -434,14 +409,13 @@ class ChipListWidget(QtWidgets.QScrollArea):
 class AovChipsInput(QtWidgets.QWidget):
     """AOV picker with checkable chips for selected planes."""
 
-    def __init__(self, parent=None):
-        # type: (Optional[QtWidgets.QWidget]) -> None
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         """Initialize the AOV chips selector widget.
 
         Args:
             parent: Optional parent QWidget.
         """
-        super(AovChipsInput, self).__init__(parent)
+        super().__init__(parent)
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
@@ -465,11 +439,10 @@ class AovChipsInput(QtWidgets.QWidget):
         layout.addWidget(self.scroll)
         layout.addWidget(self.custom_input)
 
-        self._buttons = []  # type: List[QtWidgets.QPushButton]
+        self._buttons: list[QtWidgets.QPushButton] = []
         self._available_planes = []
 
-    def set_available_planes(self, planes):
-        # type: (List[str]) -> None
+    def set_available_planes(self, planes: list[str]) -> None:
         """Set the selectable AOV planes in the flow layout.
 
         Args:
@@ -501,8 +474,7 @@ class AovChipsInput(QtWidgets.QWidget):
             self._flow.addWidget(btn)
             self._buttons.append(btn)
 
-    def set_chips(self, planes):
-        # type: (List[str]) -> None
+    def set_chips(self, planes: list[str]) -> None:
         """Check buttons matching the provided plane names.
 
         Args:
@@ -512,8 +484,7 @@ class AovChipsInput(QtWidgets.QWidget):
         for btn in self._buttons:
             btn.setChecked(btn.text() in selected_set)
 
-    def selected_chips(self):
-        # type: () -> List[str]
+    def selected_chips(self) -> list[str]:
         """Get the names of all selected AOV planes (standard chips + custom input).
 
         Returns:
@@ -525,8 +496,7 @@ class AovChipsInput(QtWidgets.QWidget):
             selected.extend([x.strip() for x in custom_text.split(",") if x.strip()])
         return selected
 
-    def clear(self):
-        # type: () -> None
+    def clear(self) -> None:
         """Clear all checked chips and custom input field."""
         for btn in self._buttons:
             btn.setChecked(False)

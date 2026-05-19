@@ -1,12 +1,13 @@
 """Tests for utils.file_utils module."""
 
 import os
+
 from h_denoise_utils.utils.file_utils import (
-    natural_sort_key,
-    is_image_file,
-    scan_images,
     build_output_path,
     compute_output_folder,
+    is_image_file,
+    natural_sort_key,
+    scan_images,
 )
 
 

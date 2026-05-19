@@ -50,9 +50,7 @@ class AOVConfig:
     def __post_init__(self):
         """Validate configuration after initialization."""
         # Convert None to empty list for list fields (immutable workaround)
-        if self.aovs_to_denoise is not None and not isinstance(
-            self.aovs_to_denoise, list
-        ):
+        if self.aovs_to_denoise is not None and not isinstance(self.aovs_to_denoise, list):
             raise TypeError("aovs_to_denoise must be a list or None")
         if self.extra_aovs is not None and not isinstance(self.extra_aovs, list):
             raise TypeError("extra_aovs must be a list or None")

@@ -1,13 +1,14 @@
 """AOV inspection utilities (no UI dependencies)."""
 
+from __future__ import annotations
+
 import os
 
 from ...discovery.exr_inspector import list_exr_planes
 from ...utils.file_utils import scan_images
 
 
-def find_first_exr(path, selected_files=None):
-    # type: (str, Optional[List[str]]) -> Optional[str]
+def find_first_exr(path: str, selected_files: list[str] | None = None) -> str | None:
     """Find the first EXR file from selected files, a file path, or directory.
 
     Args:
@@ -31,8 +32,7 @@ def find_first_exr(path, selected_files=None):
     return None
 
 
-def analyze_aovs(path, selected_files=None):
-    # type: (str, Optional[List[str]]) -> Dict[str, object]
+def analyze_aovs(path: str, selected_files: list[str] | None = None) -> dict[str, object]:
     """Analyze AOV planes from the first resolved EXR file.
 
     Args:

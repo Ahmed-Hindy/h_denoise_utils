@@ -1,10 +1,10 @@
 """Tests for bundled OIDN runtime resolution."""
 
-import pytest
 from pathlib import Path
 
-from h_denoise_utils.core.config import AOVConfig
-from h_denoise_utils.core.config import DenoiseConfig
+import pytest
+
+from h_denoise_utils.core.config import AOVConfig, DenoiseConfig
 from h_denoise_utils.core.denoiser import Denoiser
 from h_denoise_utils.discovery import bundled_oidn
 
@@ -15,7 +15,7 @@ def _write_oidn_runtime(tmp_path):
         / "vendor"
         / "oidn-denoiser"
         / "windows-x64"
-        / "oidn-{}".format(bundled_oidn.PINNED_OIDN_VERSION)
+        / f"oidn-{bundled_oidn.PINNED_OIDN_VERSION}"
     )
     exe = root / "Denoiser.exe"
     exe.parent.mkdir(parents=True)

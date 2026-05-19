@@ -1,14 +1,18 @@
 """AOV validation and filtering utilities."""
 
+from __future__ import annotations
+
 import logging
+from typing import Any
 
 from .exr_inspector import list_exr_planes
 
 logger = logging.getLogger(__name__)
 
 
-def validate_aov_exists(exr_path, aov_name, oiiotool_path=None):
-    # type: (str, Optional[str], Optional[str]) -> bool
+def validate_aov_exists(
+    exr_path: str, aov_name: str | None, oiiotool_path: str | None = None
+) -> bool:
     """Check if a specific AOV exists in an EXR file (case-insensitive).
 
     Args:
@@ -27,13 +31,12 @@ def validate_aov_exists(exr_path, aov_name, oiiotool_path=None):
         return False
 
     aov_lower = aov_name.strip().lower()
-    available_lower = {p.lower() for p in available_planes}  # type: Set[str]
+    available_lower: set[str] = {p.lower() for p in available_planes}
 
     return aov_lower in available_lower
 
 
-def filter_existing_aovs(exr_path, **aov_params):
-    # type: (str, **Any) -> Dict[str, Any]
+def filter_existing_aovs(exr_path: str, **aov_params: Any) -> dict[str, Any]:
     """Filter AOVs to only include those that exist in the EXR file.
 
     Works with any AOV names from any render engine (Arnold, Karma, etc.),
@@ -67,7 +70,7 @@ def filter_existing_aovs(exr_path, **aov_params):
     # Build case-insensitive lookup
     available_lower = {p.lower(): p for p in available_planes}
 
-    validated = {}  # type: Dict[str, Any]
+    validated: dict[str, Any] = {}
 
     for key, value in aov_params.items():
         if value is None:
@@ -76,7 +79,7 @@ def filter_existing_aovs(exr_path, **aov_params):
 
         # Handle list of AOVs
         if isinstance(value, list):
-            validated_list = []  # type: List[str]
+            validated_list: list[str] = []
             for aov in value:
                 if not aov:
                     continue
