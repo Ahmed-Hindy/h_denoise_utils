@@ -1,6 +1,6 @@
 param(
     [string]$Repository = "Ahmed-Hindy/h_denoise_utils",
-    [string]$Tag = "oidn-denoiser-v2026.05.19",
+    [string]$Tag = "",
     [string]$Version = "2.4.1",
     [string]$Platform = "windows-x64",
     [string]$SourceShortSha = ""
@@ -14,6 +14,35 @@ if ($Platform -ne "windows-x64") {
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $vendorDir = Join-Path $repoRoot "h_denoise_utils\vendor\oidn-denoiser\$Platform\oidn-$Version"
+
+function Get-OidnDenoiserAssetPattern {
+    if ($SourceShortSha) {
+        return "oidn-denoiser-$Platform-oidn-$Version-$SourceShortSha.zip"
+    }
+    return "oidn-denoiser-$Platform-oidn-$Version-*.zip"
+}
+
+function Resolve-OidnDenoiserReleaseTag {
+    param([Parameter(Mandatory = $true)][string]$Pattern)
+
+    $releaseJson = gh release list --repo $Repository --exclude-drafts --exclude-pre-releases --limit 50 --json tagName
+    $releases = $releaseJson | ConvertFrom-Json
+    foreach ($release in $releases) {
+        $candidateTag = [string]$release.tagName
+        if (-not $candidateTag.StartsWith("v")) {
+            continue
+        }
+
+        $viewJson = gh release view $candidateTag --repo $Repository --json assets
+        $view = $viewJson | ConvertFrom-Json
+        $asset = $view.assets | Where-Object { $_.name -like $Pattern } | Select-Object -First 1
+        if ($asset) {
+            return $candidateTag
+        }
+    }
+
+    throw "No non-draft app release in $Repository contains an OIDN denoiser asset matching $Pattern. Pass -Tag vX.Y.Z or set HDU_OIDN_DENOISER_ZIP_DIR."
+}
 
 function Test-OidnDenoiserInstalled {
     return (
@@ -33,13 +62,8 @@ New-Item -ItemType Directory -Path $downloadDir | Out-Null
 try {
     $zipPath = $null
     $localZipDir = $env:HDU_OIDN_DENOISER_ZIP_DIR
+    $pattern = Get-OidnDenoiserAssetPattern
     if ($localZipDir) {
-        $pattern = if ($SourceShortSha) {
-            "oidn-denoiser-$Platform-oidn-$Version-$SourceShortSha.zip"
-        }
-        else {
-            "oidn-denoiser-$Platform-oidn-$Version-*.zip"
-        }
         $localZip = Get-ChildItem -LiteralPath $localZipDir -Filter $pattern | Select-Object -First 1
         if (-not $localZip) {
             throw "HDU_OIDN_DENOISER_ZIP_DIR is missing $pattern"
@@ -48,11 +72,9 @@ try {
         Copy-Item -LiteralPath $localZip.FullName -Destination $zipPath -Force
     }
     else {
-        $pattern = if ($SourceShortSha) {
-            "oidn-denoiser-$Platform-oidn-$Version-$SourceShortSha.zip"
-        }
-        else {
-            "oidn-denoiser-$Platform-oidn-$Version-*.zip"
+        if (-not $Tag) {
+            $Tag = Resolve-OidnDenoiserReleaseTag -Pattern $pattern
+            Write-Host "Resolved OIDN denoiser release tag: $Tag"
         }
         gh release download $Tag --repo $Repository --pattern $pattern --dir $downloadDir
         $downloaded = Get-ChildItem -LiteralPath $downloadDir -Filter $pattern | Select-Object -First 1

@@ -78,3 +78,25 @@ def test_layered_channel_names(tmp_path):
     )
 
     assert list_exr_planes(str(path)) == ["diffuse", "specular"]
+
+
+def test_nested_layered_channel_names_use_last_separator(tmp_path):
+    path = tmp_path / "nested-layered.exr"
+    path.write_bytes(
+        _singlepart_exr(
+            [
+                _channels_attr(
+                    [
+                        "diffuse.direct.R",
+                        "diffuse.direct.G",
+                        "diffuse.direct.B",
+                        "diffuse.indirect.R",
+                        "diffuse.indirect.G",
+                        "diffuse.indirect.B",
+                    ]
+                )
+            ]
+        )
+    )
+
+    assert list_exr_planes(str(path)) == ["diffuse.direct", "diffuse.indirect"]

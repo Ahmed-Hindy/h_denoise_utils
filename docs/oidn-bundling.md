@@ -40,6 +40,14 @@ Fetch a released wrapper asset with:
 .\tools\fetch_oidn_denoiser.ps1
 ```
 
+By default the fetch script searches the latest non-draft `v*` app release for
+an `oidn-denoiser-windows-x64-oidn-2.4.1-*.zip` asset. To fetch from a specific
+release, pass the tag explicitly:
+
+```powershell
+.\tools\fetch_oidn_denoiser.ps1 -Tag vX.Y.Z
+```
+
 Build the bundled portable app package after both OptiX and OIDN runtimes are
 present:
 

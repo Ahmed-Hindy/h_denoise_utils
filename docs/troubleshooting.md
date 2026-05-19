@@ -11,6 +11,8 @@
 
 - Run `.\tools\fetch_oidn_denoiser.ps1` from the repo root, or use the
   `OIDN Denoiser` GitHub Actions workflow to build a fresh bundle.
+  The fetch script searches released app tags (`v*`) by default; pass
+  `-Tag vX.Y.Z` if you need a specific release.
 - Confirm `h_denoise_utils/vendor/oidn-denoiser/windows-x64/oidn-2.4.1/Denoiser.exe`
   exists.
 - For development, set `HDU_OIDN_DENOISER_EXE` to a specific custom OIDN

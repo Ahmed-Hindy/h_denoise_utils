@@ -47,6 +47,9 @@ Fetch a released custom OIDN wrapper:
 .\tools\fetch_oidn_denoiser.ps1
 ```
 
+The wrapper fetcher searches released app tags (`v*`) for the matching OIDN
+wrapper asset. Use `-Tag vX.Y.Z` when you need a specific release.
+
 ## Build the bundled package
 
 After both runtimes are present:

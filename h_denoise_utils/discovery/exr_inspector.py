@@ -105,7 +105,7 @@ def _layer_names_from_channels(channels):
     for channel in channels:
         if "." not in channel:
             continue
-        stem = channel.split(".", 1)[0]
+        stem = channel.rsplit(".", 1)[0]
         if stem and stem not in seen:
             seen.add(stem)
             stems.append(stem)
