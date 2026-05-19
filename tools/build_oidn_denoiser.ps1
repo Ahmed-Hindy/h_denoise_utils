@@ -7,6 +7,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if ($PSVersionTable.PSVersion.Major -ge 7) {
+    $PSNativeCommandUseErrorActionPreference = $true
+}
 
 if ($Platform -ne "windows-x64") {
     throw "Unsupported OIDN denoiser platform '$Platform'. Expected windows-x64."
@@ -46,7 +49,7 @@ New-Item -ItemType Directory -Path $buildRoot, $bundleRoot, $distRoot -Force | O
 Push-Location $nativeDir
 try {
     uv run --native-tls --with conan conan profile detect --force
-    uv run --native-tls --with conan conan install . --output-folder $buildRoot --build=missing -s build_type=$Configuration
+    uv run --native-tls --with conan conan install . --output-folder $buildRoot --build=missing -s build_type=$Configuration -s compiler.cppstd=20
 
     $toolchain = Join-Path $buildRoot "build\generators\conan_toolchain.cmake"
     if (-not (Test-Path -LiteralPath $toolchain)) {
