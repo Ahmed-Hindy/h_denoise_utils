@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
 from pathlib import Path
 
 SPEC_DIR = Path(SPECPATH).resolve()
@@ -9,6 +10,9 @@ ROOT = SPEC_DIR.parent
 PACKAGE_DIR = ROOT / "h_denoise_utils"
 UI_DIR = PACKAGE_DIR / "ui"
 ICONS_DIR = UI_DIR / "icons"
+VENDOR_DENOISER_DIR = PACKAGE_DIR / "vendor" / "optix-denoiser"
+VENDOR_OIDN_DENOISER_DIR = PACKAGE_DIR / "vendor" / "oidn-denoiser"
+PACKAGE_VARIANT = os.environ.get("HDU_PACKAGE_VARIANT", "").strip().lower()
 
 datas = [(str(UI_DIR / "style.qss"), "h_denoise_utils/ui")]
 datas.extend(
@@ -16,6 +20,24 @@ datas.extend(
     for path in ICONS_DIR.iterdir()
     if path.is_file()
 )
+if VENDOR_DENOISER_DIR.exists() and PACKAGE_VARIANT in ("", "bundled"):
+    datas.extend(
+        (
+            str(path),
+            str(Path("h_denoise_utils") / "vendor" / "optix-denoiser" / path.relative_to(VENDOR_DENOISER_DIR).parent),
+        )
+        for path in VENDOR_DENOISER_DIR.rglob("*")
+        if path.is_file()
+    )
+if VENDOR_OIDN_DENOISER_DIR.exists() and PACKAGE_VARIANT in ("", "bundled"):
+    datas.extend(
+        (
+            str(path),
+            str(Path("h_denoise_utils") / "vendor" / "oidn-denoiser" / path.relative_to(VENDOR_OIDN_DENOISER_DIR).parent),
+        )
+        for path in VENDOR_OIDN_DENOISER_DIR.rglob("*")
+        if path.is_file()
+    )
 
 a = Analysis(
     [str(PACKAGE_DIR / "__main__.py")],

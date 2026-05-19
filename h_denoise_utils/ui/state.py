@@ -21,7 +21,7 @@ class AovState:
 @dataclass
 class DenoiseState:
     backend: str = ""
-    idenoise_path: str = ""
+    denoiser_path: str = ""
     threads: int = 0
     overwrite: bool = False
     prefix: str = ""

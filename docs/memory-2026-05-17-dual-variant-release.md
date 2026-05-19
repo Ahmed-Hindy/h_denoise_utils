@@ -450,3 +450,81 @@ gh run watch <run-id> --repo Ahmed-Hindy/h_denoise_utils --exit-status
   - Output contains 22 parts.
   - Raw source-vs-output OpenEXR header metadata diff count remains `0`.
 - Keep `main` and `optix-bundled-denoiser` version numbers aligned before any future app release tag.
+
+## 2026-05-18 Three-OptiX Shipping Update
+
+User asked to ship `h_denoise_utils` with three bundled OptiX builds: 8.1, 9.0, and 9.1.
+
+Upstream denoiser release created in `Ahmed-Hindy/NvidiaAIDenoiser`:
+
+```text
+tag: optix-denoiser-v2026.05.18
+url: https://github.com/Ahmed-Hindy/NvidiaAIDenoiser/releases/tag/optix-denoiser-v2026.05.18
+source commit in assets: fc927b7eaa5f0c949226f3d23e302ebb0f4e33cf
+```
+
+Release assets:
+
+```text
+optix-denoiser-windows-x64-optix-8.1-fc927b7.zip
+optix-denoiser-windows-x64-optix-9.0-fc927b7.zip
+optix-denoiser-windows-x64-optix-9.1-fc927b7.zip
+```
+
+Runtime matrix:
+
+```text
+OptiX 8.1 -> optix-dev v8.1.0 -> 50021ea0af6d41609a97777ceebbdf1e1d34efe7 -> locally validated
+OptiX 9.0 -> optix-dev v9.0.0 -> fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd -> locally validated and default
+OptiX 9.1 -> optix-dev v9.1.0 -> f1f6dd803f3159992d248178f6e09421c6eb8b6d -> included for newer drivers
+```
+
+The 8.1 and 9.0 builds both passed the Canyon Run multipart metadata smoke:
+
+```text
+output_part_count -> 22
+raw_attribute_value_diff_count -> 0
+attribute_order_diff_count -> 0
+```
+
+The 9.1 build is expected to fail on the maintainer workstation with local NVIDIA driver `576.80`; `optixInit` returned error `7801` there because OptiX 9.1 requires a newer driver. This is not a release blocker for the 9.1 asset.
+
+`h_denoise_utils` changes for this update:
+
+- `tools/fetch_optix_denoiser.ps1` now downloads all three assets from `optix-denoiser-v2026.05.18`.
+- Assets install under:
+  - `h_denoise_utils/vendor/optix-denoiser/windows-x64/optix-8.1/Denoiser.exe`
+  - `h_denoise_utils/vendor/optix-denoiser/windows-x64/optix-9.0/Denoiser.exe`
+  - `h_denoise_utils/vendor/optix-denoiser/windows-x64/optix-9.1/Denoiser.exe`
+- `h_denoise_utils/discovery/bundled_denoiser.py` defaults to OptiX 9.0 and supports `HDU_OPTIX_VERSION=8.1|9.0|9.1`.
+- `HDU_DENOISER_EXE` still overrides all bundled paths for development.
+- The GUI Settings -> Bundled Runtime section now includes an OptiX runtime selector.
+- The release workflow records the denoiser release tag, NvidiaAIDenoiser source SHA, and all three OptiX SDK SHAs.
+
+Validation for this update:
+
+```powershell
+uv run --native-tls --frozen pytest --tb=short
+# 96 passed in 14.80s
+
+.\tools\fetch_optix_denoiser.ps1
+# installed optix-8.1, optix-9.0, optix-9.1
+
+.\tools\build_windows_package.ps1 -Variant optix
+# Package created: dist\h-denoise-optix-windows-x64-v1.3.0.zip
+# Zip size after final upstream release refresh: 137516504 bytes
+
+.\dist\h-denoise\h-denoise.exe --smoke-test
+$env:HDU_OPTIX_VERSION='8.1'; .\dist\h-denoise\h-denoise.exe --smoke-test
+$env:HDU_OPTIX_VERSION='9.1'; .\dist\h-denoise\h-denoise.exe --smoke-test
+# all exited 0
+```
+
+The generated package zip was inspected and contained:
+
+```text
+h-denoise/_internal/h_denoise_utils/vendor/optix-denoiser/windows-x64/manifest.json
+h-denoise/_internal/h_denoise_utils/vendor/optix-denoiser/windows-x64/optix-8.1/Denoiser.exe
+h-denoise/_internal/h_denoise_utils/vendor/optix-denoiser/windows-x64/optix-9.0/Denoiser.exe
+h-denoise/_internal/h_denoise_utils/vendor/optix-denoiser/windows-x64/optix-9.1/Denoiser.exe
+```

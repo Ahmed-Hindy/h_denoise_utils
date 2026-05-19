@@ -57,13 +57,32 @@ jobs:
       - name: Install packaging dependencies
         run: uv sync --frozen --extra pyside6 --extra package
 
+      - name: Fetch bundled OptiX denoiser
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .\tools\fetch_optix_denoiser.ps1
+
+      - name: Build bundled OIDN denoiser
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .\tools\build_oidn_denoiser.ps1
+
+      - name: Validate OIDN UINT channel preservation
+        shell: pwsh
+        run: |
+          $denoiser = Get-ChildItem -LiteralPath ".\h_denoise_utils\vendor\oidn-denoiser\windows-x64" -Filter "Denoiser.exe" -Recurse | Select-Object -First 1
+          if (-not $denoiser) { throw "Could not find bundled OIDN Denoiser.exe" }
+          uv run --native-tls --with OpenEXR --with numpy python .\tools\validate_oidn_uint_preservation.py --denoiser $denoiser.FullName
+
       - name: Build portable package
         shell: pwsh
-        run: .\tools\build_windows_package.ps1 -Variant houdini
+        run: .\tools\build_windows_package.ps1 -Variant bundled
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
         with:
-          name: h-denoise-houdini-windows-x64
-          path: dist/h-denoise-houdini-windows-x64-v*.zip
+          name: h-denoise-bundled-windows-x64
+          path: dist/h-denoise-bundled-windows-x64-v*.zip
           if-no-files-found: error

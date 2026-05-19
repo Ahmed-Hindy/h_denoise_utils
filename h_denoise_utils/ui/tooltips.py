@@ -13,9 +13,7 @@ FILES_REMOVE_BTN = "Remove selected files from the batch list"
 FILES_CLEAR_BTN = "Clear all selected files"
 SUMMARY_FILES = "Number of image files in the input path"
 SUMMARY_PLANES = "AOV planes detected in the last scan"
-SUMMARY_MOTION = (
-    "Whether motion-vector AOVs were found (needed for temporal)"
-)
+SUMMARY_MOTION = "Bundled denoiser runtime mode"
 SCAN_SPINNER = "Scanning input for AOVs…"
 PLANES_TOGGLE = "Count: {} | Last scan: {}"
 
@@ -33,17 +31,17 @@ ACTION_DESTINATION = "→ {}"
 
 # Settings
 ADVANCED_TOGGLE = "Show or hide denoise settings"
-ADVANCED_SETTINGS_TOGGLE = "Show or hide idenoise and EXR options"
-BACKEND_COMBO = "Oidn = CPU, Optix = GPU (NVIDIA)"
-THREAD_SPIN = "CPU threads passed to idenoise (-t)"
+ADVANCED_SETTINGS_TOGGLE = "Show or hide bundled denoiser details"
+BEAUTY_COMBO = "Beauty subimage name to denoise; usually C"
+BACKEND_COMBO = "Choose the bundled denoiser backend"
+THREAD_SPIN = "Not used by the bundled OptiX denoiser"
 PREFIX_EDIT = "Prefix added to output filenames"
 ALBEDO_COMBO = (
     "Albedo AOV name; improves quality when present"
 )
 NORMAL_COMBO = "Normal AOV name; improves quality when present"
-MOTION_COMBO = (
-    "Motion vectors AOV; required for temporal denoising"
-)
+OPTIX_VERSION_COMBO = "Bundled OptiX runtime version"
+MOTION_COMBO = "Temporal denoising is not enabled in this bundled OptiX build"
 TEMPORAL_CHK_ENABLED = (
     "Use previous frame for temporal denoising (OptiX only)"
 )
@@ -53,13 +51,13 @@ TEMPORAL_CHK_BACKEND_UNSUPPORTED = (
 TEMPORAL_CHK_NO_MOTION = (
     "Requires motion vectors AOV to enable temporal denoising"
 )
-DENOISER_COMBO = "Houdini idenoise executable to run"
-CUSTOM_EXE_BTN = "Browse for a custom idenoise executable"
+DENOISER_COMBO = "Bundled denoiser executable"
+CUSTOM_EXE_BTN = "Custom executables are not used by this bundled OptiX build"
 EXRMODE_COMBO = (
     "HOUDINI_OIIO_EXR read mode (-1, 0, or 1); default uses env var"
 )
 OPTIONS_EDIT = (
-    "JSON options passed to idenoise (e.g. blendfactor, auxareclean)"
+    "Advanced denoiser options are not exposed in this bundled OptiX build"
 )
 OPTIONS_INVALID_JSON = "Invalid JSON: {}"
 EXTRA_AOVS_EDIT = "Reference AOVs included but not denoised"

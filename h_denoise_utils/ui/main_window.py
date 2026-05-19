@@ -1,6 +1,5 @@
-"""Main window for h_denoise_utils GUI"""
+"""Main window for the bundled OptiX denoiser GUI."""
 
-import json
 import os
 import re
 import time
@@ -18,7 +17,13 @@ from ..core.config import (
     DenoiseConfig,
     AOVConfig,
 )
-from ..discovery.houdini import detect_houdini_versions
+from ..discovery.bundled_denoiser import (
+    DEFAULT_OPTIX_VERSION,
+    ENV_OPTIX_VERSION,
+    SUPPORTED_OPTIX_VERSIONS,
+    resolve_bundled_denoiser,
+)
+from ..discovery.bundled_oidn import resolve_bundled_oidn_denoiser
 from .aov_scan_manager import AovScanManager
 from . import tooltips
 from .services.output_paths import preview_output_path
@@ -54,12 +59,12 @@ logger = logging.getLogger(__name__)
 
 
 class BaseWindow(QtWidgets.QMainWindow):
-    """Main UI widget for Denoiser - exact port of old UI."""
+    """Main UI widget for bundled OptiX denoising."""
 
     # Standard AOV names for heuristics
+    BEAUTY_NAMES = {"C", "beauty", "Beauty", "RGBA", "rgb"}
     NORMAL_NAMES = {"N", "normal", "normals", "Normal"}
     ALBEDO_NAMES = {"albedo", "Albedo", "diffuse_albedo"}
-    MOTION_NAMES = {"motionvectors", "motionvector"}
 
     def __init__(self, parent=None, initial_path=None):
         # type: (Optional[QtWidgets.QWidget], Optional[str]) -> None
@@ -109,6 +114,10 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.advanced_settings_section = None  # type: Optional[QtWidgets.QFrame]
         self.advanced_settings_body = None  # type: Optional[QtWidgets.QWidget]
         self.advanced_settings_toggle = None  # type: Optional[QtWidgets.QToolButton]
+        self.beauty_combo = None  # type: Optional[QtWidgets.QComboBox]
+        self.backend_combo = None  # type: Optional[QtWidgets.QComboBox]
+        self.optix_version_combo = None  # type: Optional[QtWidgets.QComboBox]
+        self.denoiser_status_label = None  # type: Optional[QtWidgets.QLabel]
         self.motion_label = None  # type: Optional[QtWidgets.QLabel]
         self._path_analysis_timer = QtCore.QTimer(self)
         self._path_analysis_timer.setSingleShot(True)
@@ -125,7 +134,10 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.main_splitter = None  # type: Optional[QtWidgets.QSplitter]
         self._pre_run_enabled = {}  # type: dict
 
-        self.houdini_versions = detect_houdini_versions()
+        self.supported_optix_versions = SUPPORTED_OPTIX_VERSIONS
+        self.selected_backend = "optix"
+        self.selected_optix_version = self._initial_optix_version()
+        self.bundled_denoiser_path = self._resolve_selected_denoiser_path()
         self._setup_menus()
         self._setup_ui()
         self._load_recent_paths()
@@ -162,7 +174,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         ui_dir = os.path.dirname(__file__)
         icons_dir = os.path.join(ui_dir, "icons")
         if os.path.isdir(icons_dir):
-            # Stable QSS path prefix, independent of Houdini launch cwd.
+            # Stable QSS path prefix, independent of launch cwd.
             QtCore.QDir.addSearchPath("hdui", os.path.normpath(icons_dir))
         style_path = os.path.join(ui_dir, "style.qss")
         if os.path.exists(style_path):
@@ -197,8 +209,8 @@ class BaseWindow(QtWidgets.QMainWindow):
             "About Denoiser",
             (
                 "<b>Denoiser</b><br>Version {}<br><br>"
-                "Denoises images using Houdini's <code>idenoise</code> "
-                "(OIDN/OptiX), with smart AOV detection and temporal processing."
+                "Denoises multipart EXRs with bundled OptiX or OIDN denoisers, "
+                "with smart AOV detection and source metadata preservation."
             ).format(__version__),
         )
 
@@ -346,17 +358,11 @@ class BaseWindow(QtWidgets.QMainWindow):
             self.advanced_toggle,
             self.advanced_settings_toggle,
             self.prefix_edit,
+            self.beauty_combo,
             self.albedo_combo,
             self.normal_combo,
-            self.motion_combo,
-            self.temporal_chk,
             self.backend_combo,
-            self.thread_spin,
-            self.denoiser_combo,
-            self.custom_exe_btn,
-            self.exrmode_combo,
-            self.options_edit,
-            self.extra_aovs_edit,
+            self.optix_version_combo,
             self.log_filter_combo,
         ]
         return [w for w in widgets if w is not None]
@@ -381,6 +387,67 @@ class BaseWindow(QtWidgets.QMainWindow):
             enabled = False
         widget.setEnabled(enabled)
 
+    def _initial_optix_version(self):
+        # type: () -> str
+        env_value = os.environ.get(ENV_OPTIX_VERSION, "").strip()
+        if env_value.lower().startswith("optix-"):
+            env_value = env_value[6:]
+        if env_value in self.supported_optix_versions:
+            return env_value
+        return DEFAULT_OPTIX_VERSION
+
+    def _optix_version_key(self):
+        # type: () -> str
+        if self.optix_version_combo:
+            data = self.optix_version_combo.currentData()
+            if data:
+                return str(data)
+        return self.selected_optix_version or DEFAULT_OPTIX_VERSION
+
+    def _resolve_selected_denoiser_path(self):
+        # type: () -> str
+        try:
+            if self._backend_key() == "oidn":
+                return resolve_bundled_oidn_denoiser(required=False) or ""
+            return (
+                resolve_bundled_denoiser(
+                    required=False,
+                    optix_version=self.selected_optix_version,
+                )
+                or ""
+            )
+        except ValueError:
+            return ""
+
+    def _runtime_missing_text(self):
+        # type: () -> str
+        if self._backend_key() == "oidn":
+            return "Missing bundled OIDN Denoiser.exe"
+        return "Missing bundled Denoiser.exe for OptiX {}".format(
+            self.selected_optix_version
+        )
+
+    def _sync_backend_controls(self):
+        # type: () -> None
+        is_optix = self._backend_key() == "optix"
+        if self.optix_version_combo:
+            self.optix_version_combo.setEnabled(is_optix)
+        self._refresh_denoiser_status()
+        self._update_summary_strip()
+
+    def _refresh_denoiser_status(self):
+        # type: () -> None
+        if self.denoiser_status_label:
+            self.denoiser_status_label.setText(
+                self.bundled_denoiser_path or self._runtime_missing_text()
+            )
+
+    def _on_optix_version_changed(self, _text):
+        # type: (str) -> None
+        self.selected_optix_version = self._optix_version_key()
+        self.bundled_denoiser_path = self._resolve_selected_denoiser_path()
+        self._sync_backend_controls()
+
     # --- Signal wiring ---
     def _connect_signals(self):
         # type: () -> None
@@ -393,7 +460,6 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.files_remove_btn.clicked.connect(self._remove_selected_files)
         self.files_clear_btn.clicked.connect(self._clear_selected_files)
 
-        self.custom_exe_btn.clicked.connect(self._pick_custom_exe)
         if self.output_toggle:
             self.output_toggle.toggled.connect(self._toggle_output_body)
         if self.denoise_toggle:
@@ -407,15 +473,17 @@ class BaseWindow(QtWidgets.QMainWindow):
                 self._toggle_advanced_settings
             )
         self.control_btn.clicked.connect(self._on_control)
-        self.backend_combo.currentTextChanged.connect(self._on_backend_changed)
-        self.backend_combo.currentTextChanged.connect(self._mark_custom)
-        self.temporal_chk.toggled.connect(self._mark_custom)
+        self.beauty_combo.currentTextChanged.connect(self._mark_custom)
         self.normal_combo.currentTextChanged.connect(self._mark_custom)
         self.albedo_combo.currentTextChanged.connect(self._mark_custom)
-        self.motion_combo.currentTextChanged.connect(self._on_motion_changed)
+        if self.optix_version_combo:
+            self.optix_version_combo.currentTextChanged.connect(
+                self._on_optix_version_changed
+            )
+        if self.backend_combo:
+            self.backend_combo.currentTextChanged.connect(self._on_backend_changed)
         self.preset_combo.currentTextChanged.connect(self._on_preset_changed)
         self.log_filter_combo.currentTextChanged.connect(self._refresh_log_view)
-        self.options_edit.editingFinished.connect(self._on_options_edit_finished)
         self.log_table.customContextMenuRequested.connect(self._show_log_context_menu)
         shortcut_cls = getattr(QtWidgets, "QShortcut", None) or getattr(
             QtGui, "QShortcut", None
@@ -461,17 +529,16 @@ class BaseWindow(QtWidgets.QMainWindow):
 
         self.advanced_toggle.setToolTip(tooltips.ADVANCED_TOGGLE)
         self.advanced_settings_toggle.setToolTip(tooltips.ADVANCED_SETTINGS_TOGGLE)
-        self.backend_combo.setToolTip(tooltips.BACKEND_COMBO)
-        self.thread_spin.setToolTip(tooltips.THREAD_SPIN)
         self.prefix_edit.setToolTip(tooltips.PREFIX_EDIT)
+        self.beauty_combo.setToolTip(tooltips.BEAUTY_COMBO)
         self.albedo_combo.setToolTip(tooltips.ALBEDO_COMBO)
         self.normal_combo.setToolTip(tooltips.NORMAL_COMBO)
-        self.motion_combo.setToolTip(tooltips.MOTION_COMBO)
-        self.denoiser_combo.setToolTip(tooltips.DENOISER_COMBO)
-        self.custom_exe_btn.setToolTip(tooltips.CUSTOM_EXE_BTN)
-        self.exrmode_combo.setToolTip(tooltips.EXRMODE_COMBO)
-        self.options_edit.setToolTip(tooltips.OPTIONS_EDIT)
-        self.extra_aovs_edit.setToolTip(tooltips.EXTRA_AOVS_EDIT)
+        if self.optix_version_combo:
+            self.optix_version_combo.setToolTip(tooltips.OPTIX_VERSION_COMBO)
+        if self.backend_combo:
+            self.backend_combo.setToolTip(tooltips.BACKEND_COMBO)
+        if self.denoiser_status_label:
+            self.denoiser_status_label.setToolTip(tooltips.DENOISER_COMBO)
 
         self.control_btn.setToolTip(tooltips.CONTROL_BTN_START)
         self.progress.setToolTip(tooltips.PROGRESS)
@@ -480,7 +547,6 @@ class BaseWindow(QtWidgets.QMainWindow):
 
         self.log_filter_combo.setToolTip(tooltips.LOG_FILTER_COMBO)
 
-        self._update_temporal_state()
         self._update_output_label()
 
     def _browse(self):
@@ -888,11 +954,6 @@ class BaseWindow(QtWidgets.QMainWindow):
         if not planes:
             self._aov_state.planes = []
             self._update_planes_panel([])
-            self._suppress_custom_changes = True
-            try:
-                self._update_temporal_state()
-            finally:
-                self._suppress_custom_changes = False
             self._update_summary_strip()
             return
 
@@ -905,9 +966,9 @@ class BaseWindow(QtWidgets.QMainWindow):
         self._suppress_custom_changes = True
         try:
             for combo in [
+                self.beauty_combo,
                 self.albedo_combo,
                 self.normal_combo,
-                self.motion_combo,
             ]:
                 current = combo.currentText()
                 combo.clear()
@@ -917,22 +978,16 @@ class BaseWindow(QtWidgets.QMainWindow):
             self.aovs_input.set_available_planes(available_planes)
 
             self._set_smart_selection(
+                self.beauty_combo, self.BEAUTY_NAMES, available_planes
+            )
+            self._set_smart_selection(
                 self.albedo_combo, self.ALBEDO_NAMES, available_planes
             )
             self._set_smart_selection(
                 self.normal_combo, self.NORMAL_NAMES, available_planes
             )
-            self._set_smart_selection(
-                self.motion_combo, self.MOTION_NAMES, available_planes
-            )
-            self._update_temporal_state()
         finally:
             self._suppress_custom_changes = False
-
-        if not self._motion_vectors_available():
-            self._log(
-                "Temporal denoising disabled: No motion vectors found.", "warning"
-            )
 
         self._log("AOVs updated from analysis.", "success")
 
@@ -1079,13 +1134,16 @@ class BaseWindow(QtWidgets.QMainWindow):
         )
         path_invalid = bool(path_text) and not has_files
         planes_count = len(self._aov_state.planes)
-        motion_ok = self._motion_vectors_available()
         path_ready = has_files or bool(path_text and os.path.exists(path_text))
 
         self.summary_files.setText(files_text)
         self.summary_planes.setText("AOVs: {}".format(planes_count))
-        motion_text = "Motion: OK" if motion_ok else "Motion: missing"
-        self.summary_motion.setText(motion_text)
+        if self._backend_key() == "oidn":
+            self.summary_motion.setText("Mode: OIDN")
+        else:
+            self.summary_motion.setText(
+                "Mode: OptiX {}".format(self.selected_optix_version)
+            )
 
         if has_files:
             files_chip = "summaryChipOk"
@@ -1103,16 +1161,9 @@ class BaseWindow(QtWidgets.QMainWindow):
         else:
             planes_chip = "summaryChip"
 
-        if motion_ok:
-            motion_chip = "summaryChipOk"
-        elif planes_count >= 1:
-            motion_chip = "summaryChipWarn"
-        else:
-            motion_chip = "summaryChip"
-
         _apply_chip_state(self.summary_files, files_chip)
         _apply_chip_state(self.summary_planes, planes_chip)
-        _apply_chip_state(self.summary_motion, motion_chip)
+        _apply_chip_state(self.summary_motion, "summaryChipOk")
 
     def _flash_summary_planes(self):
         # type: () -> None
@@ -1180,14 +1231,18 @@ class BaseWindow(QtWidgets.QMainWindow):
         # type: (str) -> str
         key = (backend_key or "").strip().lower()
         if key == "oidn":
-            return "Oidn"
+            return "OIDN"
         if key == "optix":
-            return "Optix"
+            return "OptiX"
         return backend_key
 
     def _backend_key(self):
         # type: () -> str
-        return self.backend_combo.currentText().strip().lower()
+        if self.backend_combo:
+            data = self.backend_combo.currentData()
+            if data:
+                return str(data).strip().lower()
+        return self.selected_backend or "optix"
 
     def _apply_preset(self, preset_name):
         # type: (str) -> None
@@ -1196,16 +1251,9 @@ class BaseWindow(QtWidgets.QMainWindow):
         preset = PRESETS[preset_name]
         self._suppress_custom_changes = True
         try:
-            backend_key = preset.get("backend", "optix")
-            self.backend_combo.setCurrentText(self._backend_display(backend_key))
-            self._apply_preset_plane(self.normal_combo, preset.get("normal", "normal"))
+            self._apply_preset_plane(self.beauty_combo, preset.get("beauty", "C"))
+            self._apply_preset_plane(self.normal_combo, preset.get("normal", "N"))
             self._apply_preset_plane(self.albedo_combo, preset.get("albedo", "albedo"))
-            self._apply_preset_plane(
-                self.motion_combo, preset.get("motion", "motionvectors")
-            )
-            self._update_temporal_state(
-                desired_checked=bool(preset.get("temporal", False))
-            )
         finally:
             self._suppress_custom_changes = False
 
@@ -1216,7 +1264,7 @@ class BaseWindow(QtWidgets.QMainWindow):
             return
         available_planes = self._aov_state.planes
         if not available_planes:
-            combo.setCurrentText("")
+            combo.setCurrentText(str(preset_value))
             return
         preset_lower = str(preset_value).lower()
         match = ""
@@ -1243,51 +1291,22 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _motion_vectors_available(self):
         # type: () -> bool
-        motion_text = self.motion_combo.currentText().strip()
-        available_planes = self._aov_state.planes
-        if not motion_text or not available_planes:
-            return False
-        return motion_text.lower() in {p.lower() for p in available_planes}
+        return False
 
     def _update_temporal_state(self, desired_checked=None):
         # type: (Optional[bool]) -> bool
-        backend = self._backend_key()
-        motion_valid = self._motion_vectors_available()
-        allow_temporal = backend == "optix" and motion_valid
-
-        if desired_checked is None:
-            desired_checked = self.temporal_chk.isChecked()
-
-        if allow_temporal:
-            self._set_lockable_enabled(self.temporal_chk, True)
-            self.temporal_chk.setChecked(bool(desired_checked))
-            self.temporal_chk.setToolTip(tooltips.TEMPORAL_CHK_ENABLED)
-        else:
-            self.temporal_chk.setChecked(False)
-            self._set_lockable_enabled(self.temporal_chk, False)
-            if backend != "optix":
-                self.temporal_chk.setToolTip(
-                    tooltips.temporal_backend_unsupported(
-                        self.backend_combo.currentText()
-                    )
-                )
-            else:
-                self.temporal_chk.setToolTip(tooltips.TEMPORAL_CHK_NO_MOTION)
-
         self._update_summary_strip()
-        return allow_temporal
+        return False
 
     def _pick_custom_exe(self):
         # type: () -> None
-        path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Select idenoise executable", "", "Executables (*.exe);;All Files (*)"
-        )
-        if path:
-            self.denoiser_combo.addItem(os.path.basename(path), path)
-            self.denoiser_combo.setCurrentIndex(self.denoiser_combo.count() - 1)
+        return
 
     def _on_backend_changed(self, backend):
         # type: (str) -> None
+        self.selected_backend = self._backend_key()
+        self.bundled_denoiser_path = self._resolve_selected_denoiser_path()
+        self._sync_backend_controls()
         self._update_temporal_state()
 
     def _on_motion_changed(self, _):
@@ -1318,34 +1337,6 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _validate_options_json(self, show_message=False):
         # type: (bool) -> bool
-        text = self.options_edit.text().strip()
-        if not text:
-            self.options_edit.setProperty("error", False)
-            options_style = self.options_edit.style()
-            options_style.unpolish(self.options_edit)
-            options_style.polish(self.options_edit)
-            self.options_edit.setToolTip(tooltips.OPTIONS_EDIT)
-            return True
-        try:
-            json.loads(text)
-        except Exception as exc:
-            self.options_edit.setProperty("error", True)
-            options_style = self.options_edit.style()
-            options_style.unpolish(self.options_edit)
-            options_style.polish(self.options_edit)
-            self.options_edit.setToolTip(tooltips.options_invalid_json(exc))
-            if show_message:
-                QtWidgets.QMessageBox.warning(
-                    self,
-                    "Invalid Options JSON",
-                    "Options JSON is invalid:\n{}".format(exc),
-                )
-            return False
-        self.options_edit.setProperty("error", False)
-        options_style = self.options_edit.style()
-        options_style.unpolish(self.options_edit)
-        options_style.polish(self.options_edit)
-        self.options_edit.setToolTip(tooltips.OPTIONS_EDIT)
         return True
 
     # --- Denoise workflow ---
@@ -1359,40 +1350,57 @@ class BaseWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, "Error", "Invalid input path")
             return
 
-        idenoise_path = self.denoiser_combo.currentData()
-        if not idenoise_path:
+        self.selected_backend = self._backend_key()
+        self.selected_optix_version = self._optix_version_key()
+        if self.selected_backend == "oidn":
+            denoiser_path = resolve_bundled_oidn_denoiser(required=False)
+        else:
+            denoiser_path = resolve_bundled_denoiser(
+                required=False,
+                optix_version=self.selected_optix_version,
+            )
+        if not denoiser_path:
+            if self.selected_backend == "oidn":
+                message = (
+                    "Bundled OIDN Denoiser.exe was not found. Reinstall the bundled "
+                    "runtime package or set HDU_OIDN_DENOISER_EXE for development."
+                )
+            else:
+                message = (
+                    "Bundled OptiX Denoiser.exe was not found for OptiX {}. "
+                    "Reinstall the bundled runtime package or set HDU_DENOISER_EXE "
+                    "for development."
+                ).format(self.selected_optix_version)
             QtWidgets.QMessageBox.warning(
-                self, "Error", "No idenoise executable selected"
+                self,
+                "Error",
+                message,
             )
             return
-        if not self._validate_options_json(show_message=True):
-            return
 
-        self._denoise_state.backend = self._backend_key()
-        self._denoise_state.idenoise_path = idenoise_path
-        self._denoise_state.threads = self.thread_spin.value()
+        self.bundled_denoiser_path = denoiser_path
+        self._refresh_denoiser_status()
+        self._denoise_state.backend = self.selected_backend
+        self._denoise_state.denoiser_path = denoiser_path
+        self._denoise_state.threads = 0
         self._denoise_state.overwrite = self.overwrite_chk.isChecked()
         self._denoise_state.prefix = self.prefix_edit.text()
-        self._denoise_state.options_json = self.options_edit.text().strip() or ""
-        self._denoise_state.temporal = self.temporal_chk.isChecked()
+        self._denoise_state.options_json = ""
+        self._denoise_state.temporal = False
 
         # Collect settings
         denoise_config = DenoiseConfig(
             backend=self._denoise_state.backend,
-            temporal=self._denoise_state.temporal,
+            temporal=False,
             overwrite=self._denoise_state.overwrite,
-            threads=self._denoise_state.threads,
             prefix=self._denoise_state.prefix,
-            exrmode=self._get_exrmode(),
-            options_json=self._denoise_state.options_json or None,
         )
 
         aov_config = AOVConfig(
+            beauty_plane=self.beauty_combo.currentText().strip() or "C",
             normal_plane=self.normal_combo.currentText().strip() or None,
             albedo_plane=self.albedo_combo.currentText().strip() or None,
-            motionvectors_plane=self.motion_combo.currentText().strip() or None,
             aovs_to_denoise=self.aovs_input.selected_chips() or None,
-            extra_aovs=self._parse_space_list(self.extra_aovs_edit.text()),
         )
 
         # Start worker
@@ -1400,7 +1408,7 @@ class BaseWindow(QtWidgets.QMainWindow):
             input_path,
             denoise_config,
             aov_config,
-            idenoise_path,
+            denoiser_path,
             extensions=None,
             file_list=list(selected_files) if selected_files else None,
         )
@@ -1641,9 +1649,6 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _get_exrmode(self):
         # type: () -> Optional[int]
-        text = self.exrmode_combo.currentText()
-        if text in ("-1", "0", "1"):
-            return int(text)
         return None
 
     @staticmethod

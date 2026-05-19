@@ -8,15 +8,12 @@ references back onto the window instance (`window.path_edit`,
 `BaseWindow` rather than constructing a standalone section object.
 """
 
-import multiprocessing
-
 from ..core.config import PRESETS
 from .qt_compat import QtCore, QtWidgets
 from .widgets import (
     AovChipsInput,
     FlowLayout,
     NoWheelComboBox,
-    NoWheelSpinBox,
 )
 
 QWIDGETSIZE_MAX = 16777215
@@ -100,7 +97,7 @@ def build_source_section(window, top_layout):
     window.summary_files.setObjectName("summaryChip")
     window.summary_planes = QtWidgets.QLabel("AOVs: 0")
     window.summary_planes.setObjectName("summaryChip")
-    window.summary_motion = QtWidgets.QLabel("Motion: -")
+    window.summary_motion = QtWidgets.QLabel("Mode: OptiX")
     window.summary_motion.setObjectName("summaryChip")
     input_header_row.addWidget(window.summary_files)
     input_header_row.addWidget(window.summary_planes)
@@ -282,14 +279,12 @@ def build_extras_section(window, top_layout):
         QtWidgets.QFormLayout.ExpandingFieldsGrow
     )
 
-    window.backend_combo = NoWheelComboBox()
-    window.backend_combo.addItems(["Oidn", "Optix"])
-    advanced_settings_form.addRow("Backend:", window.backend_combo)
-
-    window.thread_spin = NoWheelSpinBox()
-    window.thread_spin.setRange(1, 16)
-    window.thread_spin.setValue(min(8, max(1, multiprocessing.cpu_count())))
-    advanced_settings_form.addRow("CPU Threads:", window.thread_spin)
+    window.beauty_combo = NoWheelComboBox()
+    window.beauty_combo.setEditable(True)
+    window.beauty_combo.lineEdit().setPlaceholderText("e.g. C")
+    window.beauty_combo.setSizePolicy(
+        QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+    )
 
     window.albedo_combo = NoWheelComboBox()
     window.albedo_combo.setEditable(True)
@@ -305,63 +300,36 @@ def build_extras_section(window, top_layout):
         QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
     )
 
-    window.motion_combo = NoWheelComboBox()
-    window.motion_combo.setEditable(True)
-    window.motion_combo.lineEdit().setPlaceholderText("e.g. velocity")
-    window.motion_combo.setSizePolicy(
-        QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
-    )
-
-    window.temporal_chk = QtWidgets.QCheckBox()
-    window.temporal_chk.setText("Use Temporal Denoise")
     window.prefix_edit = QtWidgets.QLineEdit("den_")
     window.prefix_edit.setMaxLength(32)
     settings_form.addRow("Output Prefix:", window.prefix_edit)
-    settings_form.addRow("Albedo (-a):", window.albedo_combo)
-    settings_form.addRow("Normal (-n):", window.normal_combo)
-
-    motion_row = QtWidgets.QWidget()
-    motion_layout = QtWidgets.QHBoxLayout(motion_row)
-    motion_layout.setContentsMargins(0, 0, 0, 0)
-    motion_layout.setSpacing(8)
-    motion_layout.addWidget(window.temporal_chk)
-    window.motion_label = QtWidgets.QLabel("Motion (-m):")
-    motion_layout.addWidget(window.motion_label)
-    motion_layout.addWidget(window.motion_combo, 1)
-    settings_form.addRow(motion_row)
+    settings_form.addRow("Beauty:", window.beauty_combo)
+    settings_form.addRow("Albedo:", window.albedo_combo)
+    settings_form.addRow("Normal:", window.normal_combo)
 
     divider = QtWidgets.QFrame()
     divider.setFrameShape(QtWidgets.QFrame.HLine)
     divider.setFrameShadow(QtWidgets.QFrame.Sunken)
     advanced_settings_form.addRow(divider)
 
-    window.denoiser_combo = NoWheelComboBox()
-    for ver, exe in window.houdini_versions.items():
-        window.denoiser_combo.addItem(ver, exe)
-    if window.houdini_versions:
-        window.denoiser_combo.setCurrentIndex(0)
+    window.backend_combo = NoWheelComboBox()
+    window.backend_combo.addItem("OptiX", "optix")
+    window.backend_combo.addItem("OIDN", "oidn")
+    advanced_settings_form.addRow("Backend:", window.backend_combo)
 
-    window.custom_exe_btn = QtWidgets.QPushButton("Custom EXE.")
-    idenoise_row = QtWidgets.QWidget()
-    idenoise_layout = QtWidgets.QHBoxLayout(idenoise_row)
-    idenoise_layout.setContentsMargins(0, 0, 0, 0)
-    idenoise_layout.addWidget(window.denoiser_combo, 1)
-    idenoise_layout.addWidget(window.custom_exe_btn)
-    advanced_settings_form.addRow("idenoise:", idenoise_row)
+    window.optix_version_combo = NoWheelComboBox()
+    for version in window.supported_optix_versions:
+        window.optix_version_combo.addItem("OptiX {}".format(version), version)
+    current_index = window.optix_version_combo.findData(window.selected_optix_version)
+    if current_index >= 0:
+        window.optix_version_combo.setCurrentIndex(current_index)
+    advanced_settings_form.addRow("OptiX Runtime:", window.optix_version_combo)
 
-    window.exrmode_combo = NoWheelComboBox()
-    window.exrmode_combo.addItems(["(default HOUDINI_OIIO_EXR)", "-1", "0", "1"])
-    advanced_settings_form.addRow("EXR Read Mode:", window.exrmode_combo)
-
-    window.options_edit = QtWidgets.QLineEdit()
-    window.options_edit.setPlaceholderText(
-        'e.g., {"blendfactor":0.25} or {"auxareclean":true}'
+    window.denoiser_status_label = QtWidgets.QLabel(
+        window.bundled_denoiser_path or window._runtime_missing_text()
     )
-    advanced_settings_form.addRow("Advanced Options (JSON):", window.options_edit)
-
-    window.extra_aovs_edit = QtWidgets.QLineEdit()
-    window.extra_aovs_edit.setPlaceholderText("reference AOVs (not denoised)")
-    advanced_settings_form.addRow("Optional auxiliary AOVs:", window.extra_aovs_edit)
+    window.denoiser_status_label.setWordWrap(True)
+    advanced_settings_form.addRow("Bundled Denoiser:", window.denoiser_status_label)
 
     advanced_body_layout.addLayout(settings_form)
 
@@ -378,7 +346,7 @@ def build_extras_section(window, top_layout):
     window.advanced_settings_toggle.setChecked(False)
     window.advanced_settings_toggle.setAutoRaise(True)
     advanced_settings_header.addWidget(window.advanced_settings_toggle)
-    advanced_settings_title = QtWidgets.QLabel("Advanced Settings")
+    advanced_settings_title = QtWidgets.QLabel("Bundled Runtime")
     advanced_settings_title.setObjectName("subsectionTitle")
     advanced_settings_header.addWidget(advanced_settings_title)
     advanced_settings_header.addStretch(1)

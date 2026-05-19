@@ -30,7 +30,7 @@ BaseWindow
  v
 DenoiseWorker --> core.Denoiser
                    |--> command_builder
-                   |--> process_utils (idenoise subprocess)
+                   |--> process_utils (bundled Denoiser.exe subprocess)
                    +--> file_utils (scan/copy paths)
 ```
 
@@ -59,11 +59,13 @@ DenoiseWorker --> core.Denoiser
 - `core/config.py`: Dataclasses and validation for denoise + AOV configs.
 - `core/denoiser.py`: Pure denoise orchestration (file discovery, temp
   workspace, AOV validation, command execution).
-- `core/command_builder.py`: Builds `idenoise` command lines from config.
+- `core/command_builder.py`: Builds bundled multipart `Denoiser.exe` command
+  lines from config.
 
 ### Discovery layer (`h_denoise_utils.discovery`)
 
-- `houdini.py`: Detects Houdini installs and default tools.
+- `bundled_denoiser.py`: Resolves bundled OptiX runtimes.
+- `bundled_oidn.py`: Resolves the bundled custom OIDN runtime.
 - `exr_inspector.py`: Reads EXR plane/channel information.
 - `aov_validator.py`: Filters AOVs based on EXR contents.
 
@@ -107,4 +109,3 @@ DenoiseWorker --> core.Denoiser
 3) `ui/worker.py` then `core/denoiser.py` for the denoise pipeline.
 4) `core/config.py` and `core/command_builder.py` for config validation
    and command generation.
-

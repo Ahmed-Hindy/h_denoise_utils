@@ -3,8 +3,11 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set
 
-# File extensions supported for input
-DEFAULT_INPUT_EXTS = [".exr", ".hdr", ".tif", ".tiff", ".png", ".jpg", ".jpeg", ".bmp"]
+# File extensions supported by the bundled multipart denoiser path.
+DEFAULT_INPUT_EXTS = [".exr"]
+
+# Backends known to the public configuration surface.
+SUPPORTED_BACKENDS = ("optix", "oidn")
 
 # AOVs that should never be denoised (auxiliary data)
 AOVS_NEVER_DENOISE: Set[str] = {"albedo", "normal", "n", "velocity", "motionvectors"}
@@ -16,18 +19,18 @@ BEAUTY_AOV_ALIASES: Set[str] = {"c", "rgba", "rgb", "beauty", "ci"}
 PRESETS: Dict[str, Dict[str, any]] = {
     "Beauty": {
         "backend": "optix",
-        "temporal": True,
-        "normal": "normal",
+        "temporal": False,
+        "beauty": "C",
+        "normal": "N",
         "albedo": "albedo",
-        "motion": "motionvectors",
         "aovs": "",  # empty -> auto-detect from EXR
     },
     "Misc": {
         "backend": "optix",
         "temporal": False,
-        "normal": "normal",
+        "beauty": "C",
+        "normal": "N",
         "albedo": "",
-        "motion": "",
         "aovs": "",  # empty -> auto-detect from EXR
     },
 }
@@ -37,6 +40,7 @@ PRESETS: Dict[str, Dict[str, any]] = {
 class AOVConfig:
     """Configuration for AOV (Arbitrary Output Variable) processing."""
 
+    beauty_plane: Optional[str] = "C"
     normal_plane: Optional[str] = None
     albedo_plane: Optional[str] = None
     motionvectors_plane: Optional[str] = None
@@ -68,9 +72,11 @@ class DenoiseConfig:
 
     def __post_init__(self):
         """Validate configuration after initialization."""
-        if self.backend not in ("oidn", "optix"):
+        if self.backend not in SUPPORTED_BACKENDS:
             raise ValueError(
-                f"Invalid backend: {self.backend}. Must be 'oidn' or 'optix'"
+                "Invalid backend: {}. Must be one of: {}".format(
+                    self.backend, ", ".join(SUPPORTED_BACKENDS)
+                )
             )
         if self.exrmode is not None and self.exrmode not in (-1, 0, 1):
             raise ValueError(f"Invalid exrmode: {self.exrmode}. Must be -1, 0, or 1")

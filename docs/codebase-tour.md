@@ -6,7 +6,7 @@ Use this as a quick map of where to look for common logic.
 
 - `ui/`: Qt UI and UI-specific helpers.
 - `core/`: Pure denoise logic and configs.
-- `discovery/`: Houdini/EXR discovery helpers.
+- `discovery/`: Bundled runtime and EXR discovery helpers.
 - `utils/`: File and process helpers.
 - `tests/`: Unit and UI smoke tests.
 
@@ -24,12 +24,14 @@ Use this as a quick map of where to look for common logic.
 
 - `core/denoiser.py`: Orchestrates denoise runs (prepare, denoise, cleanup).
 - `core/config.py`: Config dataclasses and validation rules.
-- `core/command_builder.py`: Builds `idenoise` CLI command lines.
+- `core/command_builder.py`: Builds bundled multipart `Denoiser.exe` CLI
+  command lines.
 
 ### Discovery + Utilities
 
 - `discovery/exr_inspector.py`: EXR plane inspection.
-- `discovery/houdini.py`: Houdini install discovery.
+- `discovery/bundled_denoiser.py`: Bundled OptiX runtime discovery.
+- `discovery/bundled_oidn.py`: Bundled OIDN runtime discovery.
 - `utils/file_utils.py`: File scanning, output paths.
 - `utils/process_utils.py`: Subprocess execution.
 

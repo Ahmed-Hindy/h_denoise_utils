@@ -18,7 +18,7 @@ class DenoiseWorker(QtCore.QThread):
         input_path,  # type: str
         denoise_config,  # type: DenoiseConfig
         aov_config,  # type: AOVConfig
-        idenoise_path,  # type: str
+        denoiser_path,  # type: str
         extensions=None,  # type: Optional[List[str]]
         file_list=None,  # type: Optional[List[str]]
         parent=None,  # type: Optional[QtCore.QObject]
@@ -28,7 +28,7 @@ class DenoiseWorker(QtCore.QThread):
         self.input_path = input_path
         self.denoise_config = denoise_config
         self.aov_config = aov_config
-        self.idenoise_path = idenoise_path
+        self.denoiser_path = denoiser_path
         self.extensions = extensions
         self.file_list = file_list
         self._stop_requested = False
@@ -47,7 +47,7 @@ class DenoiseWorker(QtCore.QThread):
                 input_path=self.input_path,
                 denoise_config=self.denoise_config,
                 aov_config=self.aov_config,
-                idenoise_path=self.idenoise_path,
+                denoiser_path=self.denoiser_path,
                 extensions=self.extensions,
                 file_list=self.file_list,
             )

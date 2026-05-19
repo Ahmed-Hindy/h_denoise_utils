@@ -1,1 +1,1 @@
-"""Discovery utilities for Houdini installations and EXR inspection."""
+"""Discovery utilities for bundled denoiser and EXR inspection."""

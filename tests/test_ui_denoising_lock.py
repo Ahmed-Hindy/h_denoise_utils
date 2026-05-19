@@ -8,7 +8,7 @@ Covers:
   - A widget disabled before the run remains disabled after unlock.
   - Calling _apply_ui_lock(False) with no prior lock is a no-op.
   - Ctrl+Enter shortcut calls _stop_denoise when is_running=True.
-  - Scan and temporal callbacks cannot re-enable locked widgets mid-run.
+  - Scan callbacks cannot re-enable locked widgets mid-run.
   - F5 scan shortcut is ignored while is_running=True.
   - Drag-and-drop input changes are ignored while is_running=True.
 
@@ -93,14 +93,14 @@ def test_unlock_restores_original_states(window):
 
 
 def test_pre_disabled_widget_stays_disabled_after_unlock(window):
-    """temporal_chk disabled before the run must stay disabled after unlock."""
-    window.temporal_chk.setEnabled(False)
+    """A disabled settings widget before the run must stay disabled after unlock."""
+    window.beauty_combo.setEnabled(False)
 
     window._apply_ui_lock(True)
     window._apply_ui_lock(False)
 
-    assert not window.temporal_chk.isEnabled(), (
-        "temporal_chk was disabled before the run and must remain disabled after unlock"
+    assert not window.beauty_combo.isEnabled(), (
+        "beauty_combo was disabled before the run and must remain disabled after unlock"
     )
 
 
@@ -182,35 +182,7 @@ def test_scan_busy_callback_keeps_scan_button_disabled_while_running(window):
 
 
 # ---------------------------------------------------------------------------
-# Test 8 - Temporal callback cannot unlock temporal_chk while running
-# Requirements: 1.1, 3.1, 3.2
-# ---------------------------------------------------------------------------
-
-
-def test_temporal_callback_keeps_checkbox_disabled_while_running(
-    window, monkeypatch
-):
-    """Temporal state refreshes must not re-enable temporal_chk during a run."""
-    monkeypatch.setattr(window, "_motion_vectors_available", lambda: True)
-    window.backend_combo.setCurrentText("Optix")
-    window._update_temporal_state(desired_checked=True)
-    assert window.temporal_chk.isEnabled(), "temporal_chk must start enabled"
-
-    window._ui_state.is_running = True
-    window._apply_ui_lock(True)
-
-    assert window._update_temporal_state(desired_checked=True)
-    assert not window.temporal_chk.isEnabled(), (
-        "temporal_chk must remain disabled while is_running=True"
-    )
-
-    window._ui_state.is_running = False
-    window._apply_ui_lock(False)
-    assert window.temporal_chk.isEnabled(), "temporal_chk must restore after unlock"
-
-
-# ---------------------------------------------------------------------------
-# Test 9 - F5 scan shortcut is ignored while running
+# Test 8 - F5 scan shortcut is ignored while running
 # Requirements: 1.1, 3.1, 4.1
 # ---------------------------------------------------------------------------
 
@@ -232,7 +204,7 @@ def test_f5_scan_shortcut_is_ignored_while_running(window, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Test 10 - Drag-and-drop input changes are ignored while running
+# Test 9 - Drag-and-drop input changes are ignored while running
 # Requirements: 1.1, 3.1
 # ---------------------------------------------------------------------------
 

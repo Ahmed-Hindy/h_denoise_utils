@@ -1,0 +1,86 @@
+name: OIDN Denoiser
+
+on:
+  workflow_dispatch:
+    inputs:
+      oidn_version:
+        description: Intel Open Image Denoise version
+        required: true
+        default: "2.4.1"
+  push:
+    paths:
+      - "native/oidn-denoiser/**"
+      - "tools/build_oidn_denoiser.ps1"
+      - "tools/validate_oidn_uint_preservation.py"
+      - "tools/fetch_oidn.ps1"
+      - "packaging/h-denoise.spec"
+      - "tools/build_windows_package.ps1"
+      - ".github/workflows/oidn-denoiser.yml"
+  pull_request:
+    paths:
+      - "native/oidn-denoiser/**"
+      - "tools/build_oidn_denoiser.ps1"
+      - "tools/validate_oidn_uint_preservation.py"
+      - "tools/fetch_oidn.ps1"
+      - "packaging/h-denoise.spec"
+      - "tools/build_windows_package.ps1"
+      - ".github/workflows/oidn-denoiser.yml"
+
+jobs:
+  build-windows:
+    name: "build / OIDN Denoiser.exe"
+    runs-on: windows-2022
+    env:
+      QT_BACKEND: pyside6
+      OIDN_VERSION: ${{ github.event.inputs.oidn_version || '2.4.1' }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Build OIDN denoiser bundle
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .\tools\build_oidn_denoiser.ps1 -Version $env:OIDN_VERSION
+
+      - name: Validate OIDN UINT channel preservation
+        shell: pwsh
+        run: |
+          uv run --native-tls --with OpenEXR --with numpy python .\tools\validate_oidn_uint_preservation.py `
+            --denoiser ".\h_denoise_utils\vendor\oidn-denoiser\windows-x64\oidn-$env:OIDN_VERSION\Denoiser.exe"
+
+      - name: Install packaging dependencies
+        run: uv sync --frozen --extra pyside6 --extra package
+
+      - name: Fetch bundled OptiX denoiser
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .\tools\fetch_optix_denoiser.ps1
+
+      - name: Build bundled portable package
+        shell: pwsh
+        run: .\tools\build_windows_package.ps1 -Variant bundled
+
+      - name: Upload OIDN denoiser bundle artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: oidn-denoiser-windows-x64
+          path: |
+            h_denoise_utils/vendor/oidn-denoiser/windows-x64/oidn-${{ env.OIDN_VERSION }}/**
+            dist/oidn-denoiser-windows-x64-oidn-${{ env.OIDN_VERSION }}-*.zip
+          if-no-files-found: error
+
+      - name: Upload bundled app package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: h-denoise-bundled-windows-x64
+          path: dist/h-denoise-bundled-windows-x64-v*.zip
+          if-no-files-found: error

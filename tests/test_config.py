@@ -4,6 +4,7 @@ import pytest
 from h_denoise_utils.core.config import (
     AOVConfig,
     DenoiseConfig,
+    SUPPORTED_BACKENDS,
     normalize_plane_name,
     is_beauty_plane,
     DEFAULT_INPUT_EXTS,
@@ -36,6 +37,7 @@ class TestAOVConfig:
     def test_default_values(self):
         """Test default initialization."""
         config = AOVConfig()
+        assert config.beauty_plane == "C"
         assert config.normal_plane is None
         assert config.albedo_plane is None
         assert config.motionvectors_plane is None
@@ -45,10 +47,12 @@ class TestAOVConfig:
     def test_custom_values(self):
         """Test initialization with custom values."""
         config = AOVConfig(
+            beauty_plane="beauty",
             normal_plane="N",
             albedo_plane="albedo",
             aovs_to_denoise=["diffuse", "specular"],
         )
+        assert config.beauty_plane == "beauty"
         assert config.normal_plane == "N"
         assert config.albedo_plane == "albedo"
         assert config.aovs_to_denoise == ["diffuse", "specular"]
@@ -71,17 +75,17 @@ class TestDenoiseConfig:
         assert config.overwrite is False
         assert config.prefix == "den_"
 
-    def test_valid_backends(self):
-        """Test that valid backends are accepted."""
-        config1 = DenoiseConfig(backend="optix")
-        config2 = DenoiseConfig(backend="oidn")
-        assert config1.backend == "optix"
-        assert config2.backend == "oidn"
+    def test_valid_backend(self):
+        """Test that known backend names are accepted."""
+        for backend in SUPPORTED_BACKENDS:
+            config = DenoiseConfig(backend=backend)
+            assert config.backend == backend
 
     def test_invalid_backend_raises_error(self):
         """Test that invalid backend raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid backend"):
-            DenoiseConfig(backend="invalid")
+        for backend in ["invalid", "cycles"]:
+            with pytest.raises(ValueError, match="Invalid backend"):
+                DenoiseConfig(backend=backend)
 
     def test_valid_exrmode_values(self):
         """Test that valid exrmode values are accepted."""
@@ -116,7 +120,7 @@ class TestConstants:
 
     def test_default_input_exts_contains_exr(self):
         """Test that DEFAULT_INPUT_EXTS includes .exr."""
-        assert ".exr" in DEFAULT_INPUT_EXTS
+        assert DEFAULT_INPUT_EXTS == [".exr"]
 
     def test_aovs_never_denoise_contains_normal(self):
         """Test that AOVS_NEVER_DENOISE includes normal."""

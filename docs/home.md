@@ -2,13 +2,12 @@
 
 Welcome to the h_denoise_utils documentation.
 
-**h_denoise_utils** is a modular Python package for denoising images using
-Houdini's `idenoise` utility with Intel OIDN or NVIDIA OptiX backends.
+**h_denoise_utils** is a modular Python package for denoising multipart EXRs
+using bundled Intel OIDN and NVIDIA OptiX runtimes.
 
 ## Features
 
 - Multiple backends (Intel OIDN CPU / NVIDIA OptiX GPU)
-- Temporal denoising for animation sequences
 - AOV support with auto-detection
 - Full-featured Qt GUI and headless API
 - Python 3.7+ compatible
@@ -36,7 +35,7 @@ h_denoise_utils.show_ui()
 from h_denoise_utils.core.denoiser import Denoiser
 from h_denoise_utils.core.config import DenoiseConfig, AOVConfig
 
-denoise_config = DenoiseConfig(backend="optix", temporal=True)
+denoise_config = DenoiseConfig(backend="optix")
 aov_config = AOVConfig(normal_plane="N", albedo_plane="albedo")
 
 denoiser = Denoiser("/path/to/images", denoise_config, aov_config)
@@ -55,4 +54,3 @@ denoiser.cleanup()
 - [Troubleshooting](troubleshooting.md)
 - [Glossary](glossary.md)
 - [API Reference](modules.md)
-
