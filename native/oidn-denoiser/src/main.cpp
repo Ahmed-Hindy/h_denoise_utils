@@ -5,6 +5,7 @@
 #include <ImfChannelList.h>
 #include <ImfFrameBuffer.h>
 #include <ImfHeader.h>
+#include <ImfInputPart.h>
 #include <ImfMultiPartInputFile.h>
 #include <ImfMultiPartOutputFile.h>
 #include <ImfOutputPart.h>
@@ -336,23 +337,11 @@ bool loadPlaneByName(const MultipartOptions& multipart, const std::string& name,
     return true;
 }
 
-bool packNativeEXRPlane(
-    const std::vector<float>& source_pixels,
-    const OIIO::ImageSpec& spec,
-    const OPENEXR_IMF_NAMESPACE::Header& header,
-    NativeEXRPlane& native_plane)
+bool initializeNativeEXRPlane(const OPENEXR_IMF_NAMESPACE::Header& header, NativeEXRPlane& native_plane)
 {
     const IMATH_NAMESPACE::Box2i data_window = header.dataWindow();
     const size_t width = static_cast<size_t>(data_window.max.x - data_window.min.x + 1);
     const size_t height = static_cast<size_t>(data_window.max.y - data_window.min.y + 1);
-    const size_t expected_values = width * height * static_cast<size_t>(spec.nchannels);
-    if (source_pixels.size() != expected_values)
-    {
-        const std::string spec_name(spec.get_string_attribute("name"));
-        PrintError("Pixel buffer size mismatch for subimage '%s': expected %zu values, got %zu",
-            spec_name.c_str(), expected_values, source_pixels.size());
-        return false;
-    }
 
     native_plane = NativeEXRPlane();
     const OPENEXR_IMF_NAMESPACE::ChannelList& channels = header.channels();
@@ -374,20 +363,102 @@ bool packNativeEXRPlane(
     }
 
     native_plane.pixels.resize(width * height * native_plane.pixel_stride);
+    return true;
+}
+
+void insertNativeEXRSlices(
+    const OPENEXR_IMF_NAMESPACE::Header& header,
+    NativeEXRPlane& native_plane,
+    OPENEXR_IMF_NAMESPACE::FrameBuffer& frame_buffer)
+{
+    const IMATH_NAMESPACE::Box2i data_window = header.dataWindow();
+    const int width = data_window.max.x - data_window.min.x + 1;
+    const size_t row_stride = native_plane.pixel_stride * static_cast<size_t>(width);
+
+    size_t channel = 0;
+    for (OPENEXR_IMF_NAMESPACE::ChannelList::ConstIterator it = header.channels().begin(); it != header.channels().end(); ++it, ++channel)
+    {
+        char* base = reinterpret_cast<char*>(native_plane.pixels.data() + native_plane.channel_offsets[channel]);
+        base -= static_cast<ptrdiff_t>(data_window.min.x) * static_cast<ptrdiff_t>(native_plane.pixel_stride);
+        base -= static_cast<ptrdiff_t>(data_window.min.y) * static_cast<ptrdiff_t>(row_stride);
+        frame_buffer.insert(
+            it.name(),
+            OPENEXR_IMF_NAMESPACE::Slice(
+                it.channel().type,
+                base,
+                native_plane.pixel_stride,
+                row_stride,
+                it.channel().xSampling,
+                it.channel().ySampling));
+    }
+}
+
+bool readNativeEXRPart(
+    OPENEXR_IMF_NAMESPACE::MultiPartInputFile& source,
+    int input_part,
+    const OPENEXR_IMF_NAMESPACE::Header& header,
+    NativeEXRPlane& native_plane)
+{
+    if (!initializeNativeEXRPlane(header, native_plane))
+        return false;
+
+    OPENEXR_IMF_NAMESPACE::FrameBuffer frame_buffer;
+    insertNativeEXRSlices(header, native_plane, frame_buffer);
+
+    const IMATH_NAMESPACE::Box2i data_window = header.dataWindow();
+    OPENEXR_IMF_NAMESPACE::InputPart part(source, input_part);
+    part.setFrameBuffer(frame_buffer);
+    part.readPixels(data_window.min.y, data_window.max.y);
+    return true;
+}
+
+bool overwriteNativeEXRRGBChannels(
+    NativeEXRPlane& native_plane,
+    const OPENEXR_IMF_NAMESPACE::Header& header,
+    const SubimageInfo& subimage,
+    const std::vector<float>& replacement_pixels)
+{
+    const IMATH_NAMESPACE::Box2i data_window = header.dataWindow();
+    const size_t width = static_cast<size_t>(data_window.max.x - data_window.min.x + 1);
+    const size_t height = static_cast<size_t>(data_window.max.y - data_window.min.y + 1);
+    const size_t channel_count = static_cast<size_t>(subimage.spec.nchannels);
+    const size_t expected_values = width * height * channel_count;
+    if (replacement_pixels.size() != expected_values)
+    {
+        PrintError("Denoised pixel buffer size mismatch for subimage '%s': expected %zu values, got %zu",
+            subimage.name.c_str(), expected_values, replacement_pixels.size());
+        return false;
+    }
+
+    int rgb_channels[3];
+    if (!findRGBChannels(subimage, rgb_channels))
+        return false;
+
+    bool wrote_rgb[3] = {false, false, false};
     size_t header_channel = 0;
+    const OPENEXR_IMF_NAMESPACE::ChannelList& channels = header.channels();
     for (OPENEXR_IMF_NAMESPACE::ChannelList::ConstIterator it = channels.begin(); it != channels.end(); ++it, ++header_channel)
     {
-        const int source_channel = findHeaderChannelIndex(spec, it.name());
+        const int source_channel = findHeaderChannelIndex(subimage.spec, it.name());
         if (source_channel < 0)
+            continue;
+
+        int rgb_slot = -1;
+        for (int slot = 0; slot < 3; ++slot)
         {
-            PrintError("Could not map OpenEXR channel '%s' to OIIO subimage channels", it.name());
-            return false;
+            if (source_channel == rgb_channels[slot])
+            {
+                rgb_slot = slot;
+                break;
+            }
         }
+        if (rgb_slot < 0)
+            continue;
 
         const size_t channel_offset = native_plane.channel_offsets[header_channel];
         for (size_t pixel = 0; pixel < width * height; ++pixel)
         {
-            const float value = source_pixels[pixel * static_cast<size_t>(spec.nchannels) + static_cast<size_t>(source_channel)];
+            const float value = replacement_pixels[pixel * channel_count + static_cast<size_t>(source_channel)];
             unsigned char* destination = native_plane.pixels.data() + pixel * native_plane.pixel_stride + channel_offset;
             switch (it.channel().type)
             {
@@ -410,6 +481,13 @@ bool packNativeEXRPlane(
                 return false;
             }
         }
+        wrote_rgb[rgb_slot] = true;
+    }
+
+    if (!wrote_rgb[0] || !wrote_rgb[1] || !wrote_rgb[2])
+    {
+        PrintError("Could not map all denoised RGB channels back to OpenEXR header channels for '%s'", subimage.name.c_str());
+        return false;
     }
 
     return true;
@@ -419,35 +497,13 @@ bool writeNativeEXRPart(
     OPENEXR_IMF_NAMESPACE::MultiPartOutputFile& output,
     int output_part,
     const OPENEXR_IMF_NAMESPACE::Header& header,
-    const OIIO::ImageSpec& spec,
-    const std::vector<float>& pixels)
+    NativeEXRPlane& native_plane)
 {
-    NativeEXRPlane native_plane;
-    if (!packNativeEXRPlane(pixels, spec, header, native_plane))
-        return false;
-
     const IMATH_NAMESPACE::Box2i data_window = header.dataWindow();
-    const int width = data_window.max.x - data_window.min.x + 1;
     const int height = data_window.max.y - data_window.min.y + 1;
-    const size_t row_stride = native_plane.pixel_stride * static_cast<size_t>(width);
 
     OPENEXR_IMF_NAMESPACE::FrameBuffer frame_buffer;
-    size_t channel = 0;
-    for (OPENEXR_IMF_NAMESPACE::ChannelList::ConstIterator it = header.channels().begin(); it != header.channels().end(); ++it, ++channel)
-    {
-        char* base = reinterpret_cast<char*>(native_plane.pixels.data() + native_plane.channel_offsets[channel]);
-        base -= static_cast<ptrdiff_t>(data_window.min.x) * static_cast<ptrdiff_t>(native_plane.pixel_stride);
-        base -= static_cast<ptrdiff_t>(data_window.min.y) * static_cast<ptrdiff_t>(row_stride);
-        frame_buffer.insert(
-            it.name(),
-            OPENEXR_IMF_NAMESPACE::Slice(
-                it.channel().type,
-                base,
-                native_plane.pixel_stride,
-                row_stride,
-                it.channel().xSampling,
-                it.channel().ySampling));
-    }
+    insertNativeEXRSlices(header, native_plane, frame_buffer);
 
     OPENEXR_IMF_NAMESPACE::OutputPart part(output, output_part);
     part.setFrameBuffer(frame_buffer);
@@ -490,26 +546,31 @@ bool writeMultipartOutput(
         int output_part = 0;
         for (const auto& subimage : multipart.subimages)
         {
+            NativeEXRPlane native_plane;
+            if (!readNativeEXRPart(source_file, subimage.index, headers[static_cast<size_t>(output_part)], native_plane))
+            {
+                PrintError("Could not read source subimage %d from %s", subimage.index, multipart.filename.c_str());
+                return false;
+            }
+
             const auto replacement = replacements.find(subimage.index);
             if (replacement != replacements.end())
             {
-                if (!writeNativeEXRPart(output, output_part, headers[static_cast<size_t>(output_part)], subimage.spec, replacement->second))
+                if (!overwriteNativeEXRRGBChannels(
+                        native_plane,
+                        headers[static_cast<size_t>(output_part)],
+                        subimage,
+                        replacement->second))
                 {
-                    PrintError("Could not write denoised subimage %d to %s", subimage.index, out_path.c_str());
+                    PrintError("Could not apply denoised pixels to subimage %d", subimage.index);
                     return false;
                 }
             }
-            else
-            {
-                std::vector<float> source_pixels;
-                if (!readMultipartSourcePlane(multipart, subimage, source_pixels))
-                    return false;
 
-                if (!writeNativeEXRPart(output, output_part, headers[static_cast<size_t>(output_part)], subimage.spec, source_pixels))
-                {
-                    PrintError("Could not write unchanged subimage %d to %s", subimage.index, out_path.c_str());
-                    return false;
-                }
+            if (!writeNativeEXRPart(output, output_part, headers[static_cast<size_t>(output_part)], native_plane))
+            {
+                PrintError("Could not write subimage %d to %s", subimage.index, out_path.c_str());
+                return false;
             }
             ++output_part;
         }
