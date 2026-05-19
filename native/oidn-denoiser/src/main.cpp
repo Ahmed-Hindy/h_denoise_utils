@@ -227,18 +227,37 @@ int findRGBChannelIndex(const OIIO::ImageSpec& spec, const std::string& part_nam
     return -1;
 }
 
-bool findRGBChannels(const SubimageInfo& subimage, int rgb[3])
+bool findComponentChannels(
+    const SubimageInfo& subimage,
+    const std::string& first,
+    const std::string& second,
+    const std::string& third,
+    int channels[3])
 {
-    rgb[0] = findRGBChannelIndex(subimage.spec, subimage.name, "R");
-    rgb[1] = findRGBChannelIndex(subimage.spec, subimage.name, "G");
-    rgb[2] = findRGBChannelIndex(subimage.spec, subimage.name, "B");
+    channels[0] = findRGBChannelIndex(subimage.spec, subimage.name, first);
+    channels[1] = findRGBChannelIndex(subimage.spec, subimage.name, second);
+    channels[2] = findRGBChannelIndex(subimage.spec, subimage.name, third);
 
-    if (rgb[0] < 0 || rgb[1] < 0 || rgb[2] < 0)
+    return channels[0] >= 0 && channels[1] >= 0 && channels[2] >= 0;
+}
+
+bool findRGBChannels(const SubimageInfo& subimage, int rgb[3], bool allow_xyz = false)
+{
+    if (findComponentChannels(subimage, "R", "G", "B", rgb))
+        return true;
+
+    if (allow_xyz && findComponentChannels(subimage, "X", "Y", "Z", rgb))
+        return true;
+
+    if (allow_xyz)
+    {
+        PrintError("Subimage '%s' does not expose RGB or XYZ channels required by OIDN", subimage.name.c_str());
+    }
+    else
     {
         PrintError("Subimage '%s' does not expose RGB channels required by OIDN", subimage.name.c_str());
-        return false;
     }
-    return true;
+    return false;
 }
 
 bool loadMultipartLayout(MultipartOptions& multipart)
@@ -514,10 +533,10 @@ size_t planeHeight(const SubimageInfo& subimage)
     return static_cast<size_t>(subimage.spec.height);
 }
 
-bool extractRGB(const PlanePixels& plane, std::vector<float>& rgb)
+bool extractRGB(const PlanePixels& plane, std::vector<float>& rgb, bool allow_xyz = false)
 {
     int channels[3];
-    if (!findRGBChannels(plane.subimage, channels))
+    if (!findRGBChannels(plane.subimage, channels, allow_xyz))
         return false;
 
     const size_t width = planeWidth(plane.subimage);
@@ -606,7 +625,7 @@ bool denoisePlane(
                 normal->subimage.name.c_str(), target.subimage.name.c_str());
             return false;
         }
-        if (!extractRGB(*normal, normal_rgb))
+        if (!extractRGB(*normal, normal_rgb, true))
             return false;
     }
 
