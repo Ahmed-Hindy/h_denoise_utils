@@ -13,8 +13,6 @@ PINNED_OPTIX_SDK_COMMITS = {
     "9.1": "f1f6dd803f3159992d248178f6e09421c6eb8b6d",
 }
 
-ENV_DENOISER_EXE = "HDU_DENOISER_EXE"
-ENV_OPTIX_VERSION = "HDU_OPTIX_VERSION"
 SUPPORTED_OPTIX_VERSIONS = ("8.1", "9.0", "9.1")
 DEFAULT_OPTIX_VERSION = "9.0"
 PREFERRED_OPTIX_VERSIONS = (
@@ -52,10 +50,6 @@ def _requested_optix_version(optix_version: Optional[str]) -> Tuple[str, bool]:
     if optix_version is not None:
         return _normalize_optix_version(optix_version), True
 
-    env_value = os.environ.get(ENV_OPTIX_VERSION, "").strip()
-    if env_value:
-        return _normalize_optix_version(env_value), True
-
     return DEFAULT_OPTIX_VERSION, False
 
 
@@ -82,17 +76,6 @@ def resolve_bundled_denoiser(
     required: bool = True,
     optix_version: Optional[str] = None,
 ) -> Optional[str]:
-    override = os.environ.get(ENV_DENOISER_EXE, "").strip()
-    if override:
-        override_path = Path(override)
-        if override_path.is_file():
-            return str(override_path)
-        if required:
-            raise FileNotFoundError(
-                f"{ENV_DENOISER_EXE} points to a missing denoiser: {override}"
-            )
-        return None
-
     version, explicit_version = _requested_optix_version(optix_version)
     candidate = bundled_denoiser_path(version)
     if candidate.is_file():
@@ -112,7 +95,7 @@ def resolve_bundled_denoiser(
 
     if required:
         requested = (
-            f"Requested OptiX {version} via {ENV_OPTIX_VERSION}. "
+            f"Requested OptiX {version}. "
             if explicit_version
             else f"Default OptiX {DEFAULT_OPTIX_VERSION} was selected. "
         )

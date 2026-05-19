@@ -19,7 +19,6 @@ from ..core.config import (
 )
 from ..discovery.bundled_denoiser import (
     DEFAULT_OPTIX_VERSION,
-    ENV_OPTIX_VERSION,
     SUPPORTED_OPTIX_VERSIONS,
     resolve_bundled_denoiser,
 )
@@ -389,11 +388,6 @@ class BaseWindow(QtWidgets.QMainWindow):
 
     def _initial_optix_version(self):
         # type: () -> str
-        env_value = os.environ.get(ENV_OPTIX_VERSION, "").strip()
-        if env_value.lower().startswith("optix-"):
-            env_value = env_value[6:]
-        if env_value in self.supported_optix_versions:
-            return env_value
         return DEFAULT_OPTIX_VERSION
 
     def _optix_version_key(self):
@@ -1363,13 +1357,12 @@ class BaseWindow(QtWidgets.QMainWindow):
             if self.selected_backend == "oidn":
                 message = (
                     "Bundled OIDN Denoiser.exe was not found. Reinstall the bundled "
-                    "runtime package or set HDU_OIDN_DENOISER_EXE for development."
+                    "runtime package."
                 )
             else:
                 message = (
                     "Bundled OptiX Denoiser.exe was not found for OptiX {}. "
-                    "Reinstall the bundled runtime package or set HDU_DENOISER_EXE "
-                    "for development."
+                    "Reinstall the bundled runtime package."
                 ).format(self.selected_optix_version)
             QtWidgets.QMessageBox.warning(
                 self,

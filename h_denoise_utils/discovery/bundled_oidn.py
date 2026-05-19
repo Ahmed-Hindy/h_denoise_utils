@@ -10,9 +10,6 @@ PINNED_OIDN_RELEASE = "v2.4.1"
 PINNED_OIDN_WINDOWS_ASSET = "oidn-2.4.1.x64.windows.zip"
 PINNED_OIDN_DENOISER_RELEASE = "v*"
 
-ENV_OIDN_DENOISER_EXE = "HDU_OIDN_DENOISER_EXE"
-ENV_OIDN_ROOT = "HDU_OIDN_ROOT"
-
 DEFAULT_OIDN_PLATFORM = "windows-x64"
 SUPPORTED_OIDN_PLATFORMS = (DEFAULT_OIDN_PLATFORM,)
 
@@ -74,33 +71,6 @@ def resolve_bundled_oidn_denoiser(
     required: bool = True,
     platform: Optional[str] = None,
 ) -> Optional[str]:
-    override = os.environ.get(ENV_OIDN_DENOISER_EXE, "").strip()
-    if override:
-        override_path = Path(override)
-        if override_path.is_file():
-            return str(override_path)
-        if required:
-            raise FileNotFoundError(
-                "{} points to a missing OIDN denoiser: {}".format(
-                    ENV_OIDN_DENOISER_EXE, override
-                )
-            )
-        return None
-
-    root_override = os.environ.get(ENV_OIDN_ROOT, "").strip()
-    if root_override:
-        root_path = Path(root_override)
-        candidate = root_path / _exe_name(platform)
-        if candidate.is_file():
-            return str(candidate)
-        if required:
-            raise FileNotFoundError(
-                "{} points to an OIDN root without {}: {}".format(
-                    ENV_OIDN_ROOT, _exe_name(platform), root_override
-                )
-            )
-        return None
-
     platform_key = _normalize_platform(platform)
     candidate = bundled_oidn_denoiser_path(platform_key)
     if candidate.is_file():

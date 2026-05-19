@@ -23,25 +23,7 @@ def _write_oidn_runtime(tmp_path):
     return root, exe
 
 
-def test_resolve_uses_env_override(monkeypatch, tmp_path):
-    exe = tmp_path / "Denoiser.exe"
-    exe.write_text("placeholder")
-    monkeypatch.setenv(bundled_oidn.ENV_OIDN_DENOISER_EXE, str(exe))
-
-    assert bundled_oidn.resolve_bundled_oidn_denoiser() == str(exe)
-
-
-def test_resolve_uses_root_override(monkeypatch, tmp_path):
-    root, exe = _write_oidn_runtime(tmp_path)
-    monkeypatch.delenv(bundled_oidn.ENV_OIDN_DENOISER_EXE, raising=False)
-    monkeypatch.setenv(bundled_oidn.ENV_OIDN_ROOT, str(root))
-
-    assert bundled_oidn.resolve_bundled_oidn_denoiser() == str(exe)
-
-
 def test_resolve_uses_bundled_runtime(monkeypatch, tmp_path):
-    monkeypatch.delenv(bundled_oidn.ENV_OIDN_DENOISER_EXE, raising=False)
-    monkeypatch.delenv(bundled_oidn.ENV_OIDN_ROOT, raising=False)
     monkeypatch.setattr(bundled_oidn, "_package_root", lambda: tmp_path)
     _root, exe = _write_oidn_runtime(tmp_path)
 
@@ -63,8 +45,6 @@ def test_available_bundled_oidn_runtimes(monkeypatch, tmp_path):
 
 
 def test_resolve_missing_optional_returns_none(monkeypatch, tmp_path):
-    monkeypatch.delenv(bundled_oidn.ENV_OIDN_DENOISER_EXE, raising=False)
-    monkeypatch.delenv(bundled_oidn.ENV_OIDN_ROOT, raising=False)
     monkeypatch.setattr(bundled_oidn, "_package_root", lambda: tmp_path)
 
     assert bundled_oidn.resolve_bundled_oidn_denoiser(required=False) is None

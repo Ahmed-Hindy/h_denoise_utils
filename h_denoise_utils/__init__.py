@@ -28,7 +28,6 @@ from .core.command_builder import (
 # Discovery exports
 from .discovery.bundled_denoiser import (
     DEFAULT_OPTIX_VERSION,
-    ENV_OPTIX_VERSION,
     PINNED_DENOISER_COMMIT,
     PINNED_DENOISER_RELEASE,
     PINNED_OPTIX_SDK_COMMITS,
@@ -38,8 +37,6 @@ from .discovery.bundled_denoiser import (
 )
 from .discovery.bundled_oidn import (
     DEFAULT_OIDN_PLATFORM,
-    ENV_OIDN_DENOISER_EXE,
-    ENV_OIDN_ROOT,
     PINNED_OIDN_RELEASE,
     PINNED_OIDN_DENOISER_RELEASE,
     PINNED_OIDN_VERSION,
@@ -82,7 +79,6 @@ __all__ = [
     "build_oidn_denoise_command",
     # Discovery
     "DEFAULT_OPTIX_VERSION",
-    "ENV_OPTIX_VERSION",
     "PINNED_DENOISER_COMMIT",
     "PINNED_DENOISER_RELEASE",
     "PINNED_OPTIX_SDK_COMMITS",
@@ -90,8 +86,6 @@ __all__ = [
     "available_bundled_denoisers",
     "resolve_bundled_denoiser",
     "DEFAULT_OIDN_PLATFORM",
-    "ENV_OIDN_DENOISER_EXE",
-    "ENV_OIDN_ROOT",
     "PINNED_OIDN_RELEASE",
     "PINNED_OIDN_DENOISER_RELEASE",
     "PINNED_OIDN_VERSION",
