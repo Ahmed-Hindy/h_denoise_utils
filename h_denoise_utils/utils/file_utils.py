@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+from pathlib import Path
 
 
 def natural_sort_key(name: str) -> list:
@@ -70,25 +71,22 @@ def build_output_path(src_full: str, out_folder: str, prefix: str) -> str:
     Raises:
         ValueError: If output path would escape output folder
     """
-    base = os.path.basename(src_full)
+    base = Path(src_full).name
     dst_name = f"{prefix}{base}"
 
     # Security: validate output path doesn't escape output folder
-    output_path = os.path.normpath(os.path.join(out_folder, dst_name))
-    out_folder_norm = os.path.normpath(out_folder)
+    out_folder_path = Path(out_folder)
+    output_path = out_folder_path / dst_name
 
-    output_path_abs = os.path.normcase(os.path.abspath(output_path))
-    out_folder_abs = os.path.normcase(os.path.abspath(out_folder_norm))
+    resolved_output = output_path.resolve(strict=False)
+    resolved_out_folder = out_folder_path.resolve(strict=False)
 
     try:
-        common = os.path.commonpath([output_path_abs, out_folder_abs])
+        resolved_output.relative_to(resolved_out_folder)
     except ValueError:
         raise ValueError(f"Output path {output_path} would escape output folder")
 
-    if common != out_folder_abs:
-        raise ValueError(f"Output path {output_path} would escape output folder")
-
-    return output_path
+    return str(output_path)
 
 
 def compute_output_folder(in_path: str, extensions: list[str]) -> str:
@@ -101,7 +99,14 @@ def compute_output_folder(in_path: str, extensions: list[str]) -> str:
     Returns:
         Path to output folder
     """
-    base_dir = in_path if os.path.isdir(in_path) else (os.path.dirname(in_path) or os.getcwd())
-    out = os.path.join(base_dir, "denoised")
-    os.makedirs(out, exist_ok=True)
-    return out.replace("\\", "/")
+    input_path = Path(in_path)
+    if input_path.is_dir():
+        base_dir = input_path
+    elif input_path.parent != Path("."):
+        base_dir = input_path.parent
+    else:
+        base_dir = Path.cwd()
+
+    out = base_dir / "denoised"
+    out.mkdir(parents=True, exist_ok=True)
+    return out.as_posix()
