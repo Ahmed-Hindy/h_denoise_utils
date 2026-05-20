@@ -35,6 +35,7 @@ coverage.xml
 .idea/
 .vscode/
 !.vscode/settings.json
+.kiro/
 
 # macOS
 .DS_Store
