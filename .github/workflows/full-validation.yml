@@ -1,4 +1,4 @@
-name: OIDN Denoiser
+name: Full Validation
 
 on:
   workflow_dispatch:
@@ -7,41 +7,52 @@ on:
         description: Intel Open Image Denoise version
         required: true
         default: "2.4.1"
-  push:
-    branches:
-      - main
-      - "release/**"
-    paths:
-      - "native/oidn-denoiser/**"
-      - "tools/build_oidn_denoiser.ps1"
-      - "tools/fetch_oidn_denoiser.ps1"
-      - "tools/validate_oidn_uint_preservation.py"
-      - "tools/fetch_oidn.ps1"
-      - "packaging/h-denoise.spec"
-      - "tools/build_windows_package.ps1"
-      - ".github/workflows/oidn-denoiser.yml"
-  pull_request:
-    paths:
-      - "native/oidn-denoiser/**"
-      - "tools/build_oidn_denoiser.ps1"
-      - "tools/fetch_oidn_denoiser.ps1"
-      - "tools/validate_oidn_uint_preservation.py"
-      - "tools/fetch_oidn.ps1"
-      - "packaging/h-denoise.spec"
-      - "tools/build_windows_package.ps1"
-      - ".github/workflows/oidn-denoiser.yml"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-windows:
-    name: "build / OIDN Denoiser.exe"
+  test:
+    name: "pytest / Python ${{ matrix.python-version }}"
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Qt system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl1 libegl1 libxkbcommon0 libdbus-1-3
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install dependencies
+        run: uv sync --extra dev --extra pyside6
+
+      - name: Run tests
+        run: uv run pytest --tb=short
+
+  bundled-windows:
+    name: "bundled runtime / Windows"
+    needs: test
     runs-on: windows-2022
+    permissions:
+      contents: read
     env:
       QT_BACKEND: pyside6
-      OIDN_VERSION: ${{ github.event.inputs.oidn_version || '2.4.1' }}
+      OIDN_VERSION: ${{ github.event.inputs.oidn_version }}
 
     steps:
       - uses: actions/checkout@v6
