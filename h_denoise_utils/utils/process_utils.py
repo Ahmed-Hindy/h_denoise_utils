@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import subprocess
 
+from ..constants import DEFAULT_DENOISER_TIMEOUT_SECONDS
+
 
 def get_subprocess_config() -> tuple[subprocess.STARTUPINFO | None, int]:
     """Get subprocess configuration to hide console on Windows.
@@ -24,7 +26,10 @@ def get_subprocess_config() -> tuple[subprocess.STARTUPINFO | None, int]:
     return startupinfo, creation_flags
 
 
-def run_subprocess(cmd: list, timeout: int = 300) -> tuple[bool, str]:
+def run_subprocess(
+    cmd: list,
+    timeout: int = DEFAULT_DENOISER_TIMEOUT_SECONDS,
+) -> tuple[bool, str]:
     """Run a subprocess and return success status and error message.
 
     Args:
