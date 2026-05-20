@@ -3,7 +3,10 @@ param(
     [string]$Tag = "",
     [string]$Version = "2.4.1",
     [string]$Platform = "windows-x64",
-    [string]$SourceShortSha = ""
+    [string]$SourceShortSha = "",
+    [string]$Configuration = "Release",
+    [switch]$AllowSourceKeyMismatch,
+    [switch]$CopyAssetToDist
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,6 +17,61 @@ if ($Platform -ne "windows-x64") {
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $vendorDir = Join-Path $repoRoot "h_denoise_utils\vendor\oidn-denoiser\$Platform\oidn-$Version"
+$distRoot = Join-Path $repoRoot "dist"
+
+function Get-OidnDenoiserSourceKey {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$Version,
+        [Parameter(Mandatory = $true)][string]$Platform,
+        [Parameter(Mandatory = $true)][string]$Configuration
+    )
+
+    $inputs = @(
+        (Join-Path $RepoRoot "native\oidn-denoiser"),
+        (Join-Path $RepoRoot "tools\build_oidn_denoiser.ps1"),
+        (Join-Path $RepoRoot "tools\fetch_oidn.ps1")
+    )
+    $payload = [System.Collections.Generic.List[string]]::new()
+    $payload.Add("version=$Version")
+    $payload.Add("platform=$Platform")
+    $payload.Add("configuration=$Configuration")
+
+    foreach ($inputPath in $inputs) {
+        if (-not (Test-Path -LiteralPath $inputPath)) {
+            throw "OIDN source-key input is missing: $inputPath"
+        }
+
+        $item = Get-Item -LiteralPath $inputPath
+        $files = if ($item.PSIsContainer) {
+            Get-ChildItem -LiteralPath $item.FullName -File -Recurse
+        }
+        else {
+            @($item)
+        }
+
+        foreach ($file in ($files | Sort-Object FullName)) {
+            $relative = [System.IO.Path]::GetRelativePath($RepoRoot, $file.FullName).Replace("\", "/")
+            $fileHash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            $payload.Add("$relative=$fileHash")
+        }
+    }
+
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes(($payload -join "`n"))
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $hashBytes = $sha.ComputeHash($bytes)
+        return -join ($hashBytes | ForEach-Object { $_.ToString("x2") })
+    }
+    finally {
+        $sha.Dispose()
+    }
+}
+
+$expectedSourceKey = Get-OidnDenoiserSourceKey -RepoRoot $repoRoot -Version $Version -Platform $Platform -Configuration $Configuration
+if (-not $SourceShortSha) {
+    $SourceShortSha = $expectedSourceKey.Substring(0, [Math]::Min(12, $expectedSourceKey.Length))
+}
 
 function Get-OidnDenoiserAssetPattern {
     if ($SourceShortSha) {
@@ -51,7 +109,51 @@ function Test-OidnDenoiserInstalled {
     )
 }
 
+function Assert-OidnDenoiserManifest {
+    param(
+        [Parameter(Mandatory = $true)][string]$ManifestPath,
+        [Parameter(Mandatory = $true)][string]$ExePath
+    )
+
+    $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
+    if ($manifest.name -ne "hdu-oidn-denoiser") {
+        throw "OIDN denoiser manifest name mismatch: expected hdu-oidn-denoiser, got $($manifest.name)"
+    }
+    if ($manifest.executable -ne "Denoiser.exe") {
+        throw "OIDN denoiser manifest executable mismatch: expected Denoiser.exe, got $($manifest.executable)"
+    }
+    if ($manifest.oidn_version -ne $Version) {
+        throw "OIDN denoiser manifest version mismatch: expected $Version, got $($manifest.oidn_version)"
+    }
+    if ($manifest.platform -ne $Platform) {
+        throw "OIDN denoiser manifest platform mismatch: expected $Platform, got $($manifest.platform)"
+    }
+    if ($manifest.contract -ne "optix-compatible-multipart-v1") {
+        throw "OIDN denoiser manifest contract mismatch: expected optix-compatible-multipart-v1, got $($manifest.contract)"
+    }
+    if (-not $manifest.sha256) {
+        throw "OIDN denoiser manifest is missing sha256"
+    }
+
+    $actualHash = (Get-FileHash -LiteralPath $ExePath -Algorithm SHA256).Hash
+    if ($actualHash -ne $manifest.sha256) {
+        throw "OIDN denoiser executable hash mismatch: expected $($manifest.sha256), got $actualHash"
+    }
+
+    if (-not $AllowSourceKeyMismatch) {
+        if (-not $manifest.source_key) {
+            throw "OIDN denoiser manifest is missing source_key; rebuild it with the current build script."
+        }
+        if ($manifest.source_key -ne $expectedSourceKey) {
+            throw "OIDN denoiser source_key mismatch: expected $expectedSourceKey, got $($manifest.source_key)"
+        }
+    }
+}
+
 if (Test-OidnDenoiserInstalled) {
+    Assert-OidnDenoiserManifest `
+        -ManifestPath (Join-Path $vendorDir "manifest.json") `
+        -ExePath (Join-Path $vendorDir "Denoiser.exe")
     Write-Host "Bundled OIDN denoiser already exists: $(Join-Path $vendorDir 'Denoiser.exe')"
     exit 0
 }
@@ -94,10 +196,22 @@ try {
     if (-not $foundManifest) {
         throw "manifest.json was not found in $zipPath"
     }
+    if ($foundExe.DirectoryName -ne $foundManifest.DirectoryName) {
+        throw "Denoiser.exe and manifest.json must be in the same bundle directory."
+    }
+    Assert-OidnDenoiserManifest -ManifestPath $foundManifest.FullName -ExePath $foundExe.FullName
 
+    if (Test-Path -LiteralPath $vendorDir) {
+        Remove-Item -LiteralPath $vendorDir -Recurse -Force
+    }
     New-Item -ItemType Directory -Path $vendorDir -Force | Out-Null
-    Get-ChildItem -LiteralPath $extractDir -File -Recurse |
-        Copy-Item -Destination $vendorDir -Force
+    Get-ChildItem -LiteralPath $foundManifest.DirectoryName -Force |
+        Copy-Item -Destination $vendorDir -Recurse -Force
+
+    if ($CopyAssetToDist) {
+        New-Item -ItemType Directory -Path $distRoot -Force | Out-Null
+        Copy-Item -LiteralPath $zipPath -Destination (Join-Path $distRoot (Split-Path $zipPath -Leaf)) -Force
+    }
 
     Write-Host "Bundled OIDN denoiser installed: $(Join-Path $vendorDir 'Denoiser.exe')"
 }
