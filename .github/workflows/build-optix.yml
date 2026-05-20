@@ -45,11 +45,6 @@ jobs:
           git fetch origin $commit
           git checkout $commit
 
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          python-version: "3.12"
-
       - name: Install Conan
         run: pipx install conan
 
@@ -146,11 +141,6 @@ jobs:
           fi
           git fetch origin "$COMMIT"
           git checkout "$COMMIT"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          python-version: "3.12"
 
       - name: Install Conan
         run: pipx install conan
