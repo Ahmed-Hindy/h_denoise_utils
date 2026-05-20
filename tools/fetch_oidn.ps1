@@ -69,14 +69,9 @@ try {
         Copy-Item -LiteralPath $localZip -Destination $zipPath -Force
     }
     else {
-        $gh = Get-Command gh -ErrorAction SilentlyContinue
-        if ($gh) {
-            gh release download $Tag --repo $Repository --pattern $AssetName --dir $downloadDir
-        }
-        else {
-            $url = "https://github.com/$Repository/releases/download/$Tag/$AssetName"
-            Invoke-WebRequest -Uri $url -OutFile $zipPath -Headers @{ "User-Agent" = "h_denoise_utils" }
-        }
+        $url = "https://github.com/$Repository/releases/download/$Tag/$AssetName"
+        Write-Host "Downloading OIDN SDK from: $url"
+        Invoke-WebRequest -Uri $url -OutFile $zipPath -Headers @{ "User-Agent" = "h_denoise_utils" }
     }
 
     if (-not (Test-Path -LiteralPath $zipPath)) {

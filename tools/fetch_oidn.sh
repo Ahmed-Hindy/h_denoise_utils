@@ -68,12 +68,9 @@ if [ -n "${HDU_OIDN_ZIP_DIR:-}" ]; then
   fi
   cp "${HDU_OIDN_ZIP_DIR}/${ASSET_NAME}" "${ZIP_PATH}"
 else
-  if command -v gh &> /dev/null; then
-    gh release download "${TAG}" --repo "${REPOSITORY}" --pattern "${ASSET_NAME}" --dir "${DOWNLOAD_DIR}"
-  else
-    URL="https://github.com/${REPOSITORY}/releases/download/${TAG}/${ASSET_NAME}"
-    curl -L -H "User-Agent: h_denoise_utils" -o "${ZIP_PATH}" "${URL}"
-  fi
+  URL="https://github.com/${REPOSITORY}/releases/download/${TAG}/${ASSET_NAME}"
+  echo "Downloading OIDN SDK from: ${URL}"
+  curl -L -H "User-Agent: h_denoise_utils" -o "${ZIP_PATH}" "${URL}"
 fi
 
 if [ ! -f "${ZIP_PATH}" ]; then
