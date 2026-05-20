@@ -38,14 +38,12 @@ jobs:
         shell: pwsh
         run: |
           cd NvidiaAIDenoiser/contrib/optix
-          git fetch origin
-          if ("${{ matrix.optix-version }}" -eq "8.1") {
-            git checkout $env:OPTIX_COMMIT_8_1
-          } elseif ("${{ matrix.optix-version }}" -eq "9.0") {
-            git checkout $env:OPTIX_COMMIT_9_0
-          } elseif ("${{ matrix.optix-version }}" -eq "9.1") {
-            git checkout $env:OPTIX_COMMIT_9_1
-          }
+          $commit = ""
+          if ("${{ matrix.optix-version }}" -eq "8.1") { $commit = $env:OPTIX_COMMIT_8_1 }
+          elseif ("${{ matrix.optix-version }}" -eq "9.0") { $commit = $env:OPTIX_COMMIT_9_0 }
+          elseif ("${{ matrix.optix-version }}" -eq "9.1") { $commit = $env:OPTIX_COMMIT_9_1 }
+          git fetch origin $commit
+          git checkout $commit
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -53,7 +51,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Conan
-        run: uv pip install --system conan
+        run: pipx install conan
 
       - name: Conan Profile Detect
         run: conan profile detect --force
@@ -138,14 +136,16 @@ jobs:
       - name: Checkout specific OptiX SDK version
         run: |
           cd NvidiaAIDenoiser/contrib/optix
-          git fetch origin
+          COMMIT=""
           if [ "${{ matrix.optix-version }}" = "8.1" ]; then
-            git checkout $OPTIX_COMMIT_8_1
+            COMMIT=$OPTIX_COMMIT_8_1
           elif [ "${{ matrix.optix-version }}" = "9.0" ]; then
-            git checkout $OPTIX_COMMIT_9_0
+            COMMIT=$OPTIX_COMMIT_9_0
           elif [ "${{ matrix.optix-version }}" = "9.1" ]; then
-            git checkout $OPTIX_COMMIT_9_1
+            COMMIT=$OPTIX_COMMIT_9_1
           fi
+          git fetch origin "$COMMIT"
+          git checkout "$COMMIT"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -153,7 +153,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Conan
-        run: uv pip install --system conan
+        run: pipx install conan
 
       - name: Conan Profile Detect
         run: conan profile detect --force
