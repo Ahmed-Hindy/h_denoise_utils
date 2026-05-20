@@ -13,6 +13,7 @@ jobs:
       contents: write
     env:
       QT_BACKEND: pyside6
+      OIDN_VERSION: "2.4.1"
 
     steps:
       - name: Checkout release tag
@@ -25,6 +26,21 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: oidn-conan-${{ runner.os }}-${{ env.OIDN_VERSION }}-${{ hashFiles('native/oidn-denoiser/conanfile.txt') }}
+          restore-keys: |
+            oidn-conan-${{ runner.os }}-${{ env.OIDN_VERSION }}-
+            oidn-conan-${{ runner.os }}-
+
+      - name: Cache OIDN SDK package
+        uses: actions/cache@v4
+        with:
+          path: h_denoise_utils/vendor/oidn/windows-x64/oidn-${{ env.OIDN_VERSION }}
+          key: oidn-sdk-${{ runner.os }}-${{ env.OIDN_VERSION }}
 
       - name: Verify tag version
         shell: pwsh
@@ -41,11 +57,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: .\tools\fetch_optix_denoiser.ps1
 
-      - name: Build bundled OIDN denoiser
+      - name: Fetch or build bundled OIDN denoiser
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: .\tools\build_oidn_denoiser.ps1
+        run: |
+          try {
+            .\tools\fetch_oidn_denoiser.ps1 -Version $env:OIDN_VERSION -CopyAssetToDist
+          }
+          catch {
+            Write-Warning "Could not fetch a matching prebuilt OIDN denoiser: $($_.Exception.Message)"
+            .\tools\build_oidn_denoiser.ps1 -Version $env:OIDN_VERSION
+          }
 
       - name: Validate OIDN UINT channel preservation
         shell: pwsh
@@ -84,7 +107,7 @@ jobs:
           $optix81Sha = "50021ea0af6d41609a97777ceebbdf1e1d34efe7"
           $optix90Sha = "fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd"
           $optix91Sha = "f1f6dd803f3159992d248178f6e09421c6eb8b6d"
-          $oidnVersion = "2.4.1"
+          $oidnVersion = "$env:OIDN_VERSION"
           $variantNotes = @"
 
           ## Windows Package

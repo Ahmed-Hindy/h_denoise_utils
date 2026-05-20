@@ -22,6 +22,55 @@ $bundleRoot = Join-Path $repoRoot "h_denoise_utils\vendor\oidn-denoiser\$Platfor
 $buildRoot = Join-Path $repoRoot "build\oidn-denoiser\$Platform\oidn-$Version"
 $distRoot = Join-Path $repoRoot "dist"
 
+function Get-OidnDenoiserSourceKey {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$Version,
+        [Parameter(Mandatory = $true)][string]$Platform,
+        [Parameter(Mandatory = $true)][string]$Configuration
+    )
+
+    $inputs = @(
+        (Join-Path $RepoRoot "native\oidn-denoiser"),
+        (Join-Path $RepoRoot "tools\build_oidn_denoiser.ps1"),
+        (Join-Path $RepoRoot "tools\fetch_oidn.ps1")
+    )
+    $payload = [System.Collections.Generic.List[string]]::new()
+    $payload.Add("version=$Version")
+    $payload.Add("platform=$Platform")
+    $payload.Add("configuration=$Configuration")
+
+    foreach ($inputPath in $inputs) {
+        if (-not (Test-Path -LiteralPath $inputPath)) {
+            throw "OIDN source-key input is missing: $inputPath"
+        }
+
+        $item = Get-Item -LiteralPath $inputPath
+        $files = if ($item.PSIsContainer) {
+            Get-ChildItem -LiteralPath $item.FullName -File -Recurse
+        }
+        else {
+            @($item)
+        }
+
+        foreach ($file in ($files | Sort-Object FullName)) {
+            $relative = [System.IO.Path]::GetRelativePath($RepoRoot, $file.FullName).Replace("\", "/")
+            $fileHash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            $payload.Add("$relative=$fileHash")
+        }
+    }
+
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes(($payload -join "`n"))
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $hashBytes = $sha.ComputeHash($bytes)
+        return -join ($hashBytes | ForEach-Object { $_.ToString("x2") })
+    }
+    finally {
+        $sha.Dispose()
+    }
+}
+
 if (-not $SkipOidnFetch) {
     & (Join-Path $PSScriptRoot "fetch_oidn.ps1") -Version $Version -Platform $Platform
 }
@@ -36,7 +85,8 @@ if (-not (Test-Path -LiteralPath (Join-Path $oidnRoot "lib\OpenImageDenoise.lib"
 if (-not $SourceCommit) {
     $SourceCommit = (& git -C $repoRoot rev-parse HEAD).Trim()
 }
-$sourceShort = $SourceCommit.Substring(0, [Math]::Min(7, $SourceCommit.Length))
+$sourceKey = Get-OidnDenoiserSourceKey -RepoRoot $repoRoot -Version $Version -Platform $Platform -Configuration $Configuration
+$sourceKeyShort = $sourceKey.Substring(0, [Math]::Min(12, $sourceKey.Length))
 
 if (Test-Path -LiteralPath $buildRoot) {
     Remove-Item -LiteralPath $buildRoot -Recurse -Force
@@ -96,6 +146,7 @@ $manifest = [ordered]@{
     name = "hdu-oidn-denoiser"
     executable = "Denoiser.exe"
     source_commit = $SourceCommit
+    source_key = $sourceKey
     oidn_version = $Version
     oidn_release = "v$Version"
     platform = $Platform
@@ -108,7 +159,7 @@ $manifest |
     ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath (Join-Path $bundleRoot "manifest.json") -Encoding utf8NoBOM
 
-$assetName = "oidn-denoiser-$Platform-oidn-$Version-$sourceShort.zip"
+$assetName = "oidn-denoiser-$Platform-oidn-$Version-$sourceKeyShort.zip"
 $assetPath = Join-Path $distRoot $assetName
 if (Test-Path -LiteralPath $assetPath) {
     Remove-Item -LiteralPath $assetPath -Force
