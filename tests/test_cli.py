@@ -153,6 +153,7 @@ def test_cli_optix_backend_uses_selected_runtime(monkeypatch):
     assert created["runtime_request"] == ("optix", "9.1")
     assert created["denoiser"].kwargs["backend"] == "optix"
     assert created["denoiser"].kwargs["beauty_plane"] == "beauty"
+    assert created["denoiser"].kwargs.get("output_folder") is None
 
 
 def test_cli_missing_runtime_returns_error(monkeypatch, capsys):
@@ -167,3 +168,40 @@ def test_cli_missing_runtime_returns_error(monkeypatch, capsys):
 
     assert result == 1
     assert "Bundled OIDN Denoiser.exe was not found" in capsys.readouterr().err
+
+
+def test_cli_output_folder_is_optional_and_defaults_to_denoised(monkeypatch, tmp_path):
+    """Omitting --output-folder defaults to a subfolder called 'denoised' next to input."""
+    from pathlib import Path
+
+    input_file = tmp_path / "image.exr"
+    input_file.touch()
+
+    fake_exe = tmp_path / "Denoiser.exe"
+    fake_exe.touch()
+
+    monkeypatch.setattr(
+        main_module,
+        "_resolve_cli_runtime",
+        lambda backend, optix_version: str(fake_exe),
+    )
+
+    run_calls = []
+
+    def fake_run_subprocess(cmd, timeout=300):
+        run_calls.append(cmd)
+        output_path = cmd[cmd.index("-o") + 1]
+        Path(output_path).touch()
+        return True, ""
+
+    monkeypatch.setattr("h_denoise_utils.core.denoiser.run_subprocess", fake_run_subprocess)
+
+    result = main_module.main([
+        str(input_file),
+        "--backend", "optix",
+    ])
+
+    assert result == 0
+    expected_output_folder = tmp_path / "denoised"
+    assert expected_output_folder.is_dir()
+    assert (expected_output_folder / "den_image.exr").exists()
