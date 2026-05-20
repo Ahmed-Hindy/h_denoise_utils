@@ -1,7 +1,7 @@
 # Bundled OIDN Denoiser
 
-This branch bundles a custom Intel Open Image Denoise (OIDN) wrapper next to
-the bundled OptiX runtimes.
+The app bundles a custom Intel Open Image Denoise (OIDN) wrapper next to the
+bundled OptiX runtimes.
 
 ## Runtime layout
 

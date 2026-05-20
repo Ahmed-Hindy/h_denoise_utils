@@ -114,7 +114,11 @@ def _run_validation(denoiser: Path, work_dir: Path) -> None:
     if len(output_file.parts) != 2:
         raise AssertionError(f"Expected 2 EXR parts, found {len(output_file.parts)}")
 
-    _assert_equal("denoised part UINT side channel", expected_beauty_ids, _read_channel(output, "C", "object_id"))
+    _assert_equal(
+        "denoised part UINT side channel",
+        expected_beauty_ids,
+        _read_channel(output, "C", "object_id"),
+    )
     _assert_equal("untouched UINT part", expected_untouched_ids, _read_channel(output, "ids", "id"))
 
     print("OIDN UINT preservation smoke test passed.")
@@ -122,9 +126,18 @@ def _run_validation(denoiser: Path, work_dir: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--denoiser", required=True, type=Path, help="Path to the custom OIDN Denoiser.exe")
+    parser.add_argument(
+        "--denoiser",
+        required=True,
+        type=Path,
+        help="Path to the custom OIDN Denoiser.exe",
+    )
     parser.add_argument("--work-dir", type=Path, help="Directory for temporary EXR files")
-    parser.add_argument("--keep-files", action="store_true", help="Keep generated EXR files for inspection")
+    parser.add_argument(
+        "--keep-files",
+        action="store_true",
+        help="Keep generated EXR files for inspection",
+    )
     args = parser.parse_args()
 
     denoiser = args.denoiser.resolve()
