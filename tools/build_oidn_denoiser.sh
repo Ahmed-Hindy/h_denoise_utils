@@ -117,11 +117,8 @@ cd "${NATIVE_DIR}"
 uv run --native-tls --with conan conan profile detect --force
 uv run --native-tls --with conan conan install . --output-folder "${BUILD_ROOT}" --build=missing -s build_type="${CONFIGURATION}" -s compiler.cppstd=20
 
-TOOLCHAIN="${BUILD_ROOT}/build/generators/conan_toolchain.cmake"
-if [ ! -f "${TOOLCHAIN}" ]; then
-  TOOLCHAIN="${BUILD_ROOT}/generators/conan_toolchain.cmake"
-fi
-if [ ! -f "${TOOLCHAIN}" ]; then
+TOOLCHAIN=$(find "${BUILD_ROOT}" -name conan_toolchain.cmake | head -n 1)
+if [ -z "${TOOLCHAIN}" ] || [ ! -f "${TOOLCHAIN}" ]; then
   echo "Conan toolchain file was not created under ${BUILD_ROOT}" >&2
   exit 1
 fi

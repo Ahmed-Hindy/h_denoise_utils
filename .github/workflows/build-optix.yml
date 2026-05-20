@@ -166,9 +166,10 @@ jobs:
       - name: Configure CMake
         run: |
           cd NvidiaAIDenoiser
-          TOOLCHAIN="build/build/generators/conan_toolchain.cmake"
-          if [ ! -f "${TOOLCHAIN}" ]; then
-            TOOLCHAIN="build/generators/conan_toolchain.cmake"
+          TOOLCHAIN=$(find build -name conan_toolchain.cmake | head -n 1)
+          if [ -z "${TOOLCHAIN}" ] || [ ! -f "${TOOLCHAIN}" ]; then
+            echo "Conan toolchain file was not created under build/" >&2
+            exit 1
           fi
           cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN}" -DCMAKE_INSTALL_PREFIX="dist/optix-${{ matrix.optix-version }}" -DCMAKE_BUILD_TYPE=Release
 
