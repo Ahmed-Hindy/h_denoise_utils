@@ -2,6 +2,8 @@
 
 import os
 
+import pytest
+
 from h_denoise_utils.utils.file_utils import (
     build_output_path,
     compute_output_folder,
@@ -89,16 +91,8 @@ class TestBuildOutputPath:
         # This should be caught by normpath validation
         src = str(tmp_path / "render.exr")
 
-        # Test with a malicious prefix that tries to escape
-        try:
-            result = build_output_path(src, out_folder, "../../../evil_")
-            # If we get here, check that result is still within out_folder
-            out_folder_abs = os.path.normcase(os.path.abspath(out_folder))
-            result_abs = os.path.normcase(os.path.abspath(result))
-            assert os.path.commonpath([result_abs, out_folder_abs]) == out_folder_abs
-        except ValueError:
-            # This is also acceptable - the function rejected the attempt
-            pass
+        with pytest.raises(ValueError):
+            build_output_path(src, out_folder, "../../../evil_")
 
 
 class TestComputeOutputFolder:
