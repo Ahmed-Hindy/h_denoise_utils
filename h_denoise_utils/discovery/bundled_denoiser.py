@@ -37,7 +37,8 @@ def _denoiser_base_dir() -> Path:
     Returns:
         Path: Path to the base vendor directory.
     """
-    return _package_root() / "vendor" / "optix-denoiser" / "windows-x64"
+    platform = "windows-x64" if os.name == "nt" else "linux-x64"
+    return _package_root() / "vendor" / "optix-denoiser" / platform
 
 
 def _exe_name() -> str:
@@ -46,7 +47,7 @@ def _exe_name() -> str:
     Returns:
         str: The executable name.
     """
-    return "Denoiser.exe"
+    return "Denoiser.exe" if os.name == "nt" else "Denoiser"
 
 
 def _normalize_optix_version(optix_version: str) -> str:
@@ -163,9 +164,9 @@ def resolve_bundled_denoiser(
         expected = ", ".join(
             str(_denoiser_base_dir() / f"optix-{v}" / _exe_name()) for v in SUPPORTED_OPTIX_VERSIONS
         )
-        if os.name != "nt":
+        if sys.platform not in ("win32", "linux"):
             raise FileNotFoundError(
-                "Bundled OptiX denoising is currently available only in the Windows package."
+                "Bundled OptiX denoising is currently available only in Windows and Linux packages."
             )
         location = getattr(sys, "_MEIPASS", None) or str(_package_root())
         raise FileNotFoundError(
