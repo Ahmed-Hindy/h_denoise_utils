@@ -115,7 +115,7 @@ mkdir -p "${BUILD_ROOT}" "${BUNDLE_ROOT}" "${DIST_ROOT}"
 # Run Conan and CMake Build
 cd "${NATIVE_DIR}"
 uv run --native-tls --with conan conan profile detect --force
-uv run --native-tls --with conan conan install . --output-folder "${BUILD_ROOT}" --build=missing -s build_type="${CONFIGURATION}" -s compiler.cppstd=20
+uv run --native-tls --with conan conan install . --output-folder "${BUILD_ROOT}" --build=missing -s build_type="${CONFIGURATION}" -s compiler.cppstd=20 -c tools.system.package_manager:mode=install -c tools.system.package_manager:sudo=True
 
 TOOLCHAIN=$(find "${BUILD_ROOT}" -name conan_toolchain.cmake | head -n 1)
 if [ -z "${TOOLCHAIN}" ] || [ ! -f "${TOOLCHAIN}" ]; then
