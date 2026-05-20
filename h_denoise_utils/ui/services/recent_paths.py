@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 
+from ...constants import RECENT_PATHS_LIMIT
+
 
 def load_recent_paths(settings: object) -> list[str]:
     """Load the list of recently opened directory paths from settings.
@@ -34,7 +36,11 @@ def save_recent_paths(settings: object, paths: list[str]) -> None:
     settings.setValue("recent_paths", list(paths))
 
 
-def remember_path(paths: list[str], path: str, max_items: int = 10) -> list[str]:
+def remember_path(
+    paths: list[str],
+    path: str,
+    max_items: int = RECENT_PATHS_LIMIT,
+) -> list[str]:
     """Add a new path to the list of recent paths, maintaining constraints.
 
     Deduplicates the path, validates it exists, and limits the list size.

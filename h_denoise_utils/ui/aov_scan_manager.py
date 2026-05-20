@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ..constants import DEFAULT_AOV_SCAN_TIMEOUT_MS
 from .qt_compat import QtCore, Signal
 from .services.aov_inspector import analyze_aovs
 
@@ -42,7 +43,11 @@ class AovScanManager(QtCore.QObject):
     completed = Signal(dict)
     timed_out = Signal()
 
-    def __init__(self, timeout_ms: int = 10000, parent: QtCore.QObject | None = None) -> None:
+    def __init__(
+        self,
+        timeout_ms: int = DEFAULT_AOV_SCAN_TIMEOUT_MS,
+        parent: QtCore.QObject | None = None,
+    ) -> None:
         """Initialize the AOV scan manager.
 
         Args:

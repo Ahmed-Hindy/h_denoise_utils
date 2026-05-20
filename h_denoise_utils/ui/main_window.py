@@ -8,6 +8,14 @@ import re
 import time
 
 from .. import __version__
+from ..constants import (
+    AOV_PREVIEW_PLANE_LIMIT,
+    DEFAULT_AOV_SCAN_TIMEOUT_MS,
+    MANUAL_FILE_CLEAR_CONFIRM_THRESHOLD,
+    PATH_ANALYSIS_DEBOUNCE_MS,
+    RECENT_PATHS_LIMIT,
+    SUMMARY_PLANES_FLASH_MS,
+)
 from ..core.config import (
     PRESETS,
     AOVConfig,
@@ -95,7 +103,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.output_path_label: QtWidgets.QLabel | None = None
         self.action_dest_label: QtWidgets.QLabel | None = None
         self._package_logger: logging.Logger | None = None
-        self._aov_timeout_ms = 10000
+        self._aov_timeout_ms = DEFAULT_AOV_SCAN_TIMEOUT_MS
         self._aov_scan = AovScanManager(timeout_ms=self._aov_timeout_ms, parent=self)
         self.scan_spinner: QtWidgets.QProgressBar | None = None
         self.summary_files: QtWidgets.QLabel | None = None
@@ -126,7 +134,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         self.motion_label: QtWidgets.QLabel | None = None
         self._path_analysis_timer = QtCore.QTimer(self)
         self._path_analysis_timer.setSingleShot(True)
-        self._path_analysis_timer.setInterval(500)
+        self._path_analysis_timer.setInterval(PATH_ANALYSIS_DEBOUNCE_MS)
         self._path_analysis_timer.timeout.connect(self._analyze_input)
         self._summary_planes_flash_timer = QtCore.QTimer(self)
         self._summary_planes_flash_timer.setSingleShot(True)
@@ -868,7 +876,11 @@ class BaseWindow(QtWidgets.QMainWindow):
         Args:
             path: The directory path to add.
         """
-        self._recent_paths = remember_path(self._recent_paths, path, max_items=10)
+        self._recent_paths = remember_path(
+            self._recent_paths,
+            path,
+            max_items=RECENT_PATHS_LIMIT,
+        )
         self._save_recent_paths()
         self._refresh_recent_paths()
 
@@ -912,7 +924,10 @@ class BaseWindow(QtWidgets.QMainWindow):
     def _clear_selected_files(self) -> None:
         """Clear all files from manual selection with user confirmation."""
         selected_count = len(self._input_state.selected_files)
-        if selected_count > 3 and self.sender() is self.files_clear_btn:
+        if (
+            selected_count > MANUAL_FILE_CLEAR_CONFIRM_THRESHOLD
+            and self.sender() is self.files_clear_btn
+        ):
             response = QtWidgets.QMessageBox.question(
                 self,
                 "Clear Selected Files",
@@ -1323,7 +1338,7 @@ class BaseWindow(QtWidgets.QMainWindow):
         if not self._summary_planes_flash_timer.isActive():
             self._summary_planes_flash_original_style = self.summary_planes.styleSheet()
         self.summary_planes.setStyleSheet("QLabel { background-color: #3a5f8a; }")
-        self._summary_planes_flash_timer.start(400)
+        self._summary_planes_flash_timer.start(SUMMARY_PLANES_FLASH_MS)
 
     def _clear_summary_planes_flash(self) -> None:
         """Restore original stylesheet of AOV summary chip."""
@@ -1344,8 +1359,8 @@ class BaseWindow(QtWidgets.QMainWindow):
         if not planes:
             self.planes_preview.setText("")
             return
-        preview = ", ".join(planes[:4])
-        if len(planes) > 4:
+        preview = ", ".join(planes[:AOV_PREVIEW_PLANE_LIMIT])
+        if len(planes) > AOV_PREVIEW_PLANE_LIMIT:
             preview += ", ..."
         self.planes_preview.setText(preview)
 

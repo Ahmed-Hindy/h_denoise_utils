@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from h_denoise_utils.constants import DEFAULT_DENOISER_TIMEOUT_SECONDS
 from h_denoise_utils.core.config import AOVConfig, DenoiseConfig
 from h_denoise_utils.core.denoiser import Denoiser
 from h_denoise_utils.discovery import bundled_oidn
@@ -84,7 +85,7 @@ def test_denoiser_oidn_backend_runs_optix_compatible_command(monkeypatch, tmp_pa
     output_dir = tmp_path / "out"
     captured = {}
 
-    def fake_run_subprocess(cmd, timeout=300):
+    def fake_run_subprocess(cmd, timeout=DEFAULT_DENOISER_TIMEOUT_SECONDS):
         captured["cmd"] = cmd
         captured["timeout"] = timeout
         output_path = cmd[cmd.index("-o") + 1]
@@ -114,7 +115,7 @@ def test_denoiser_oidn_backend_runs_optix_compatible_command(monkeypatch, tmp_pa
         denoiser.cleanup()
 
     assert result["status"] == "success"
-    assert captured["timeout"] == 300
+    assert captured["timeout"] == DEFAULT_DENOISER_TIMEOUT_SECONDS
     cmd = captured["cmd"]
     assert cmd[0] == str(exe)
     assert cmd[1:4] == ["-v", "1", "-multipart"]

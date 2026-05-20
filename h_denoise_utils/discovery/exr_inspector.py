@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 
 OPENEXR_MAGIC = bytes.fromhex("762f3101")
 OPENEXR_MULTIPART_FLAG = 0x1000
+OPENEXR_UINT_BYTE_COUNT = 4
+OPENEXR_CHANNEL_ENTRY_METADATA_BYTES = 16
 
 
 def _read_cstring(stream, first_byte=b""):
@@ -58,8 +60,8 @@ def _read_header(stream, first_name_byte=b""):
         if not name:
             break
         attr_type = _read_cstring(stream)
-        size_data = stream.read(4)
-        if len(size_data) != 4:
+        size_data = stream.read(OPENEXR_UINT_BYTE_COUNT)
+        if len(size_data) != OPENEXR_UINT_BYTE_COUNT:
             raise EOFError("unexpected EOF while reading EXR attribute size")
         size = struct.unpack("<I", size_data)[0]
         value = stream.read(size)
@@ -83,11 +85,11 @@ def _read_headers(path):
     """
     headers = []
     with open(path, "rb") as stream:
-        magic = stream.read(4)
+        magic = stream.read(OPENEXR_UINT_BYTE_COUNT)
         if magic != OPENEXR_MAGIC:
             return []
-        version_data = stream.read(4)
-        if len(version_data) != 4:
+        version_data = stream.read(OPENEXR_UINT_BYTE_COUNT)
+        if len(version_data) != OPENEXR_UINT_BYTE_COUNT:
             return []
         version_flags = struct.unpack("<I", version_data)[0]
         headers.append(_read_header(stream))
@@ -148,7 +150,7 @@ def _channel_names(attrs):
         if not raw_name:
             break
         names.append(raw_name.decode("utf-8", "replace"))
-        offset += 16
+        offset += OPENEXR_CHANNEL_ENTRY_METADATA_BYTES
     return names
 
 

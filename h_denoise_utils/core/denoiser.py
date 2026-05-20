@@ -8,6 +8,7 @@ import shutil
 import tempfile
 from typing import Any
 
+from ..constants import DEFAULT_DENOISER_TIMEOUT_SECONDS
 from ..discovery.aov_validator import filter_existing_aovs
 from ..discovery.bundled_denoiser import resolve_bundled_denoiser
 from ..discovery.bundled_oidn import resolve_bundled_oidn_denoiser
@@ -261,7 +262,7 @@ class Denoiser:
         )
 
         # Run denoising
-        success, error = run_subprocess(cmd, timeout=300)
+        success, error = run_subprocess(cmd, timeout=DEFAULT_DENOISER_TIMEOUT_SECONDS)
         if not success:
             return {"status": "error", "message": error}
 
