@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Set up CUDA
-        uses: Jimver/cuda-toolkit@v0.2.21
+        uses: Jimver/cuda-toolkit@v0.2.29
         with:
           cuda: "12.9.0"
 
@@ -123,7 +123,7 @@ jobs:
 
     steps:
       - name: Set up CUDA
-        uses: Jimver/cuda-toolkit@v0.2.21
+        uses: Jimver/cuda-toolkit@v0.2.29
         with:
           cuda: "12.9.0"
 
