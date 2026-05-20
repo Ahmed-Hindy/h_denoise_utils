@@ -12,3 +12,4 @@ cmake_layout
 
 [options]
 openimageio/*:shared=False
+openimageio/*:with_ffmpeg=False
