@@ -2,14 +2,19 @@
 
 import logging
 import uuid
+from typing import Callable, Iterator, List
 
 import pytest
 
 from h_denoise_utils import logger as logger_module
 
 
-def _reset_logger(name):
-    # type: (str) -> None
+def _reset_logger(name: str) -> None:
+    """Reset a named logger to its default test-safe state.
+
+    Args:
+        name: Logger name to reset.
+    """
     logger = logging.getLogger(name)
     for handler in list(logger.handlers):
         logger.removeHandler(handler)
@@ -18,8 +23,12 @@ def _reset_logger(name):
     logger.propagate = True
 
 
-def _flush_handlers(logger):
-    # type: (logging.Logger) -> None
+def _flush_handlers(logger: logging.Logger) -> None:
+    """Flush all handlers attached to a logger.
+
+    Args:
+        logger: Logger whose handlers should be flushed.
+    """
     for handler in logger.handlers:
         flush = getattr(handler, "flush", None)
         if flush is not None:
@@ -27,11 +36,23 @@ def _flush_handlers(logger):
 
 
 @pytest.fixture
-def logger_name():
-    created = []
+def logger_name() -> Iterator[Callable[[str], str]]:
+    """Create unique logger names and clean them up after a test.
 
-    def _make(prefix="logger_test"):
-        # type: (str) -> str
+    Yields:
+        Callable that returns a unique logger name for the provided prefix.
+    """
+    created: List[str] = []
+
+    def _make(prefix: str = "logger_test") -> str:
+        """Build a unique logger name for a test.
+
+        Args:
+            prefix: Prefix to include in the generated logger name.
+
+        Returns:
+            Unique logger name.
+        """
         name = f"{prefix}_{uuid.uuid4().hex}"
         created.append(name)
         return name
