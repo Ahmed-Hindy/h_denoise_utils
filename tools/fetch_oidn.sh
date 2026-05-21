@@ -46,6 +46,7 @@ INSTALL_DIR="${VENDOR_ROOT}/oidn-${VERSION}"
 # Check if already installed
 if [ -f "${INSTALL_DIR}/bin/oidnDenoise" ] && \
    [ -f "${INSTALL_DIR}/lib/libOpenImageDenoise.so" ] && \
+   [ -f "${INSTALL_DIR}/lib/libOpenImageDenoise_core.so" ] && \
    [ -f "${INSTALL_DIR}/doc/LICENSE.txt" ]; then
   echo "Bundled OIDN runtime already exists under: ${INSTALL_DIR}"
   exit 0
@@ -92,6 +93,7 @@ fi
 REQUIRED_FILES=(
   "bin/oidnDenoise"
   "lib/libOpenImageDenoise.so"
+  "lib/libOpenImageDenoise_core.so"
   "doc/LICENSE.txt"
   "include/OpenImageDenoise/oidn.h"
 )

@@ -62,6 +62,10 @@ if [ ! -f "${OIDN_ROOT}/lib/libOpenImageDenoise.so" ]; then
   echo "OIDN shared library was not found under ${OIDN_ROOT}. Run tools/fetch_oidn.sh first." >&2
   exit 1
 fi
+if [ ! -f "${OIDN_ROOT}/lib/libOpenImageDenoise_core.so" ]; then
+  echo "OIDN core shared library was not found under ${OIDN_ROOT}. Run tools/fetch_oidn.sh first." >&2
+  exit 1
+fi
 
 if [ -z "${SOURCE_COMMIT}" ]; then
   SOURCE_COMMIT=$(git -C "${REPO_ROOT}" rev-parse HEAD | tr -d '\n')
@@ -139,8 +143,8 @@ fi
 
 # Bundle official OIDN shared libraries (preserve symlinks with cp -P)
 echo "Bundling OIDN shared libraries..."
-cp -P "${OIDN_ROOT}"/lib/libOpenImageDenoise.so* "${BUNDLE_ROOT}/"
-cp -P "${OIDN_ROOT}"/lib/libtbb.so* "${BUNDLE_ROOT}/"
+cp -P "${OIDN_ROOT}"/lib/libOpenImageDenoise*.so* "${BUNDLE_ROOT}/"
+cp -P "${OIDN_ROOT}"/lib/libtbb*.so* "${BUNDLE_ROOT}/"
 
 # Copy Licenses
 for licenseName in LICENSE.txt third-party-programs.txt third-party-programs-DPCPP.txt third-party-programs-oneTBB.txt; do
