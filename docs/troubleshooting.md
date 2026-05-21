@@ -5,6 +5,8 @@
 - Run `.\tools\fetch_optix_denoiser.ps1` from the repo root.
 - Confirm `h_denoise_utils/vendor/optix-denoiser/windows-x64/optix-9.0/Denoiser.exe`
   exists.
+- On Linux, run `./tools/fetch_optix_denoiser.sh` and confirm
+  `h_denoise_utils/vendor/optix-denoiser/linux-x64/optix-9.0/Denoiser` exists.
 
 ## No bundled OIDN denoiser found
 

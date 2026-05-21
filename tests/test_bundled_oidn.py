@@ -11,14 +11,17 @@ from h_denoise_utils.discovery import bundled_oidn
 
 
 def _write_oidn_runtime(tmp_path):
+    import os
+    platform = "windows-x64" if os.name == "nt" else "linux-x64"
+    exe_name = "Denoiser.exe" if os.name == "nt" else "Denoiser"
     root = (
         tmp_path
         / "vendor"
         / "oidn-denoiser"
-        / "windows-x64"
+        / platform
         / f"oidn-{bundled_oidn.PINNED_OIDN_VERSION}"
     )
-    exe = root / "Denoiser.exe"
+    exe = root / exe_name
     exe.parent.mkdir(parents=True)
     exe.write_text("placeholder")
     return root, exe
@@ -39,10 +42,12 @@ def test_legacy_resolver_alias_uses_custom_wrapper(monkeypatch, tmp_path):
 
 
 def test_available_bundled_oidn_runtimes(monkeypatch, tmp_path):
+    import os
+    platform = "windows-x64" if os.name == "nt" else "linux-x64"
     monkeypatch.setattr(bundled_oidn, "_package_root", lambda: tmp_path)
     _root, exe = _write_oidn_runtime(tmp_path)
 
-    assert bundled_oidn.available_bundled_oidn_runtimes() == {"windows-x64": exe}
+    assert bundled_oidn.available_bundled_oidn_runtimes() == {platform: exe}
 
 
 def test_resolve_missing_optional_returns_none(monkeypatch, tmp_path):
@@ -55,7 +60,7 @@ def test_invalid_platform_raises():
     with pytest.raises(ValueError, match="Unsupported OIDN runtime platform"):
         bundled_oidn.resolve_bundled_oidn_denoiser(
             required=False,
-            platform="linux-x64",
+            platform="macos-x64",
         )
 
 

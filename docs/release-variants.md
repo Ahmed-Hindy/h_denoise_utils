@@ -17,17 +17,21 @@ The package includes:
 - The custom Intel OIDN 2.4.1 multipart EXR `Denoiser.exe` wrapper.
 - A GUI backend selector so users can choose OptiX or OIDN per run.
 
-Bundled OptiX runtimes come from:
+Bundled OptiX runtimes come from the support release in this repository:
 
 ```text
-https://github.com/Ahmed-Hindy/NvidiaAIDenoiser/releases/tag/optix-denoiser-v2026.05.18
+https://github.com/Ahmed-Hindy/h_denoise_utils/releases/tag/optix-denoiser-v2026.05.21
 ```
 
-All OptiX variants come from NvidiaAIDenoiser source commit:
+The wrapper source is owned in-tree under `native/optix-denoiser`, imported from
+the historical NvidiaAIDenoiser commit:
 
 ```text
 fc927b7eaa5f0c949226f3d23e302ebb0f4e33cf
 ```
+
+The NVIDIA OptiX SDK headers are not committed. CI checks out `NVIDIA/optix-dev`
+at the pinned SDK commits below when building support assets.
 
 Runtime matrix:
 

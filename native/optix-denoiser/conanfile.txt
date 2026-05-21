@@ -1,5 +1,5 @@
 [requires]
-openimageio/[>=2.4 <4]
+openimageio/[>=2.4 <3]
 openexr/[>=3.2.3 <4]
 imath/[>3.1.9 <4]
 
@@ -13,3 +13,4 @@ cmake_layout
 [options]
 openimageio/*:shared=False
 openimageio/*:with_ffmpeg=False
+openimageio/*:with_opencolorio=False

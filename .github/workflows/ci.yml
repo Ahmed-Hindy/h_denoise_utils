@@ -115,3 +115,85 @@ jobs:
           name: h-denoise-bundled-windows-x64
           path: dist/h-denoise-bundled-windows-x64-v*.zip
           if-no-files-found: error
+
+  package-linux:
+    name: "package / Linux portable"
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      QT_BACKEND: pyside6
+      OIDN_VERSION: "2.4.1"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Qt system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl1 libegl1 libxkbcommon0 libdbus-1-3
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: oidn-conan-${{ runner.os }}-${{ env.OIDN_VERSION }}-${{ hashFiles('native/oidn-denoiser/conanfile.txt') }}
+          restore-keys: |
+            oidn-conan-${{ runner.os }}-${{ env.OIDN_VERSION }}-
+            oidn-conan-${{ runner.os }}-
+
+      - name: Cache OIDN SDK package
+        uses: actions/cache@v4
+        with:
+          path: h_denoise_utils/vendor/oidn/linux-x64/oidn-${{ env.OIDN_VERSION }}
+          key: oidn-sdk-${{ runner.os }}-${{ env.OIDN_VERSION }}
+
+      - name: Install packaging dependencies
+        run: uv sync --frozen --extra pyside6 --extra package
+
+      - name: Fetch bundled OptiX denoiser
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./tools/fetch_optix_denoiser.sh
+
+      - name: Fetch or build bundled OIDN denoiser
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! ./tools/fetch_oidn_denoiser.sh --version "${OIDN_VERSION}" --copy-asset-to-dist; then
+            echo "WARNING: Could not fetch a matching prebuilt OIDN denoiser. Rebuilding from source..."
+            ./tools/build_oidn_denoiser.sh --version "${OIDN_VERSION}"
+          fi
+
+      - name: Validate OIDN UINT channel preservation
+        shell: bash
+        run: |
+          DENOISER=$(find ./h_denoise_utils/vendor/oidn-denoiser/linux-x64 -type f -name "Denoiser" | head -n 1)
+          if [ -z "${DENOISER}" ]; then
+            echo "Could not find bundled OIDN Denoiser" >&2
+            exit 1
+          fi
+          export LD_LIBRARY_PATH="$(dirname "${DENOISER}"):${LD_LIBRARY_PATH:-}"
+          uv run --native-tls --with OpenEXR --with numpy python ./tools/validate_oidn_uint_preservation.py --denoiser "${DENOISER}"
+
+      - name: Build portable package
+        shell: bash
+        run: ./tools/build_linux_package.sh --variant bundled
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: h-denoise-bundled-linux-x64
+          path: dist/h-denoise-bundled-linux-x64-v*.tar.gz
+          if-no-files-found: error

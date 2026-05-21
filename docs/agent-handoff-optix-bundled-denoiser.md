@@ -1,11 +1,14 @@
 # Agent Handoff: Bundled OptiX Branch
 
-Last updated: 2026-05-18
+Last updated: 2026-05-21
 
 > Historical note: this handoff describes the earlier standalone OptiX branch
 > strategy. The current release plan is a combined bundled-runtime app that
 > includes both OptiX and OIDN, with users choosing the backend in the UI.
 > Prefer `docs/release-variants.md` for current release/package instructions.
+> Current OptiX wrapper source is owned in this repository under
+> `native/optix-denoiser`; support assets are published to a non-latest
+> `h_denoise_utils` release instead of `Ahmed-Hindy/NvidiaAIDenoiser`.
 
 ## Goal
 
@@ -19,14 +22,18 @@ This branch is the Houdini-free OptiX release line. Keep `main` as the Houdini-l
 
 ## Pinned Denoisers
 
-- Source repository: `Ahmed-Hindy/NvidiaAIDenoiser`
-- Source commit: `fc927b7eaa5f0c949226f3d23e302ebb0f4e33cf`
-- Release tag: `optix-denoiser-v2026.05.18`
+- Source path: `native/optix-denoiser`
+- Imported source commit: `fc927b7eaa5f0c949226f3d23e302ebb0f4e33cf`
+- Release repository: `Ahmed-Hindy/h_denoise_utils`
+- Release tag: `optix-denoiser-v2026.05.21`
 - Release assets:
-  - `optix-denoiser-windows-x64-optix-8.1-fc927b7.zip`
-  - `optix-denoiser-windows-x64-optix-9.0-fc927b7.zip`
-  - `optix-denoiser-windows-x64-optix-9.1-fc927b7.zip`
-- Fetch script: `tools/fetch_optix_denoiser.ps1`
+  - `optix-denoiser-windows-x64-optix-8.1-<source_key>.zip`
+  - `optix-denoiser-windows-x64-optix-9.0-<source_key>.zip`
+  - `optix-denoiser-windows-x64-optix-9.1-<source_key>.zip`
+  - `optix-denoiser-linux-x64-optix-8.1-<source_key>.zip`
+  - `optix-denoiser-linux-x64-optix-9.0-<source_key>.zip`
+  - `optix-denoiser-linux-x64-optix-9.1-<source_key>.zip`
+- Fetch scripts: `tools/fetch_optix_denoiser.ps1`, `tools/fetch_optix_denoiser.sh`
 - Install paths:
   - `h_denoise_utils/vendor/optix-denoiser/windows-x64/optix-8.1/Denoiser.exe`
   - `h_denoise_utils/vendor/optix-denoiser/windows-x64/optix-9.0/Denoiser.exe`

@@ -1,0 +1,175 @@
+name: Build OptiX Denoiser
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "h_denoise_utils support release tag for published OptiX assets"
+        required: true
+        default: "optix-denoiser-v2026.05.21"
+      upload_to_release:
+        description: "Upload built OptiX assets to the support release"
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.inputs.release_tag || 'default' }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    name: "build / Windows OptiX ${{ matrix.optix-version }}"
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        optix-version: ["8.1", "9.0", "9.1"]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up CUDA
+        uses: Jimver/cuda-toolkit@v0.2.29
+        with:
+          cuda: "12.9.0"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-${{ hashFiles('native/optix-denoiser/conanfile.txt', 'tools/build_optix_denoiser.ps1', 'tools/build_optix_denoiser.sh') }}
+          restore-keys: |
+            optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-
+            optix-conan-${{ runner.os }}-
+
+      - name: Build OptiX denoiser bundle
+        shell: pwsh
+        run: .\tools\build_optix_denoiser.ps1 -OptixVersion "${{ matrix.optix-version }}"
+
+      - name: Upload zip artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: optix-denoiser-windows-x64-optix-${{ matrix.optix-version }}
+          path: dist/optix-denoiser-windows-x64-optix-${{ matrix.optix-version }}-*.zip
+          if-no-files-found: error
+
+  build-linux:
+    name: "build / Linux OptiX ${{ matrix.optix-version }}"
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        optix-version: ["8.1", "9.0", "9.1"]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up CUDA
+        uses: Jimver/cuda-toolkit@v0.2.29
+        with:
+          cuda: "12.9.0"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-${{ hashFiles('native/optix-denoiser/conanfile.txt', 'tools/build_optix_denoiser.ps1', 'tools/build_optix_denoiser.sh') }}
+          restore-keys: |
+            optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-
+            optix-conan-${{ runner.os }}-
+
+      - name: Build OptiX denoiser bundle
+        shell: bash
+        run: ./tools/build_optix_denoiser.sh --optix-version "${{ matrix.optix-version }}"
+
+      - name: Upload zip artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: optix-denoiser-linux-x64-optix-${{ matrix.optix-version }}
+          path: dist/optix-denoiser-linux-x64-optix-${{ matrix.optix-version }}-*.zip
+          if-no-files-found: error
+
+  publish-release:
+    name: "publish / OptiX support release"
+    if: ${{ github.event.inputs.upload_to_release == 'true' }}
+    needs:
+      - build-windows
+      - build-linux
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+          pattern: optix-denoiser-*
+          merge-multiple: true
+
+      - name: Publish support release assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ($PSVersionTable.PSVersion.Major -ge 7) {
+            $PSNativeCommandUseErrorActionPreference = $true
+          }
+          $tag = "${{ github.event.inputs.release_tag }}"
+          $repo = "${{ github.repository }}"
+          $title = "OptiX Denoiser Support Assets $tag"
+          $notes = @"
+          Support release for h_denoise_utils bundled OptiX denoiser assets.
+
+          These zips are consumed by package CI through tools/fetch_optix_denoiser.ps1 and tools/fetch_optix_denoiser.sh. They are intentionally kept separate from end-user v* app releases.
+          "@
+          $notes = $notes.Trim()
+
+          $releaseExists = $true
+          try {
+            gh release view $tag --repo $repo *> $null
+          }
+          catch {
+            $releaseExists = $false
+          }
+
+          if ($releaseExists) {
+            gh release edit $tag --repo $repo --title $title --notes $notes --latest=false
+          }
+          else {
+            gh release create $tag --repo $repo --title $title --notes $notes --target "${{ github.sha }}" --latest=false
+          }
+
+          $assets = Get-ChildItem -LiteralPath "artifacts" -Filter "optix-denoiser-*.zip" -File
+          if ($assets.Count -ne 6) {
+            throw "Expected 6 OptiX denoiser assets, found $($assets.Count)."
+          }
+
+          $existingRelease = gh release view $tag --repo $repo --json assets | ConvertFrom-Json
+          foreach ($existingAsset in $existingRelease.assets) {
+            if ($existingAsset.name -like "optix-denoiser-*.zip") {
+              gh release delete-asset $tag $existingAsset.name --repo $repo --yes
+            }
+          }
+
+          foreach ($asset in $assets) {
+            gh release upload $tag $asset.FullName --repo $repo --clobber
+          }

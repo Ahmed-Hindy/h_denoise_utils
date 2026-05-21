@@ -10,8 +10,8 @@ PINNED_OIDN_RELEASE = "v2.4.1"
 PINNED_OIDN_WINDOWS_ASSET = "oidn-2.4.1.x64.windows.zip"
 PINNED_OIDN_DENOISER_RELEASE = "v*"
 
-DEFAULT_OIDN_PLATFORM = "windows-x64"
-SUPPORTED_OIDN_PLATFORMS = (DEFAULT_OIDN_PLATFORM,)
+DEFAULT_OIDN_PLATFORM = "windows-x64" if os.name == "nt" else "linux-x64"
+SUPPORTED_OIDN_PLATFORMS = ("windows-x64", "linux-x64")
 
 
 def _package_root() -> Path:
@@ -137,13 +137,13 @@ def resolve_bundled_oidn_denoiser(
         return str(candidate)
 
     if required:
-        if os.name != "nt":
+        if sys.platform not in ("win32", "linux"):
             raise FileNotFoundError(
-                "Bundled OIDN discovery is currently pinned to the official Windows x64 package."
+                "Bundled OIDN discovery is currently pinned to official Windows and Linux packages."
             )
         location = getattr(sys, "_MEIPASS", None) or str(_package_root())
         raise FileNotFoundError(
-            f"Bundled OIDN Denoiser.exe was not found. Expected: {candidate}. "
+            f"Bundled OIDN denoiser was not found. Expected: {candidate}. "
             "Run tools/fetch_oidn_denoiser.ps1 or tools/build_oidn_denoiser.ps1 first. "
             f"Package root: {location}"
         )
