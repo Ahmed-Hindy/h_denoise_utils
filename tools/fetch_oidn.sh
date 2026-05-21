@@ -43,10 +43,15 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VENDOR_ROOT="${REPO_ROOT}/h_denoise_utils/vendor/oidn/${PLATFORM}"
 INSTALL_DIR="${VENDOR_ROOT}/oidn-${VERSION}"
 
+has_file_match() {
+  compgen -G "$1" > /dev/null
+}
+
 # Check if already installed
 if [ -f "${INSTALL_DIR}/bin/oidnDenoise" ] && \
    [ -f "${INSTALL_DIR}/lib/libOpenImageDenoise.so" ] && \
-   [ -f "${INSTALL_DIR}/lib/libOpenImageDenoise_core.so" ] && \
+   has_file_match "${INSTALL_DIR}/lib/libOpenImageDenoise_core.so*" && \
+   has_file_match "${INSTALL_DIR}/lib/libOpenImageDenoise_device_cpu.so*" && \
    [ -f "${INSTALL_DIR}/doc/LICENSE.txt" ]; then
   echo "Bundled OIDN runtime already exists under: ${INSTALL_DIR}"
   exit 0
@@ -93,7 +98,6 @@ fi
 REQUIRED_FILES=(
   "bin/oidnDenoise"
   "lib/libOpenImageDenoise.so"
-  "lib/libOpenImageDenoise_core.so"
   "doc/LICENSE.txt"
   "include/OpenImageDenoise/oidn.h"
 )
@@ -101,6 +105,17 @@ for rel in "${REQUIRED_FILES[@]}"; do
   # On Linux, libOpenImageDenoise.so is a symlink, so use -e to verify its existence
   if [ ! -e "${PACKAGE_ROOT}/${rel}" ]; then
     echo "OIDN package is missing required file: ${rel}" >&2
+    exit 1
+  fi
+done
+
+REQUIRED_GLOBS=(
+  "lib/libOpenImageDenoise_core.so*"
+  "lib/libOpenImageDenoise_device_cpu.so*"
+)
+for rel in "${REQUIRED_GLOBS[@]}"; do
+  if ! has_file_match "${PACKAGE_ROOT}/${rel}"; then
+    echo "OIDN package is missing required file matching: ${rel}" >&2
     exit 1
   fi
 done

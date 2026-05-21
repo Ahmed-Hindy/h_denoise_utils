@@ -62,8 +62,12 @@ if [ ! -f "${OIDN_ROOT}/lib/libOpenImageDenoise.so" ]; then
   echo "OIDN shared library was not found under ${OIDN_ROOT}. Run tools/fetch_oidn.sh first." >&2
   exit 1
 fi
-if [ ! -f "${OIDN_ROOT}/lib/libOpenImageDenoise_core.so" ]; then
+if ! compgen -G "${OIDN_ROOT}/lib/libOpenImageDenoise_core.so*" > /dev/null; then
   echo "OIDN core shared library was not found under ${OIDN_ROOT}. Run tools/fetch_oidn.sh first." >&2
+  exit 1
+fi
+if ! compgen -G "${OIDN_ROOT}/lib/libOpenImageDenoise_device_cpu.so*" > /dev/null; then
+  echo "OIDN CPU device shared library was not found under ${OIDN_ROOT}. Run tools/fetch_oidn.sh first." >&2
   exit 1
 fi
 
