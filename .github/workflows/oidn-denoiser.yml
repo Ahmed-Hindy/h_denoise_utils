@@ -36,6 +36,10 @@ on:
       - "tools/build_linux_package.sh"
       - ".github/workflows/oidn-denoiser.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-windows:
     name: "build / OIDN Denoiser.exe"
@@ -82,15 +86,18 @@ jobs:
             --denoiser ".\h_denoise_utils\vendor\oidn-denoiser\windows-x64\oidn-$env:OIDN_VERSION\Denoiser.exe"
 
       - name: Install packaging dependencies
+        if: github.event_name != 'push' || (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/'))
         run: uv sync --frozen --extra pyside6 --extra package
 
       - name: Fetch bundled OptiX denoiser
+        if: github.event_name != 'push' || (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/'))
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: .\tools\fetch_optix_denoiser.ps1
 
       - name: Build bundled portable package
+        if: github.event_name != 'push' || (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/'))
         shell: pwsh
         run: .\tools\build_windows_package.ps1 -Variant bundled
 
@@ -104,6 +111,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload bundled app package artifact
+        if: github.event_name != 'push' || (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/'))
         uses: actions/upload-artifact@v7
         with:
           name: h-denoise-bundled-windows-x64
@@ -161,15 +169,18 @@ jobs:
             --denoiser "./h_denoise_utils/vendor/oidn-denoiser/linux-x64/oidn-${{ env.OIDN_VERSION }}/Denoiser"
 
       - name: Install packaging dependencies
+        if: github.event_name != 'push' || (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/'))
         run: uv sync --frozen --extra pyside6 --extra package
 
       - name: Fetch bundled OptiX denoiser
+        if: github.event_name != 'push' || (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/'))
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: ./tools/fetch_optix_denoiser.sh
 
       - name: Build bundled portable package
+        if: github.event_name != 'push' || (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/'))
         shell: bash
         run: ./tools/build_linux_package.sh --variant bundled
 
@@ -183,6 +194,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload bundled app package artifact
+        if: github.event_name != 'push' || (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/'))
         uses: actions/upload-artifact@v7
         with:
           name: h-denoise-bundled-linux-x64

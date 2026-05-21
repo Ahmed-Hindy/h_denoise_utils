@@ -60,7 +60,7 @@ validate_optix_manifest() {
   local manifest_path="$1"
   local version="$2"
   local expected_optix_commit="${EXPECTED_OPTIX_COMMITS[$version]}"
-  
+
   python3 -c "
 import json, sys
 manifest_path = sys.argv[1]
@@ -151,7 +151,7 @@ for version in "${OPTIX_VERSIONS[@]}"; do
 
   cp "${FOUND_EXE}" "${VARIANT_DIR}/Denoiser"
   cp "${FOUND_MANIFEST}" "${VARIANT_DIR}/manifest.json"
-  
+
   # Copy license if present
   FOUND_LICENSE=$(find "${EXTRACT_DIR}" -type f -name "LICENSE" | head -n 1)
   if [ -n "${FOUND_LICENSE}" ]; then

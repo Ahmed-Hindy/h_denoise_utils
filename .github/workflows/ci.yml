@@ -4,6 +4,10 @@ on:
   push:
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: "pytest / Python ${{ matrix.python-version }}"
@@ -36,7 +40,7 @@ jobs:
 
   package-windows:
     name: "package / Windows portable"
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
     needs: test
     runs-on: windows-2022
     permissions:
@@ -112,7 +116,7 @@ jobs:
 
   package-linux:
     name: "package / Linux portable"
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
     needs: test
     runs-on: ubuntu-22.04
     permissions:

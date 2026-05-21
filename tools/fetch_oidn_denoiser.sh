@@ -220,6 +220,12 @@ if [ -z "${FOUND_MANIFEST}" ]; then
   echo "manifest.json was not found in ${ZIP_PATH}" >&2
   exit 1
 fi
+FOUND_EXE_DIR="$(cd "$(dirname "${FOUND_EXE}")" && pwd)"
+FOUND_MANIFEST_DIR="$(cd "$(dirname "${FOUND_MANIFEST}")" && pwd)"
+if [ "${FOUND_EXE_DIR}" != "${FOUND_MANIFEST_DIR}" ]; then
+  echo "Denoiser and manifest.json must be in the same bundle directory." >&2
+  exit 1
+fi
 
 validate_manifest "${FOUND_MANIFEST}" "${FOUND_EXE}"
 

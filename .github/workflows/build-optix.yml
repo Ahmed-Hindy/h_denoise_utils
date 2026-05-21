@@ -8,11 +8,16 @@ on:
         required: true
         default: "fc927b7eaa5f0c949226f3d23e302ebb0f4e33cf"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.inputs.source_commit || 'default' }}
+  cancel-in-progress: true
+
 jobs:
   build-windows:
     name: "build / Windows OptiX variants"
     runs-on: windows-2022
     strategy:
+      fail-fast: false
       matrix:
         optix-version: ["8.1", "9.0", "9.1"]
     env:
@@ -114,6 +119,7 @@ jobs:
     name: "build / Linux OptiX variants"
     runs-on: ubuntu-22.04
     strategy:
+      fail-fast: false
       matrix:
         optix-version: ["8.1", "9.0", "9.1"]
     env:
