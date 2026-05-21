@@ -40,6 +40,7 @@ class DenoiseWorker(QtCore.QThread):
 
     def run(self) -> None:
         """Run the denoising process."""
+        denoiser = None
         try:
             # Create denoiser
             denoiser = Denoiser(
@@ -106,9 +107,6 @@ class DenoiseWorker(QtCore.QThread):
                         "error",
                     )
 
-            # Cleanup
-            denoiser.cleanup()
-
             # Emit summary
             summary = {
                 "processed": processed,
@@ -126,3 +124,6 @@ class DenoiseWorker(QtCore.QThread):
         except Exception as e:
             self.log_message.emit(f"Error: {str(e)}", "error")
             self.finished.emit({"processed": 0, "skipped": 0, "failed": []})
+        finally:
+            if denoiser is not None:
+                denoiser.cleanup()
