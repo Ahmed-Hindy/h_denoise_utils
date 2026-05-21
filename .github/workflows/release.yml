@@ -5,6 +5,10 @@ on:
     tags:
       - "v*"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   release-windows:
     name: "release / Windows bundled runtime"
@@ -93,43 +97,10 @@ jobs:
           $repo = "${{ github.repository }}"
           $meta = & ".\tools\github_release_metadata.ps1" -Tag $tag
           $appAsset = Get-ChildItem -Path "dist" -Filter "h-denoise-bundled-windows-x64-v*.zip" | Select-Object -First 1
-          $oidnAsset = Get-ChildItem -Path "dist" -Filter "oidn-denoiser-windows-x64-oidn-*.zip" | Select-Object -First 1
           if (-not $appAsset) {
             throw "Bundled app package zip not found"
           }
-          if (-not $oidnAsset) {
-            throw "OIDN denoiser bundle zip not found"
-          }
-
-          $appSha = (& git rev-parse HEAD).Trim()
-          $denoiserRelease = "optix-denoiser-v2026.05.18"
-          $denoiserSha = "fc927b7eaa5f0c949226f3d23e302ebb0f4e33cf"
-          $optix81Sha = "50021ea0af6d41609a97777ceebbdf1e1d34efe7"
-          $optix90Sha = "fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd"
-          $optix91Sha = "f1f6dd803f3159992d248178f6e09421c6eb8b6d"
-          $oidnVersion = "$env:OIDN_VERSION"
-          $variantNotes = @"
-
-          ## Windows Package
-
-          | Package | Artifact | Behavior |
-          | --- | --- | --- |
-          | Bundled runtime | ``$($appAsset.Name)`` | Houdini-free app bundling OptiX 8.1, 9.0, 9.1, and the custom OIDN $oidnVersion multipart EXR denoiser. Users choose OptiX or OIDN in the UI. |
-          | OIDN wrapper bundle | ``$($oidnAsset.Name)`` | Raw custom OIDN ``Denoiser.exe`` runtime bundle for package fetch workflows and smoke validation. |
-
-          ## Build SHAs
-
-          - Bundled app: ``$appSha``
-          - Bundled OptiX denoiser release: ``$denoiserRelease``
-          - Bundled OptiX denoiser source: ``$denoiserSha``
-          - OptiX 8.1 SDK commit: ``$optix81Sha``
-          - OptiX 9.0 SDK commit: ``$optix90Sha``
-          - OptiX 9.1 SDK commit: ``$optix91Sha``
-          - Intel OIDN version: ``$oidnVersion``
-
-          Note: OptiX and OIDN are different denoisers. Output differences are expected and should not be treated as quality superiority without ground truth or visual review.
-          "@
-          $notes = ($meta.Notes.Trim() + "`n" + $variantNotes.Trim()).Trim()
+          $notes = $meta.Notes.Trim()
 
           gh release view $tag --repo $repo *> $null
           if ($LASTEXITCODE -ne 0) {
@@ -138,4 +109,4 @@ jobs:
           else {
             gh release edit $tag --repo $repo --title $meta.Title --notes $notes
           }
-          gh release upload $tag $appAsset.FullName $oidnAsset.FullName --repo $repo --clobber
+          gh release upload $tag $appAsset.FullName --repo $repo --clobber

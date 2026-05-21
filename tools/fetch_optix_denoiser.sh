@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPOSITORY="Ahmed-Hindy/NvidiaAIDenoiser"
-TAG="optix-denoiser-v2026.05.18"
-SOURCE_SHORT_SHA="fc927b7"
+REPOSITORY="Ahmed-Hindy/h_denoise_utils"
+TAG="optix-denoiser-v2026.05.21"
+CONFIGURATION="Release"
 OPTIX_VERSIONS=("8.1" "9.0" "9.1")
+ALLOW_SOURCE_KEY_MISMATCH=""
 
-# Parse args
+declare -A EXPECTED_OPTIX_COMMITS=(
+  ["8.1"]="50021ea0af6d41609a97777ceebbdf1e1d34efe7"
+  ["9.0"]="fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd"
+  ["9.1"]="f1f6dd803f3159992d248178f6e09421c6eb8b6d"
+)
+
 while [[ $# -gt 0 ]]; do
   case $1 in
     --repo)
@@ -17,12 +23,16 @@ while [[ $# -gt 0 ]]; do
       TAG="$2"
       shift 2
       ;;
-    --source-short-sha)
-      SOURCE_SHORT_SHA="$2"
+    --configuration)
+      CONFIGURATION="$2"
       shift 2
       ;;
+    --allow-source-key-mismatch)
+      ALLOW_SOURCE_KEY_MISMATCH="1"
+      shift
+      ;;
     *)
-      echo "Unknown option: $1"
+      echo "Unknown option: $1" >&2
       exit 1
       ;;
   esac
@@ -30,18 +40,65 @@ done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-VENDOR_DIR="${REPO_ROOT}/h_denoise_utils/vendor/optix-denoiser/linux-x64"
+PLATFORM="linux-x64"
+VENDOR_DIR="${REPO_ROOT}/h_denoise_utils/vendor/optix-denoiser/${PLATFORM}"
 
-EXPECTED_SOURCE_COMMIT="fc927b7eaa5f0c949226f3d23e302ebb0f4e33cf"
-declare -A EXPECTED_OPTIX_COMMITS=(
-  ["8.1"]="50021ea0af6d41609a97777ceebbdf1e1d34efe7"
-  ["9.0"]="fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd"
-  ["9.1"]="f1f6dd803f3159992d248178f6e09421c6eb8b6d"
-)
+calculate_source_key() {
+  local version="$1"
+  local optix_commit="$2"
+  python3 -c "
+import hashlib
+import os
+import sys
+
+repo_root = sys.argv[1]
+optix_version = sys.argv[2]
+optix_dev_commit = sys.argv[3]
+platform = sys.argv[4]
+configuration = sys.argv[5]
+
+payload = [
+    f'optix_version={optix_version}',
+    f'optix_dev_commit={optix_dev_commit}',
+    f'platform={platform}',
+    f'configuration={configuration}',
+]
+inputs = [
+    'native/optix-denoiser/CMakeLists.txt',
+    'native/optix-denoiser/conanfile.txt',
+    'native/optix-denoiser/cmake',
+    'native/optix-denoiser/src',
+    'tools/build_optix_denoiser.ps1',
+    'tools/build_optix_denoiser.sh',
+]
+
+for inp in inputs:
+    path = os.path.join(repo_root, inp)
+    if not os.path.exists(path):
+        print(f'Input missing: {path}', file=sys.stderr)
+        sys.exit(1)
+    if os.path.isdir(path):
+        files = []
+        for root, _dirs, names in os.walk(path):
+            for name in names:
+                files.append(os.path.join(root, name))
+    else:
+        files = [path]
+    for file_path in sorted(files):
+        rel = os.path.relpath(file_path, repo_root).replace(os.sep, '/')
+        with open(file_path, 'rb') as stream:
+            digest = hashlib.sha256(stream.read()).hexdigest().lower()
+        payload.append(f'{rel}={digest}')
+
+joined = '\n'.join(payload)
+print(hashlib.sha256(joined.encode('utf-8')).hexdigest().lower())
+" "${REPO_ROOT}" "${version}" "${optix_commit}" "${PLATFORM}" "${CONFIGURATION}"
+}
 
 get_optix_asset_name() {
   local version="$1"
-  echo "optix-denoiser-linux-x64-optix-${version}-${SOURCE_SHORT_SHA}.zip"
+  local source_key="$2"
+  echo "optix-denoiser-${PLATFORM}-optix-${version}-${source_key:0:12}.zip"
 }
 
 get_optix_variant_dir() {
@@ -49,48 +106,77 @@ get_optix_variant_dir() {
   echo "${VENDOR_DIR}/optix-${version}"
 }
 
-test_optix_variant_installed() {
-  local version="$1"
-  local variant_dir
-  variant_dir=$(get_optix_variant_dir "${version}")
-  [ -f "${variant_dir}/Denoiser" ] && [ -f "${variant_dir}/manifest.json" ]
-}
-
 validate_optix_manifest() {
   local manifest_path="$1"
-  local version="$2"
+  local exe_path="$2"
+  local version="$3"
+  local expected_source_key="$4"
   local expected_optix_commit="${EXPECTED_OPTIX_COMMITS[$version]}"
 
   python3 -c "
-import json, sys
+import hashlib
+import json
+import sys
+
 manifest_path = sys.argv[1]
-version = sys.argv[2]
-expected_source = sys.argv[3]
+exe_path = sys.argv[2]
+version = sys.argv[3]
 expected_optix = sys.argv[4]
+expected_platform = sys.argv[5]
+expected_source_key = sys.argv[6]
+allow_mismatch = sys.argv[7] == '1'
 
-with open(manifest_path, 'r') as f:
-    manifest = json.load(f)
+with open(manifest_path, 'r') as stream:
+    manifest = json.load(stream)
 
-if manifest.get('source_commit') != expected_source:
-    sys.exit(f'Bundled denoiser source commit mismatch for OptiX {version}. Expected {expected_source}, got {manifest.get(\"source_commit\")}')
+if manifest.get('name') != 'hdu-optix-denoiser':
+    sys.exit('Bundled OptiX manifest name mismatch')
+if manifest.get('executable') != 'Denoiser':
+    sys.exit('Bundled OptiX manifest executable mismatch')
 if manifest.get('optix_version') != version:
-    sys.exit(f'Bundled denoiser OptiX version mismatch. Expected {version}, got {manifest.get(\"optix_version\")}')
+    sys.exit(f'Bundled OptiX version mismatch. Expected {version}, got {manifest.get(\"optix_version\")}')
 if manifest.get('optix_dev_commit') != expected_optix:
-    sys.exit(f'Bundled denoiser OptiX SDK commit mismatch for OptiX {version}. Expected {expected_optix}, got {manifest.get(\"optix_dev_commit\")}')
-" "${manifest_path}" "${version}" "${EXPECTED_SOURCE_COMMIT}" "${expected_optix_commit}"
+    sys.exit(f'Bundled OptiX SDK commit mismatch for {version}. Expected {expected_optix}, got {manifest.get(\"optix_dev_commit\")}')
+if manifest.get('platform') != expected_platform:
+    sys.exit(f'Bundled OptiX platform mismatch. Expected {expected_platform}, got {manifest.get(\"platform\")}')
+if manifest.get('contract') != 'optix-compatible-multipart-v1':
+    sys.exit('Bundled OptiX manifest contract mismatch')
+
+with open(exe_path, 'rb') as stream:
+    actual_hash = hashlib.sha256(stream.read()).hexdigest().upper()
+if actual_hash != manifest.get('sha256', '').upper():
+    sys.exit('Bundled OptiX executable hash mismatch')
+
+if not allow_mismatch:
+    if not manifest.get('source_key'):
+        sys.exit('Bundled OptiX manifest is missing source_key; rebuild it with the current build script')
+    if manifest.get('source_key') != expected_source_key:
+        sys.exit(f'Bundled OptiX source_key mismatch. Expected {expected_source_key}, got {manifest.get(\"source_key\")}')
+" "${manifest_path}" "${exe_path}" "${version}" "${expected_optix_commit}" "${PLATFORM}" "${expected_source_key}" "${ALLOW_SOURCE_KEY_MISMATCH}"
 }
 
-# Verify and/or download variants
+declare -A EXPECTED_SOURCE_KEYS=()
+for version in "${OPTIX_VERSIONS[@]}"; do
+  EXPECTED_SOURCE_KEYS["${version}"]="$(calculate_source_key "${version}" "${EXPECTED_OPTIX_COMMITS[$version]}")"
+done
+
 all_installed=true
 for version in "${OPTIX_VERSIONS[@]}"; do
-  if ! test_optix_variant_installed "${version}"; then
+  variant_dir=$(get_optix_variant_dir "${version}")
+  exe_path="${variant_dir}/Denoiser"
+  manifest_path="${variant_dir}/manifest.json"
+  if [[ ! -f "${exe_path}" ]] || [[ ! -f "${manifest_path}" ]]; then
+    all_installed=false
+    break
+  fi
+  if ! validate_optix_manifest "${manifest_path}" "${exe_path}" "${version}" "${EXPECTED_SOURCE_KEYS[$version]}"; then
+    echo "Existing OptiX ${version} bundle failed validation. Will re-fetch." >&2
     all_installed=false
     break
   fi
 done
 
-if [ "${all_installed}" = true ]; then
-  # Remove legacy un-nested files if present
+if [[ "${all_installed}" == true ]]; then
   for legacyName in Denoiser manifest.json LICENSE; do
     rm -f "${VENDOR_DIR}/${legacyName}"
   done
@@ -108,12 +194,12 @@ trap cleanup EXIT
 LOCAL_ZIP_DIR="${HDU_OPTIX_DENOISER_ZIP_DIR:-}"
 
 for version in "${OPTIX_VERSIONS[@]}"; do
-  ASSET_NAME=$(get_optix_asset_name "${version}")
+  ASSET_NAME=$(get_optix_asset_name "${version}" "${EXPECTED_SOURCE_KEYS[$version]}")
   ZIP_PATH="${DOWNLOAD_DIR}/${ASSET_NAME}"
 
-  if [ -n "${LOCAL_ZIP_DIR}" ]; then
+  if [[ -n "${LOCAL_ZIP_DIR}" ]]; then
     LOCAL_ZIP="${LOCAL_ZIP_DIR}/${ASSET_NAME}"
-    if [ ! -f "${LOCAL_ZIP}" ]; then
+    if [[ ! -f "${LOCAL_ZIP}" ]]; then
       echo "HDU_OPTIX_DENOISER_ZIP_DIR is missing ${ASSET_NAME}" >&2
       exit 1
     fi
@@ -122,7 +208,7 @@ for version in "${OPTIX_VERSIONS[@]}"; do
     gh release download "${TAG}" --repo "${REPOSITORY}" --pattern "${ASSET_NAME}" --dir "${DOWNLOAD_DIR}"
   fi
 
-  if [ ! -f "${ZIP_PATH}" ]; then
+  if [[ ! -f "${ZIP_PATH}" ]]; then
     echo "Downloaded denoiser asset not found: ${ZIP_PATH}" >&2
     exit 1
   fi
@@ -132,69 +218,73 @@ for version in "${OPTIX_VERSIONS[@]}"; do
   unzip -q "${ZIP_PATH}" -d "${EXTRACT_DIR}"
 
   FOUND_EXE=$(find "${EXTRACT_DIR}" -type f -name "Denoiser" | head -n 1)
-  if [ -z "${FOUND_EXE}" ]; then
+  if [[ -z "${FOUND_EXE}" ]]; then
     echo "Denoiser was not found in ${ZIP_PATH}" >&2
     exit 1
   fi
 
   FOUND_MANIFEST=$(find "${EXTRACT_DIR}" -type f -name "manifest.json" | head -n 1)
-  if [ -z "${FOUND_MANIFEST}" ]; then
+  if [[ -z "${FOUND_MANIFEST}" ]]; then
     echo "manifest.json was not found in ${ZIP_PATH}" >&2
     exit 1
   fi
+  FOUND_EXE_DIR="$(cd "$(dirname "${FOUND_EXE}")" && pwd)"
+  FOUND_MANIFEST_DIR="$(cd "$(dirname "${FOUND_MANIFEST}")" && pwd)"
+  if [[ "${FOUND_EXE_DIR}" != "${FOUND_MANIFEST_DIR}" ]]; then
+    echo "Denoiser and manifest.json must be in the same bundle directory." >&2
+    exit 1
+  fi
 
-  validate_optix_manifest "${FOUND_MANIFEST}" "${version}"
+  validate_optix_manifest "${FOUND_MANIFEST}" "${FOUND_EXE}" "${version}" "${EXPECTED_SOURCE_KEYS[$version]}"
 
   VARIANT_DIR=$(get_optix_variant_dir "${version}")
   rm -rf "${VARIANT_DIR}"
   mkdir -p "${VARIANT_DIR}"
-
-  cp "${FOUND_EXE}" "${VARIANT_DIR}/Denoiser"
-  cp "${FOUND_MANIFEST}" "${VARIANT_DIR}/manifest.json"
-
-  # Copy license if present
-  FOUND_LICENSE=$(find "${EXTRACT_DIR}" -type f -name "LICENSE" | head -n 1)
-  if [ -n "${FOUND_LICENSE}" ]; then
-    cp "${FOUND_LICENSE}" "${VARIANT_DIR}/LICENSE"
-  fi
+  cp -a "${FOUND_EXE_DIR}/." "${VARIANT_DIR}/"
 
   echo "Bundled OptiX ${version} denoiser installed: ${VARIANT_DIR}/Denoiser"
 done
 
-# Cleanup legacy files if present
 for legacyName in Denoiser manifest.json LICENSE; do
   rm -f "${VENDOR_DIR}/${legacyName}"
 done
 
-# Build top-level manifest.json for optix-denoiser base directory
 python3 -c "
-import json, sys
+import json
+import sys
+
 vendor_dir = sys.argv[1]
 repository = sys.argv[2]
 tag = sys.argv[3]
-source_commit = sys.argv[4]
-versions = sys.argv[5].split(',')
-commits = sys.argv[6].split(',')
+versions = sys.argv[4].split(',')
+commits = sys.argv[5].split(',')
+source_keys = sys.argv[6].split(',')
 
 variants = []
-for v, c in zip(versions, commits):
+for version, commit, source_key in zip(versions, commits, source_keys):
     variants.append({
-        'optix_version': v,
-        'optix_dev_commit': c,
-        'executable': f'optix-{v}/Denoiser',
-        'manifest': f'optix-{v}/manifest.json'
+        'optix_version': version,
+        'optix_dev_commit': commit,
+        'source_key': source_key,
+        'executable': f'optix-{version}/Denoiser',
+        'manifest': f'optix-{version}/manifest.json',
     })
 
 summary = {
     'release_repository': f'https://github.com/{repository}',
     'release_tag': tag,
-    'source_commit': source_commit,
     'default_optix_version': '9.0',
-    'variants': variants
+    'variants': variants,
 }
 
-with open(f'{vendor_dir}/manifest.json', 'w') as f:
-    json.dump(summary, f, indent=2)
-" "${VENDOR_DIR}" "${REPOSITORY}" "${TAG}" "${EXPECTED_SOURCE_COMMIT}" "$(IFS=,; echo "${OPTIX_VERSIONS[*]}")" "50021ea0af6d41609a97777ceebbdf1e1d34efe7,fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd,f1f6dd803f3159992d248178f6e09421c6eb8b6d"
+with open(f'{vendor_dir}/manifest.json', 'w') as stream:
+    json.dump(summary, stream, indent=2)
+" \
+  "${VENDOR_DIR}" \
+  "${REPOSITORY}" \
+  "${TAG}" \
+  "$(IFS=,; echo "${OPTIX_VERSIONS[*]}")" \
+  "50021ea0af6d41609a97777ceebbdf1e1d34efe7,fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd,f1f6dd803f3159992d248178f6e09421c6eb8b6d" \
+  "${EXPECTED_SOURCE_KEYS["8.1"]},${EXPECTED_SOURCE_KEYS["9.0"]},${EXPECTED_SOURCE_KEYS["9.1"]}"
 
 echo "Bundled OptiX denoiser variants installed under: ${VENDOR_DIR}"

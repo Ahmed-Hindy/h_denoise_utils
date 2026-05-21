@@ -22,6 +22,10 @@ h_denoise_utils/vendor/optix-denoiser/
 h_denoise_utils/vendor/oidn/
 h_denoise_utils/vendor/oidn-denoiser/
 
+# Build-time NVIDIA OptiX SDK checkout
+native/optix-denoiser/contrib/optix/
+native/optix-denoiser/CMakeUserPresets.json
+
 # Local comparison renders
 comparison_outputs/
 

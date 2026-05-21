@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
-PINNED_DENOISER_RELEASE = "optix-denoiser-v2026.05.18"
+PINNED_DENOISER_RELEASE = "optix-denoiser-v2026.05.21"
 PINNED_DENOISER_COMMIT = "fc927b7eaa5f0c949226f3d23e302ebb0f4e33cf"
 PINNED_OPTIX_SDK_COMMITS = {
     "8.1": "50021ea0af6d41609a97777ceebbdf1e1d34efe7",
