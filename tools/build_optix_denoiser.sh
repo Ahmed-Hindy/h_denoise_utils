@@ -151,7 +151,7 @@ mkdir -p "${BUILD_ROOT}" "${BUNDLE_ROOT}" "${DIST_ROOT}"
 
 cd "${NATIVE_DIR}"
 uv run --native-tls --with conan conan profile detect --force
-uv run --native-tls --with conan conan install . --output-folder "${BUILD_ROOT}" --build=missing -s build_type="${CONFIGURATION}" -s compiler.cppstd=20 -o openimageio/*:with_ffmpeg=False -c tools.system.package_manager:mode=install -c tools.system.package_manager:sudo=True
+uv run --native-tls --with conan conan install . --output-folder "${BUILD_ROOT}" --build=missing -s build_type="${CONFIGURATION}" -s compiler.cppstd=20 -o openimageio/*:with_ffmpeg=False -o openimageio/*:with_opencolorio=False -c tools.system.package_manager:mode=install -c tools.system.package_manager:sudo=True
 
 TOOLCHAIN=$(find "${BUILD_ROOT}" -name conan_toolchain.cmake | head -n 1)
 if [[ -z "${TOOLCHAIN}" ]] || [[ ! -f "${TOOLCHAIN}" ]]; then
