@@ -16,10 +16,10 @@ FIND_PATH(OIIO_INCLUDE_DIR OpenImageIO/imageio.h
 
 FIND_LIBRARY(OIIO_LIBRARY
              NAMES OpenImageIO
-             PATHS 
+             PATHS
              $ENV{OIIO_DIR}/lib
              ${OIIO_DIR}/lib
-             /usr/lib 
+             /usr/lib
              /usr/local/lib
              )
 

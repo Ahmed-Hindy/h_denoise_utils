@@ -19,8 +19,3 @@ LIBS += -lDevIL -lILU -lILUT
 DESTDIR=./bin
 
 DEPENDPATH+=include
-
-
-
-
-

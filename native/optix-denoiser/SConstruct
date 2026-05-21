@@ -78,4 +78,3 @@ ENV.Command("bin/zlib1.dll", "./contrib/OpenImageIO/bin/zlib1.dll", Copy("$TARGE
 
 program = ENV.Program(target="bin/Denoiser", source=SOURCES,
                               LIBPATH=LIBPATH, LIBS=LIBS, LINKFLAGS=LINKFLAGS)
-

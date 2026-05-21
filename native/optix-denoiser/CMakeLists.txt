@@ -38,4 +38,3 @@ target_link_libraries(${PROJECT_NAME}
 # Install app and Conan OpenImageIO artifacts explicitly.
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-
