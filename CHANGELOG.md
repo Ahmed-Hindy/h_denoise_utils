@@ -4,9 +4,52 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [2.0.0] — 2026-05-19
+## [2.0.0] — 2026-05-20
 
 Version 2.0.0: Breaking changes to remove Houdini integration.
+
+### Added
+- Single Houdini-free bundled Windows package with OptiX 8.1, 9.0, 9.1, and
+  custom Intel OIDN 2.4.1 multipart EXR runtimes.
+- GUI backend selector for OptiX vs OIDN, plus an OptiX runtime selector for the
+  bundled 8.1 / 9.0 / 9.1 variants.
+- CLI backend selection with `--backend optix|oidn` and `--optix-version` for
+  headless batch denoise runs.
+- Native OIDN wrapper build/fetch workflow, release asset publishing, and a UINT
+  channel preservation smoke test.
+- Validation and handoff docs for bundled OptiX versions, OIDN bundling, and
+  multipart EXR metadata preservation.
+- Expanded Google-style docstring coverage and added Ruff linting to the
+  development workflow.
+
+### Changed
+- Release workflow now publishes `h-denoise-bundled-windows-x64-vX.Y.Z.zip`
+  and the matching OIDN wrapper bundle from a tag build.
+- Windows package smoke checks validate the frozen app, UI assets, and both
+  bundled runtime families before publishing.
+- OIDN build/fetch tooling now caches reusable wrapper bundles, validates the
+  source key, and reuses matching artifacts in CI and release jobs.
+- File utilities now use `pathlib`, with CLI typing, UI typing, and test
+  annotations modernized under Ruff.
+- EXR/header magic values and other cross-module literals were centralized in
+  shared constants.
+- Documentation now frames the app as a standalone bundled-runtime denoiser
+  instead of a Houdini helper.
+
+### Removed
+- Houdini discovery, `idenoise` / `hoiiotool` integration, SideFX-specific
+  options, and the legacy Houdini-linked release package.
+- Dual-package Houdini/OptiX release variant workflow from the v1.3 line.
+- Development environment overrides for bundled runtime resolution:
+  `HDU_DENOISER_EXE`, `HDU_OPTIX_VERSION`, `HDU_OIDN_DENOISER_EXE`, and
+  `HDU_OIDN_ROOT`.
+- Tracked `.kiro` spec files from the repository.
+
+### Fixed
+- OIDN EXR layer detection, XYZ normal guide channel handling, bundled runtime
+  selection, and OIDN fetch/build cache reuse.
+- Release artifact smoke checks now catch frozen wrapper startup issues before
+  upload.
 
 ## [1.3.0] — 2026-05-17
 

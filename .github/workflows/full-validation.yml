@@ -1,0 +1,121 @@
+name: Full Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      oidn_version:
+        description: Intel Open Image Denoise version
+        required: true
+        default: "2.4.1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: "pytest / Python ${{ matrix.python-version }}"
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Qt system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl1 libegl1 libxkbcommon0 libdbus-1-3
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install dependencies
+        run: uv sync --extra dev --extra pyside6
+
+      - name: Run tests
+        run: uv run pytest --tb=short
+
+  bundled-windows:
+    name: "bundled runtime / Windows"
+    needs: test
+    runs-on: windows-2022
+    permissions:
+      contents: read
+    env:
+      QT_BACKEND: pyside6
+      OIDN_VERSION: ${{ github.event.inputs.oidn_version }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: oidn-conan-${{ runner.os }}-${{ env.OIDN_VERSION }}-${{ hashFiles('native/oidn-denoiser/conanfile.txt') }}
+          restore-keys: |
+            oidn-conan-${{ runner.os }}-${{ env.OIDN_VERSION }}-
+            oidn-conan-${{ runner.os }}-
+
+      - name: Cache OIDN SDK package
+        uses: actions/cache@v4
+        with:
+          path: h_denoise_utils/vendor/oidn/windows-x64/oidn-${{ env.OIDN_VERSION }}
+          key: oidn-sdk-${{ runner.os }}-${{ env.OIDN_VERSION }}
+
+      - name: Build OIDN denoiser bundle
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .\tools\build_oidn_denoiser.ps1 -Version $env:OIDN_VERSION
+
+      - name: Validate OIDN UINT channel preservation
+        shell: pwsh
+        run: |
+          uv run --native-tls --with OpenEXR --with numpy python .\tools\validate_oidn_uint_preservation.py `
+            --denoiser ".\h_denoise_utils\vendor\oidn-denoiser\windows-x64\oidn-$env:OIDN_VERSION\Denoiser.exe"
+
+      - name: Install packaging dependencies
+        run: uv sync --frozen --extra pyside6 --extra package
+
+      - name: Fetch bundled OptiX denoiser
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .\tools\fetch_optix_denoiser.ps1
+
+      - name: Build bundled portable package
+        shell: pwsh
+        run: .\tools\build_windows_package.ps1 -Variant bundled
+
+      - name: Upload OIDN denoiser bundle artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: oidn-denoiser-windows-x64
+          path: |
+            h_denoise_utils/vendor/oidn-denoiser/windows-x64/oidn-${{ env.OIDN_VERSION }}/**
+            dist/oidn-denoiser-windows-x64-oidn-${{ env.OIDN_VERSION }}-*.zip
+          if-no-files-found: error
+
+      - name: Upload bundled app package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: h-denoise-bundled-windows-x64
+          path: dist/h-denoise-bundled-windows-x64-v*.zip
+          if-no-files-found: error

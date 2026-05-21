@@ -46,7 +46,7 @@ Runtime matrix:
 
 ## Supported Workflow
 
-V1 supports the validated multipart EXR workflow:
+Version 2.0 supports the validated multipart EXR workflow:
 
 - multipart EXR input and output
 - beauty, albedo, and normal subimage names

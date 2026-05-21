@@ -2,10 +2,12 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -40,7 +42,7 @@ jobs:
 
   package-windows:
     name: "package / Windows portable"
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: test
     runs-on: windows-2022
     permissions:
@@ -116,7 +118,7 @@ jobs:
 
   package-linux:
     name: "package / Linux portable"
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: test
     runs-on: ubuntu-22.04
     permissions:

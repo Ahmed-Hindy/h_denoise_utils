@@ -8,6 +8,9 @@ on:
         required: true
         default: "2.4.1"
   push:
+    branches:
+      - main
+      - "release/**"
     paths:
       - "native/oidn-denoiser/**"
       - "tools/build_oidn_denoiser.ps1"
@@ -37,7 +40,7 @@ on:
       - ".github/workflows/oidn-denoiser.yml"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
