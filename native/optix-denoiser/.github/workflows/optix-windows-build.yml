@@ -1,0 +1,259 @@
+name: OptiX Windows Builds
+
+on:
+  push:
+    branches:
+      - ci/github-optix-build-experiment
+    tags:
+      - "optix-denoiser-v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Optional GitHub release tag to create/update with all OptiX build zips."
+        required: false
+        type: string
+      release_title:
+        description: "Optional release title. Defaults to the release tag."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  BUILD_TYPE: Release
+  CUDA_VERSION: "12.9.0"
+
+jobs:
+  build-windows:
+    name: Build Denoiser.exe variants
+    runs-on: windows-2022
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Set up CUDA toolkit
+        uses: Jimver/cuda-toolkit@v0.2.35
+        with:
+          cuda: ${{ env.CUDA_VERSION }}
+          method: network
+
+      - name: Install Conan
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "conan>=2,<3"
+          conan --version
+
+      - name: Install C++ dependencies
+        shell: pwsh
+        run: |
+          conan profile detect --force
+          conan install . `
+            --build=missing `
+            -s:h compiler.cppstd=20 `
+            -s:b compiler.cppstd=20 `
+            -s:h build_type=${{ env.BUILD_TYPE }} `
+            -s:b build_type=${{ env.BUILD_TYPE }}
+
+      - name: Build OptiX SDK variants
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $variants = @(
+              [ordered]@{
+                  Label = "8.1"
+                  Tag = "v8.1.0"
+                  Commit = "50021ea0af6d41609a97777ceebbdf1e1d34efe7"
+              },
+              [ordered]@{
+                  Label = "9.0"
+                  Tag = "v9.0.0"
+                  Commit = "fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd"
+              },
+              [ordered]@{
+                  Label = "9.1"
+                  Tag = "v9.1.0"
+                  Commit = "f1f6dd803f3159992d248178f6e09421c6eb8b6d"
+              }
+          )
+
+          git -C contrib/optix fetch --tags origin
+          $shortSha = $env:GITHUB_SHA.Substring(0, 7)
+          $packageRoot = Join-Path $env:GITHUB_WORKSPACE "packages"
+          if (Test-Path -LiteralPath $packageRoot) {
+              Remove-Item -LiteralPath $packageRoot -Recurse -Force
+          }
+          New-Item -ItemType Directory -Path $packageRoot | Out-Null
+
+          foreach ($variant in $variants) {
+              $label = $variant.Label
+              $tag = $variant.Tag
+              $expectedCommit = $variant.Commit
+              Write-Host "Building Denoiser.exe against OptiX $label ($tag)"
+
+              git -C contrib/optix checkout $tag
+              $optixCommit = (& git -C contrib/optix rev-parse HEAD).Trim()
+              if ($optixCommit -ne $expectedCommit) {
+                  throw "OptiX $label expected $expectedCommit but checked out $optixCommit"
+              }
+
+              $buildDir = Join-Path $env:GITHUB_WORKSPACE "build-optix-$label"
+              $outDir = Join-Path $env:GITHUB_WORKSPACE "out-optix-$label"
+              if (Test-Path -LiteralPath $buildDir) {
+                  Remove-Item -LiteralPath $buildDir -Recurse -Force
+              }
+              if (Test-Path -LiteralPath $outDir) {
+                  Remove-Item -LiteralPath $outDir -Recurse -Force
+              }
+
+              cmake -S . -B $buildDir `
+                -G "Visual Studio 17 2022" `
+                -A x64 `
+                -DCMAKE_POLICY_DEFAULT_CMP0091=NEW `
+                -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\build\generators\conan_toolchain.cmake" `
+                -DCMAKE_INSTALL_PREFIX="$outDir"
+
+              cmake --build $buildDir --config ${{ env.BUILD_TYPE }} --parallel
+              cmake --install $buildDir --config ${{ env.BUILD_TYPE }}
+
+              $exe = Join-Path $outDir "bin\Denoiser.exe"
+              if (-not (Test-Path -LiteralPath $exe)) {
+                  throw "Expected executable was not created for OptiX $label`: $exe"
+              }
+
+              $packageDir = Join-Path $env:RUNNER_TEMP "optix-denoiser-windows-x64-optix-$label-$shortSha"
+              $zipPath = Join-Path $packageRoot "optix-denoiser-windows-x64-optix-$label-$shortSha.zip"
+              if (Test-Path -LiteralPath $packageDir) {
+                  Remove-Item -LiteralPath $packageDir -Recurse -Force
+              }
+              New-Item -ItemType Directory -Path $packageDir | Out-Null
+
+              Copy-Item -LiteralPath $exe -Destination (Join-Path $packageDir "Denoiser.exe")
+              Copy-Item -LiteralPath "LICENSE" -Destination (Join-Path $packageDir "LICENSE")
+
+              $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $exe
+              $manifest = [ordered]@{
+                  name = "NvidiaAIDenoiser"
+                  executable = "Denoiser.exe"
+                  source_repository = "https://github.com/${{ github.repository }}.git"
+                  source_ref = "${{ github.ref_name }}"
+                  source_commit = "${{ github.sha }}"
+                  optix_version = $label
+                  optix_dev_repository = "https://github.com/NVIDIA/optix-dev.git"
+                  optix_dev_tag = $tag
+                  optix_dev_commit = $optixCommit
+                  cuda_version = "${{ env.CUDA_VERSION }}"
+                  runner_os = "${{ runner.os }}"
+                  runner_arch = "${{ runner.arch }}"
+                  built_at_utc = (Get-Date).ToUniversalTime().ToString("o")
+                  sha256 = $hash.Hash.ToLowerInvariant()
+                  size_bytes = (Get-Item -LiteralPath $exe).Length
+              }
+              $manifest |
+                  ConvertTo-Json -Depth 4 |
+                  Set-Content -LiteralPath (Join-Path $packageDir "manifest.json") -Encoding utf8NoBOM
+
+              if (Test-Path -LiteralPath $zipPath) {
+                  Remove-Item -LiteralPath $zipPath -Force
+              }
+              Compress-Archive -Path (Join-Path $packageDir "*") -DestinationPath $zipPath -Force
+
+              Write-Host "Packaged $zipPath"
+              Write-Host "OptiX $label Denoiser.exe SHA256 $($hash.Hash)"
+          }
+
+          Get-ChildItem -LiteralPath $packageRoot -Filter "*.zip" |
+              Sort-Object Name |
+              Select-Object Name, Length |
+              Format-Table -AutoSize
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: optix-denoiser-windows-x64-builds-${{ github.sha }}
+          path: packages/*.zip
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish release assets
+    needs: build-windows
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: optix-denoiser-windows-x64-builds-${{ github.sha }}
+          path: release-assets
+
+      - name: Create or update GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $repo = "${{ github.repository }}"
+          $tag = "${{ github.ref_name }}"
+          $title = $tag
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+              $inputTag = "${{ github.event.inputs.release_tag }}".Trim()
+              if ($inputTag) {
+                  $tag = $inputTag
+              }
+              $inputTitle = "${{ github.event.inputs.release_title }}".Trim()
+              if ($inputTitle) {
+                  $title = $inputTitle
+              }
+              else {
+                  $title = $tag
+              }
+          }
+
+          $assets = Get-ChildItem -Path "release-assets" -Recurse -Filter "*.zip" | Sort-Object Name
+          if (-not $assets) {
+              throw "No OptiX build zips were downloaded"
+          }
+
+          $assetRows = $assets | ForEach-Object {
+              $name = $_.Name
+              $optix = if ($name -match 'optix-([0-9]+\.[0-9]+)-') { $Matches[1] } else { "unknown" }
+              "| OptiX $optix | ``$name`` |"
+          }
+          $notes = @"
+          Windows OptiX denoiser builds from source commit ``${{ github.sha }}``.
+
+          | SDK | Artifact |
+          | --- | --- |
+          $($assetRows -join "`n")
+
+          Each zip contains ``Denoiser.exe``, ``LICENSE``, and ``manifest.json``.
+          The manifest records source SHA, OptiX SDK tag/commit, CUDA version, executable SHA256, and executable size.
+          "@
+          $notesPath = Join-Path $env:RUNNER_TEMP "release-notes.md"
+          $notes.Trim() | Set-Content -LiteralPath $notesPath -Encoding utf8NoBOM
+
+          gh release view $tag --repo $repo *> $null
+          if ($LASTEXITCODE -ne 0) {
+              gh release create $tag --repo $repo --target "${{ github.sha }}" --title $title --notes-file $notesPath
+          }
+          else {
+              gh release edit $tag --repo $repo --title $title --notes-file $notesPath
+          }
+
+          $uploadArgs = @("release", "upload", $tag)
+          $uploadArgs += $assets.FullName
+          $uploadArgs += @("--repo", $repo, "--clobber")
+          gh @uploadArgs
