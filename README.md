@@ -6,9 +6,7 @@ Standalone EXR denoising for artists and pipeline users.
 [![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-![h_denoise_utils app screenshot](docs/assets/app-screenshot.png)
-
-[Watch a short demo](docs/assets/h-denoise-demo.mp4)
+https://github.com/user-attachments/assets/477eec96-684d-40f9-ad18-7ba86055a467
 
 ## What It Does
 
