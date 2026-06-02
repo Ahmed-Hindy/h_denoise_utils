@@ -52,16 +52,26 @@ class QtLogHandler(logging.Handler):
         """
         msg = self.format(record)
         ui_level = getattr(record, "ui_level", record.levelname.lower())
-        if self._emitter is None:
-            return
+        self.acquire()
         try:
-            self._emitter.new_record.emit(msg, ui_level)
-        except RuntimeError as exc:
-            if "deleted" not in str(exc).lower():
-                raise
-            self._emitter = None
+            emitter = self._emitter
+            if emitter is None:
+                return
+            try:
+                emitter.new_record.emit(msg, ui_level)
+            except RuntimeError as exc:
+                if "deleted" not in str(exc).lower():
+                    raise
+                if self._emitter is emitter:
+                    self._emitter = None
+        finally:
+            self.release()
 
     def close(self) -> None:
         """Detach from the Qt emitter when the logging handler is closed."""
-        self._emitter = None
-        super().close()
+        self.acquire()
+        try:
+            self._emitter = None
+            super().close()
+        finally:
+            self.release()
