@@ -8,6 +8,8 @@ Standalone EXR denoising for artists and pipeline users.
 
 ![h_denoise_utils app screenshot](docs/assets/app-screenshot.png)
 
+[Watch a short demo](docs/assets/h-denoise-demo.mp4)
+
 ## What It Does
 
 - Denoises OpenEXR image sequences.
