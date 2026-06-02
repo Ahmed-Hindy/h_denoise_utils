@@ -204,10 +204,14 @@ def test_oidn_backend_start_uses_oidn_resolver_and_config(qtbot, tmp_path, monke
             captured["file_list"] = file_list
             self.progress = FakeSignal()
             self.log_message = FakeSignal()
+            self.completed = FakeSignal()
             self.finished = FakeSignal()
 
         def start(self):
             captured["started"] = True
+
+        def deleteLater(self):
+            pass
 
     monkeypatch.setattr(
         main_window_module,

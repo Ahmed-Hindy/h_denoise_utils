@@ -31,7 +31,7 @@ class QtLogHandler(logging.Handler):
             parent: Optional parent QObject for the internal emitter.
         """
         super().__init__()
-        self._emitter = _QtLogEmitter(parent)
+        self._emitter: _QtLogEmitter | None = _QtLogEmitter(parent)
 
     @property
     def new_record(self) -> Signal:
@@ -40,6 +40,8 @@ class QtLogHandler(logging.Handler):
         Returns:
             Signal: Qt signal emitting (formatted_message, levelname).
         """
+        if self._emitter is None:
+            raise RuntimeError("Qt log emitter has been closed")
         return self._emitter.new_record
 
     def emit(self, record: logging.LogRecord) -> None:
@@ -50,4 +52,16 @@ class QtLogHandler(logging.Handler):
         """
         msg = self.format(record)
         ui_level = getattr(record, "ui_level", record.levelname.lower())
-        self._emitter.new_record.emit(msg, ui_level)
+        if self._emitter is None:
+            return
+        try:
+            self._emitter.new_record.emit(msg, ui_level)
+        except RuntimeError as exc:
+            if "deleted" not in str(exc).lower():
+                raise
+            self._emitter = None
+
+    def close(self) -> None:
+        """Detach from the Qt emitter when the logging handler is closed."""
+        self._emitter = None
+        super().close()

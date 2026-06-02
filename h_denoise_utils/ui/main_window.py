@@ -1637,7 +1637,9 @@ class BaseWindow(QtWidgets.QMainWindow):
         )
         self.worker.progress.connect(self._on_progress)
         self.worker.log_message.connect(self._log)
-        self.worker.finished.connect(self._on_finished)
+        self.worker.completed.connect(self._on_finished)
+        self.worker.finished.connect(self._on_worker_thread_finished)
+        self.worker.finished.connect(self.worker.deleteLater)
 
         self._ui_state.is_running = True
         self._ui_state.progress_current = 0
@@ -1694,8 +1696,6 @@ class BaseWindow(QtWidgets.QMainWindow):
         button_style = self.control_btn.style()
         button_style.unpolish(self.control_btn)
         button_style.polish(self.control_btn)
-        self.worker = None
-
         msg = "Processed: {}, Skipped: {}, Failed: {}".format(
             summary.get("processed", 0),
             summary.get("skipped", 0),
@@ -1727,6 +1727,10 @@ class BaseWindow(QtWidgets.QMainWindow):
             remaining = max(0.0, avg * (total - current))
             eta_text = self._format_eta(remaining)
         self.progress_label.setText(f"File {current}/{total} | ETA {eta_text}")
+
+    def _on_worker_thread_finished(self) -> None:
+        """Clear the worker reference after the QThread has actually stopped."""
+        self.worker = None
 
     @staticmethod
     def _format_eta(seconds: float) -> str:

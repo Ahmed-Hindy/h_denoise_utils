@@ -13,7 +13,7 @@ class DenoiseWorker(QtCore.QThread):
     # Signals
     progress = Signal(int, int)  # (current, total)
     log_message = Signal(str, str)  # (message, level)
-    finished = Signal(dict)  # summary dict
+    completed = Signal(dict)  # summary dict
 
     def __init__(
         self,
@@ -61,7 +61,7 @@ class DenoiseWorker(QtCore.QThread):
                     "Preparation failed: {}".format(prep_result.get("message", "Unknown error")),
                     "error",
                 )
-                self.finished.emit({"processed": 0, "skipped": 0, "failed": []})
+                self.completed.emit({"processed": 0, "skipped": 0, "failed": []})
                 return
 
             file_count = prep_result["file_count"]
@@ -114,7 +114,7 @@ class DenoiseWorker(QtCore.QThread):
                 "failed": failed,
                 "output_folder": denoiser.dest_folder,
             }
-            self.finished.emit(summary)
+            self.completed.emit(summary)
 
             if failed:
                 self.log_message.emit(f"Completed with {len(failed)} errors", "warning")
@@ -123,7 +123,7 @@ class DenoiseWorker(QtCore.QThread):
 
         except Exception as e:
             self.log_message.emit(f"Error: {str(e)}", "error")
-            self.finished.emit({"processed": 0, "skipped": 0, "failed": []})
+            self.completed.emit({"processed": 0, "skipped": 0, "failed": []})
         finally:
             if denoiser is not None:
                 denoiser.cleanup()
