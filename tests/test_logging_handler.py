@@ -27,3 +27,32 @@ def test_qt_log_handler_emits_signal(qtbot):
         logger.setLevel(old_level)
 
     assert records == [("Hello", "info")]
+
+
+def test_qt_log_handler_ignores_deleted_signal_source():
+    """A stale GUI log handler must not crash later core logging."""
+
+    class DeletedSignal:
+        def emit(self, msg, level):
+            raise RuntimeError("Signal source has been deleted")
+
+    class DeletedEmitter:
+        new_record = DeletedSignal()
+
+    handler = QtLogHandler()
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    handler._emitter = DeletedEmitter()
+
+    record = logging.LogRecord(
+        "h_denoise_utils.tests.logging_handler",
+        logging.INFO,
+        __file__,
+        1,
+        "Hello",
+        (),
+        None,
+    )
+
+    handler.emit(record)
+
+    assert handler._emitter is None

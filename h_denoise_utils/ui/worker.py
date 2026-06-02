@@ -13,7 +13,7 @@ class DenoiseWorker(QtCore.QThread):
     # Signals
     progress = Signal(int, int)  # (current, total)
     log_message = Signal(str, str)  # (message, level)
-    finished = Signal(dict)  # summary dict
+    completed = Signal(dict)  # summary dict
 
     def __init__(
         self,
@@ -38,6 +38,17 @@ class DenoiseWorker(QtCore.QThread):
         """Request the worker to stop."""
         self._stop_requested = True
 
+    @staticmethod
+    def _error_summary(message: str) -> dict:
+        """Build a completion summary for terminal worker failures."""
+        return {
+            "status": "error",
+            "error": message,
+            "processed": 0,
+            "skipped": 0,
+            "failed": [],
+        }
+
     def run(self) -> None:
         """Run the denoising process."""
         denoiser = None
@@ -57,11 +68,12 @@ class DenoiseWorker(QtCore.QThread):
             prep_result = denoiser.prepare()
 
             if prep_result["status"] != "ready":
+                message = prep_result.get("message", "Unknown error")
                 self.log_message.emit(
-                    "Preparation failed: {}".format(prep_result.get("message", "Unknown error")),
+                    f"Preparation failed: {message}",
                     "error",
                 )
-                self.finished.emit({"processed": 0, "skipped": 0, "failed": []})
+                self.completed.emit(self._error_summary(f"Preparation failed: {message}"))
                 return
 
             file_count = prep_result["file_count"]
@@ -114,7 +126,7 @@ class DenoiseWorker(QtCore.QThread):
                 "failed": failed,
                 "output_folder": denoiser.dest_folder,
             }
-            self.finished.emit(summary)
+            self.completed.emit(summary)
 
             if failed:
                 self.log_message.emit(f"Completed with {len(failed)} errors", "warning")
@@ -123,7 +135,7 @@ class DenoiseWorker(QtCore.QThread):
 
         except Exception as e:
             self.log_message.emit(f"Error: {str(e)}", "error")
-            self.finished.emit({"processed": 0, "skipped": 0, "failed": []})
+            self.completed.emit(self._error_summary(str(e)))
         finally:
             if denoiser is not None:
                 denoiser.cleanup()

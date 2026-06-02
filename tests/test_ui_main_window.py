@@ -6,6 +6,7 @@ from h_denoise_utils import __version__
 from h_denoise_utils.ui import main_window as main_window_module
 from h_denoise_utils.ui.main_window import BaseWindow
 from h_denoise_utils.ui.sections import QWIDGETSIZE_MAX
+from h_denoise_utils.ui.worker import DenoiseWorker
 
 
 def _has_ancestor(widget, ancestor):
@@ -204,10 +205,14 @@ def test_oidn_backend_start_uses_oidn_resolver_and_config(qtbot, tmp_path, monke
             captured["file_list"] = file_list
             self.progress = FakeSignal()
             self.log_message = FakeSignal()
+            self.completed = FakeSignal()
             self.finished = FakeSignal()
 
         def start(self):
             captured["started"] = True
+
+        def deleteLater(self):
+            pass
 
     monkeypatch.setattr(
         main_window_module,
@@ -227,6 +232,60 @@ def test_oidn_backend_start_uses_oidn_resolver_and_config(qtbot, tmp_path, monke
     assert captured["input_path"] == str(input_file)
     assert captured["denoise_config"].backend == "oidn"
     assert captured["denoiser_path"] == str(exe)
+
+
+def test_worker_thread_finished_ignores_stale_sender(qtbot, monkeypatch):
+    window = BaseWindow()
+    qtbot.addWidget(window)
+    old_worker = object()
+    current_worker = object()
+
+    window.worker = current_worker
+    monkeypatch.setattr(BaseWindow, "sender", lambda self: old_worker)
+
+    window._on_worker_thread_finished()
+
+    assert window.worker is current_worker
+
+    monkeypatch.setattr(BaseWindow, "sender", lambda self: current_worker)
+
+    window._on_worker_thread_finished()
+
+    assert window.worker is None
+
+
+def test_finished_error_summary_logs_error(qtbot, monkeypatch):
+    window = BaseWindow()
+    qtbot.addWidget(window)
+    logs = []
+    monkeypatch.setattr(window, "_log", lambda message, level="info": logs.append((message, level)))
+
+    window._on_finished(
+        {
+            "status": "error",
+            "error": "Preparation failed: No image files found",
+            "processed": 0,
+            "skipped": 0,
+            "failed": [],
+        }
+    )
+
+    assert logs[-1] == (
+        "Processed: 0, Skipped: 0, Failed: 0 - Preparation failed: No image files found",
+        "error",
+    )
+
+
+def test_worker_error_summary_marks_terminal_error():
+    summary = DenoiseWorker._error_summary("No image files found")
+
+    assert summary == {
+        "status": "error",
+        "error": "No image files found",
+        "processed": 0,
+        "skipped": 0,
+        "failed": [],
+    }
 
 
 def test_f5_triggers_scan(qtbot, tmp_path):

@@ -1637,7 +1637,9 @@ class BaseWindow(QtWidgets.QMainWindow):
         )
         self.worker.progress.connect(self._on_progress)
         self.worker.log_message.connect(self._log)
-        self.worker.finished.connect(self._on_finished)
+        self.worker.completed.connect(self._on_finished)
+        self.worker.finished.connect(self._on_worker_thread_finished)
+        self.worker.finished.connect(self.worker.deleteLater)
 
         self._ui_state.is_running = True
         self._ui_state.progress_current = 0
@@ -1685,6 +1687,8 @@ class BaseWindow(QtWidgets.QMainWindow):
         Args:
             summary: Metrics dictionary with processing results.
         """
+        failed = summary.get("failed", [])
+        is_error = summary.get("status") == "error"
         self._ui_state.is_running = False
         self._apply_ui_lock(False)
         self.control_btn.setText("Denoise")
@@ -1694,17 +1698,24 @@ class BaseWindow(QtWidgets.QMainWindow):
         button_style = self.control_btn.style()
         button_style.unpolish(self.control_btn)
         button_style.polish(self.control_btn)
-        self.worker = None
-
         msg = "Processed: {}, Skipped: {}, Failed: {}".format(
             summary.get("processed", 0),
             summary.get("skipped", 0),
-            len(summary.get("failed", [])),
+            len(failed),
         )
-        self._log(msg, "success" if not summary.get("failed") else "warning")
+        if is_error and summary.get("error"):
+            msg = f"{msg} - {summary['error']}"
+        if is_error:
+            level = "error"
+        elif failed:
+            level = "warning"
+        else:
+            level = "success"
+        self._log(msg, level)
         if self._run_start:
             elapsed = time.time() - self._run_start
-            self.progress_label.setText(f"Completed in {self._format_eta(elapsed)}")
+            label = "Failed" if is_error else "Completed"
+            self.progress_label.setText(f"{label} in {self._format_eta(elapsed)}")
         self._run_start = None
 
     def _update_progress_label(self, current: int, total: int) -> None:
@@ -1727,6 +1738,12 @@ class BaseWindow(QtWidgets.QMainWindow):
             remaining = max(0.0, avg * (total - current))
             eta_text = self._format_eta(remaining)
         self.progress_label.setText(f"File {current}/{total} | ETA {eta_text}")
+
+    def _on_worker_thread_finished(self) -> None:
+        """Clear the worker reference after the QThread has actually stopped."""
+        sender = self.sender()
+        if sender is not None and (sender is self.worker or sender == self.worker):
+            self.worker = None
 
     @staticmethod
     def _format_eta(seconds: float) -> str:
