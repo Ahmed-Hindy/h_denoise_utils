@@ -14,7 +14,7 @@ h-denoise-bundled-windows-x64-vX.Y.Z.zip
 The package includes:
 
 - OptiX 8.1, 9.0, and 9.1 multipart EXR denoiser runtimes.
-- The custom Intel OIDN 2.4.1 multipart EXR `Denoiser.exe` wrapper.
+- The custom Intel OIDN 2.5.0 multipart EXR `Denoiser.exe` wrapper.
 - A GUI backend selector so users can choose OptiX or OIDN per run.
 
 Bundled OptiX runtimes come from the support release in this repository:
@@ -40,7 +40,7 @@ Runtime matrix:
 | OptiX 8.1 | SDK commit `50021ea0af6d41609a97777ceebbdf1e1d34efe7` | Canyon Run multipart denoise passed; 22 parts; raw EXR header metadata diff count `0`. |
 | OptiX 9.0 | SDK commit `fff65c2a7c592f1ea5f1661ad7d2381cf965f9bd` | Default OptiX runtime; Canyon Run multipart denoise passed; 22 parts; raw EXR header metadata diff count `0`. |
 | OptiX 9.1 | SDK commit `f1f6dd803f3159992d248178f6e09421c6eb8b6d` | Included for newer-driver compatibility and validated on NVIDIA driver `596.49`. |
-| OIDN | Intel Open Image Denoise `2.4.1` | Canyon Run multipart denoise passed; 22 parts; raw EXR header metadata diff count `0`. |
+| OIDN | Intel Open Image Denoise `2.5.0` | Bundled custom multipart EXR wrapper. |
 
 
 

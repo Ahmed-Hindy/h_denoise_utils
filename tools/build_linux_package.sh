@@ -94,7 +94,7 @@ if [ ! -f "${OPTIX_DENOISER}" ]; then
   exit 1
 fi
 
-OIDN_DENOISER="${REPO_ROOT}/h_denoise_utils/vendor/oidn-denoiser/linux-x64/oidn-2.4.1/Denoiser"
+OIDN_DENOISER="${REPO_ROOT}/h_denoise_utils/vendor/oidn-denoiser/linux-x64/oidn-2.5.0/Denoiser"
 if [ ! -f "${OIDN_DENOISER}" ]; then
   echo "Bundled package requires the custom OIDN Denoiser binary. Expected: ${OIDN_DENOISER}" >&2
   exit 1

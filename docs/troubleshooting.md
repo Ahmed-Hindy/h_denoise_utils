@@ -14,7 +14,7 @@
   `OIDN Denoiser` GitHub Actions workflow to build a fresh bundle.
   The fetch script searches released app tags (`v*`) by default; pass
   `-Tag vX.Y.Z` if you need a specific release.
-- Confirm `h_denoise_utils/vendor/oidn-denoiser/windows-x64/oidn-2.4.1/Denoiser.exe`
+- Confirm `h_denoise_utils/vendor/oidn-denoiser/windows-x64/oidn-2.5.0/Denoiser.exe`
   exists.
 
 ## No EXR planes detected
