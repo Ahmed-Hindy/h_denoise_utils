@@ -6,7 +6,7 @@ on:
       oidn_version:
         description: Intel Open Image Denoise version
         required: true
-        default: "2.4.1"
+        default: "2.5.0"
   push:
     branches:
       - main
@@ -49,7 +49,7 @@ jobs:
     runs-on: windows-2022
     env:
       QT_BACKEND: pyside6
-      OIDN_VERSION: ${{ github.event.inputs.oidn_version || '2.4.1' }}
+      OIDN_VERSION: ${{ github.event.inputs.oidn_version || '2.5.0' }}
 
     steps:
       - uses: actions/checkout@v6
@@ -126,7 +126,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       QT_BACKEND: pyside6
-      OIDN_VERSION: ${{ github.event.inputs.oidn_version || '2.4.1' }}
+      OIDN_VERSION: ${{ github.event.inputs.oidn_version || '2.5.0' }}
 
     steps:
       - uses: actions/checkout@v6

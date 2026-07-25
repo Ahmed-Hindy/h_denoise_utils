@@ -3,9 +3,9 @@ set -euo pipefail
 
 REPOSITORY="RenderKit/oidn"
 VERSION="2.5.0"
-TAG="v2.5.0"
+TAG=""
 PLATFORM="linux-x64"
-ASSET_NAME="oidn-${VERSION}.x86_64.linux.tar.gz"
+ASSET_NAME=""
 
 # Parse args
 while [[ $# -gt 0 ]]; do
@@ -32,6 +32,13 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [ -z "${TAG}" ]; then
+  TAG="v${VERSION}"
+fi
+if [ -z "${ASSET_NAME}" ]; then
+  ASSET_NAME="oidn-${VERSION}.x86_64.linux.tar.gz"
+fi
 
 if [ "$PLATFORM" != "linux-x64" ]; then
   echo "Unsupported OIDN platform '$PLATFORM'. This fetcher currently supports linux-x64." >&2

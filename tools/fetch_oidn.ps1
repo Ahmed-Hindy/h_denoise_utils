@@ -1,7 +1,7 @@
 param(
     [string]$Repository = "RenderKit/oidn",
     [string]$Version = "2.5.0",
-    [string]$Tag = "v2.5.0",
+    [string]$Tag = "",
     [string]$AssetName = "",
     [string]$Platform = "windows-x64"
 )
@@ -12,6 +12,9 @@ if ($Platform -ne "windows-x64") {
     throw "Unsupported OIDN platform '$Platform'. This fetcher currently supports windows-x64."
 }
 
+if (-not $Tag) {
+    $Tag = "v$Version"
+}
 if (-not $AssetName) {
     $AssetName = "oidn-$Version.x64.windows.zip"
 }
