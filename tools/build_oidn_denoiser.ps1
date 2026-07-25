@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "2.4.1",
+    [string]$Version = "2.5.0",
     [string]$Configuration = "Release",
     [string]$Platform = "windows-x64",
     [string]$SourceCommit = "",
@@ -98,8 +98,8 @@ New-Item -ItemType Directory -Path $buildRoot, $bundleRoot, $distRoot -Force | O
 
 Push-Location $nativeDir
 try {
-    uv run --native-tls --with conan conan profile detect --force
-    uv run --native-tls --with conan conan install . --output-folder $buildRoot --build=missing -s build_type=$Configuration -s compiler.cppstd=20
+    uv run --system-certs --with conan conan profile detect --force
+    uv run --system-certs --with conan conan install . --output-folder $buildRoot --build=missing -s build_type=$Configuration -s compiler.cppstd=20
 
     $toolchain = Join-Path $buildRoot "build\generators\conan_toolchain.cmake"
     if (-not (Test-Path -LiteralPath $toolchain)) {

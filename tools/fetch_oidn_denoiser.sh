@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPOSITORY="Ahmed-Hindy/h_denoise_utils"
 TAG=""
-VERSION="2.4.1"
+VERSION="2.5.0"
 PLATFORM="linux-x64"
 SOURCE_SHORT_SHA=""
 CONFIGURATION="Release"

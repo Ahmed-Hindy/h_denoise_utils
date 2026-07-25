@@ -10,7 +10,7 @@ Version 2.0.0: Breaking changes to remove Houdini integration.
 
 ### Added
 - Single Houdini-free bundled Windows package with OptiX 8.1, 9.0, 9.1, and
-  custom Intel OIDN 2.4.1 multipart EXR runtimes.
+  custom Intel OIDN 2.5.0 multipart EXR runtimes.
 - GUI backend selector for OptiX vs OIDN, plus an OptiX runtime selector for the
   bundled 8.1 / 9.0 / 9.1 variants.
 - CLI backend selection with `--backend optix|oidn` and `--optix-version` for

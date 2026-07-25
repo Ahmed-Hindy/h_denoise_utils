@@ -27,6 +27,13 @@ def _write_oidn_runtime(tmp_path):
     return root, exe
 
 
+def test_pinned_oidn_release_metadata():
+    """The packaged runtime and fetcher defaults target the same OIDN release."""
+    assert bundled_oidn.PINNED_OIDN_VERSION == "2.5.0"
+    assert bundled_oidn.PINNED_OIDN_RELEASE == "v2.5.0"
+    assert bundled_oidn.PINNED_OIDN_WINDOWS_ASSET == "oidn-2.5.0.x64.windows.zip"
+
+
 def test_resolve_uses_bundled_runtime(monkeypatch, tmp_path):
     monkeypatch.setattr(bundled_oidn, "_package_root", lambda: tmp_path)
     _root, exe = _write_oidn_runtime(tmp_path)

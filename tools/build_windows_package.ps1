@@ -102,7 +102,7 @@ try {
     if (-not (Test-Path -LiteralPath $optixDenoiser)) {
         throw "Bundled package requires the OptiX 9.0 Denoiser.exe. Expected: $optixDenoiser"
     }
-    $oidnDenoiser = Join-Path $repoRoot "h_denoise_utils\vendor\oidn-denoiser\windows-x64\oidn-2.4.1\Denoiser.exe"
+    $oidnDenoiser = Join-Path $repoRoot "h_denoise_utils\vendor\oidn-denoiser\windows-x64\oidn-2.5.0\Denoiser.exe"
     if (-not (Test-Path -LiteralPath $oidnDenoiser)) {
         throw "Bundled package requires the custom OIDN Denoiser.exe. Expected: $oidnDenoiser"
     }

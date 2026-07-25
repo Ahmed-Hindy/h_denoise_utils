@@ -5,13 +5,13 @@ bundled OptiX runtimes.
 
 ## Runtime layout
 
-- Official OIDN runtime package: `v2.4.1`.
-- Official Windows asset: `oidn-2.4.1.x64.windows.zip`.
+- Official OIDN runtime package: `v2.5.0`.
+- Official Windows asset: `oidn-2.5.0.x64.windows.zip`.
 - Custom wrapper executable: `Denoiser.exe`.
 - Packaged vendor layout:
 
 ```text
-h_denoise_utils/vendor/oidn-denoiser/windows-x64/oidn-2.4.1/
+h_denoise_utils/vendor/oidn-denoiser/windows-x64/oidn-2.5.0/
 ├── Denoiser.exe
 ├── OpenImageDenoise*.dll
 ├── tbb*.dll
@@ -41,7 +41,7 @@ Fetch a released wrapper asset with:
 ```
 
 By default the fetch script searches the latest non-draft `v*` app release for
-an `oidn-denoiser-windows-x64-oidn-2.4.1-*.zip` asset. To fetch from a specific
+an `oidn-denoiser-windows-x64-oidn-2.5.0-*.zip` asset. To fetch from a specific
 release, pass the tag explicitly:
 
 ```powershell

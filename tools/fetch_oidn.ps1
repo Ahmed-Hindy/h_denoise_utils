@@ -1,7 +1,7 @@
 param(
     [string]$Repository = "RenderKit/oidn",
-    [string]$Version = "2.4.1",
-    [string]$Tag = "v2.4.1",
+    [string]$Version = "2.5.0",
+    [string]$Tag = "v2.5.0",
     [string]$AssetName = "",
     [string]$Platform = "windows-x64"
 )

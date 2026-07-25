@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 from typing import Dict, Optional
 
-PINNED_OIDN_VERSION = "2.4.1"
-PINNED_OIDN_RELEASE = "v2.4.1"
-PINNED_OIDN_WINDOWS_ASSET = "oidn-2.4.1.x64.windows.zip"
+PINNED_OIDN_VERSION = "2.5.0"
+PINNED_OIDN_RELEASE = "v2.5.0"
+PINNED_OIDN_WINDOWS_ASSET = "oidn-2.5.0.x64.windows.zip"
 PINNED_OIDN_DENOISER_RELEASE = "v*"
 
 DEFAULT_OIDN_PLATFORM = "windows-x64" if os.name == "nt" else "linux-x64"
