@@ -2,9 +2,17 @@ name: Windows Packaging Comparison
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - experiment/nuitka-packaging
+  pull_request:
+    paths:
+      - ".github/workflows/nuitka-package.yml"
+      - "h_denoise_utils/**"
+      - "native/**"
+      - "packaging/**"
+      - "tools/build_windows_nuitka_package.ps1"
+      - "tools/build_windows_package.ps1"
+      - "tools/compare_windows_packages.ps1"
+      - "pyproject.toml"
+      - "uv.lock"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
