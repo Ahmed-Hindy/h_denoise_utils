@@ -1,7 +1,6 @@
 """Lightweight UI state containers."""
 
 from dataclasses import dataclass, field
-from typing import List, Optional
 
 
 @dataclass
@@ -15,7 +14,7 @@ class InputState:
     """
 
     path: str = ""
-    selected_files: List[str] = field(default_factory=list)
+    selected_files: list[str] = field(default_factory=list)
     selected_root: str = ""
 
 
@@ -29,9 +28,9 @@ class AovState:
         last_error: Error message from the last scan, if any.
     """
 
-    planes: List[str] = field(default_factory=list)
-    last_exr: Optional[str] = None
-    last_error: Optional[str] = None
+    planes: list[str] = field(default_factory=list)
+    last_exr: str | None = None
+    last_error: str | None = None
 
 
 @dataclass

@@ -11,7 +11,7 @@ _QT_TEST_FILES = {
     "test_ui_main_window.py",
     "test_ui_tooltips.py",
 }
-_QT_BINDINGS = ("PySide6", "PySide2", "PyQt6", "PyQt5")
+_QT_BINDINGS = ("PySide6", "PyQt6")
 
 
 def _qt_binding_available() -> bool:

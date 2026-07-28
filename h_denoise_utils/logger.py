@@ -8,7 +8,6 @@ application startup and let module loggers use ``logging.getLogger(__name__)``.
 import logging
 import os
 from logging.handlers import RotatingFileHandler
-from typing import Optional
 
 _LOG_DIR_ENV = "H_DENOISE_LOG_DIR"
 _DEFAULT_MAX_BYTES = 2 * 1024 * 1024  # 2 MB
@@ -33,7 +32,7 @@ def _default_log_dir() -> str:
     return os.path.join(base, "h_denoise_utils", "logs")
 
 
-def get_log_dir(log_dir: Optional[str] = None) -> str:
+def get_log_dir(log_dir: str | None = None) -> str:
     """Return the effective log directory for a logger setup call."""
     return log_dir or _default_log_dir()
 
@@ -41,7 +40,7 @@ def get_log_dir(log_dir: Optional[str] = None) -> str:
 def setup_logger(
     name: str,
     level: int = logging.DEBUG,
-    log_dir: Optional[str] = None,
+    log_dir: str | None = None,
     max_bytes: int = _DEFAULT_MAX_BYTES,
     backup_count: int = _DEFAULT_BACKUP_COUNT,
 ) -> logging.Logger:

@@ -1,19 +1,17 @@
 """Command builders for denoiser subprocess execution."""
 
-from typing import List, Optional
-
 
 def build_bundled_multipart_command(
     denoiser_exe: str,
     input_path: str,
     output_path: str,
     *,
-    beauty_plane: Optional[str] = "C",
-    normal_plane: Optional[str] = None,
-    albedo_plane: Optional[str] = None,
-    aovs_to_denoise: Optional[List[str]] = None,
+    beauty_plane: str | None = "C",
+    normal_plane: str | None = None,
+    albedo_plane: str | None = None,
+    aovs_to_denoise: list[str] | None = None,
     verbosity: int = 1,
-) -> List[str]:
+) -> list[str]:
     """Build the bundled multipart Denoiser.exe command.
 
     The custom OptiX and OIDN wrappers intentionally share this CLI contract.
@@ -41,7 +39,7 @@ def build_bundled_multipart_command(
     return cmd
 
 
-def build_bundled_optix_command(*args, **kwargs) -> List[str]:
+def build_bundled_optix_command(*args, **kwargs) -> list[str]:
     """Build the bundled OptiX multipart denoiser command."""
     return build_bundled_multipart_command(*args, **kwargs)
 
@@ -51,13 +49,13 @@ def build_oidn_denoise_command(
     input_path: str,
     output_path: str,
     *,
-    albedo_path: Optional[str] = None,
-    normal_path: Optional[str] = None,
-    device: Optional[str] = None,
-    quality: Optional[str] = None,
-    threads: Optional[int] = None,
+    albedo_path: str | None = None,
+    normal_path: str | None = None,
+    device: str | None = None,
+    quality: str | None = None,
+    threads: int | None = None,
     verbosity: int = 1,
-) -> List[str]:
+) -> list[str]:
     """Build a stock oidnDenoise command for separate feature images.
 
     The official oidnDenoise app is useful as an upstream reference for simple

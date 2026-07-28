@@ -1,8 +1,7 @@
-"""Qt compatibility layer for PySide2, PySide6, PyQt6, and PyQt5."""
+"""Qt compatibility layer for PySide6 and PyQt6."""
 
 import importlib
 import os
-from typing import Optional
 
 try:
     import hou  # type: ignore
@@ -11,23 +10,19 @@ try:
 except (ModuleNotFoundError, NameError):
     isUIAvailable = False
 
-_BACKEND_ORDER = ("pyside6", "pyside2", "pyqt6", "pyqt5")
+_BACKEND_ORDER = ("pyside6", "pyqt6")
 _BACKEND_MODULES = {
     "pyside6": "PySide6",
-    "pyside2": "PySide2",
     "pyqt6": "PyQt6",
-    "pyqt5": "PyQt5",
 }
 
-QT_BACKEND: Optional[str] = os.environ.get("QT_BACKEND", "").lower().strip() or None
+QT_BACKEND: str | None = os.environ.get("QT_BACKEND", "").lower().strip() or None
 
 if isUIAvailable:
-    _backend = "pyside2"
+    _backend = "pyside6"
 elif QT_BACKEND:
     if QT_BACKEND not in _BACKEND_MODULES:
-        raise ValueError(
-            f"Invalid QT_BACKEND: {QT_BACKEND}. Must be one of: pyside6, pyside2, pyqt6, pyqt5"
-        )
+        raise ValueError(f"Invalid QT_BACKEND: {QT_BACKEND}. Must be one of: pyside6, pyqt6")
     _backend = QT_BACKEND
 else:
     _backend = None
@@ -40,9 +35,7 @@ else:
         break
 
 if _backend is None:
-    raise ImportError(
-        "No Qt backend found. Please install one of: PySide6, PySide2, PyQt6, or PyQt5"
-    )
+    raise ImportError("No Qt backend found. Please install one of: PySide6 or PyQt6")
 
 _module = _BACKEND_MODULES[_backend]
 QtCore = importlib.import_module(f"{_module}.QtCore")

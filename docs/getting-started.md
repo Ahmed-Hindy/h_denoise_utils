@@ -4,7 +4,7 @@ This page gets a developer from zero to running the UI and tests.
 
 ## Prerequisites
 
-- Python 3.7+.
+- Python 3.11 (default) or Python 3.13. Python 3.12 is not supported.
 - `uv` installed (recommended).
 - Bundled OptiX and OIDN runtimes available for real denoise runs.
 
