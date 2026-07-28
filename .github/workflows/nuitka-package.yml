@@ -11,6 +11,10 @@ on:
       - "tools/build_windows_nuitka_package.ps1"
       - "tools/build_windows_package.ps1"
       - "tools/compare_windows_packages.ps1"
+      - "tools/fetch_optix_denoiser.ps1"
+      - "tools/fetch_oidn_denoiser.ps1"
+      - "tools/build_oidn_denoiser.ps1"
+      - "tools/validate_oidn_uint_preservation.py"
       - "pyproject.toml"
       - "uv.lock"
 
