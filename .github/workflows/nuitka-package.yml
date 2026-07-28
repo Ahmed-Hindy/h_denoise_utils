@@ -16,6 +16,7 @@ on:
       - "tools/fetch_oidn_denoiser.ps1"
       - "tools/build_oidn_denoiser.ps1"
       - "tools/validate_oidn_uint_preservation.py"
+      - "tools/validate_packaged_oidn_denoise.py"
       - "pyproject.toml"
       - "uv.lock"
 
@@ -117,6 +118,13 @@ jobs:
           }
           "NUITKA_BUILD_SECONDS=$($elapsed.TotalSeconds)" |
             Add-Content -LiteralPath $env:GITHUB_ENV
+
+      - name: Validate packaged OIDN denoise
+        shell: pwsh
+        run: |
+          uv run --system-certs --with OpenEXR --with numpy python `
+            .\tools\validate_packaged_oidn_denoise.py `
+            --app .\dist\h-denoise\h-denoise.exe
 
       - name: Compare packages
         shell: pwsh

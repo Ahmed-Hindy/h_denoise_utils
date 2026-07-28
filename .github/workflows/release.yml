@@ -92,6 +92,13 @@ jobs:
         shell: pwsh
         run: .\tools\build_windows_nuitka_package.ps1 -IncludeBundledRuntimes -ReleasePackage
 
+      - name: Validate packaged OIDN denoise
+        shell: pwsh
+        run: |
+          uv run --system-certs --with OpenEXR --with numpy python `
+            .\tools\validate_packaged_oidn_denoise.py `
+            --app .\dist\h-denoise\h-denoise.exe
+
       - name: Publish GitHub release
         shell: pwsh
         env:
