@@ -16,6 +16,7 @@ pyside6 = ["PySide6-Essentials>=6.8.1"]
 pyqt6 = ["PyQt6>=6.8.1"]
 dev = ["pytest>=7", "pytest-qt", "hypothesis>=6.79.4", "ruff"]
 package = ["pyinstaller>=6.13,<7"]
+package-nuitka = ["nuitka[standalone]>=4.1,<5"]
 
 [project.scripts]
 h-denoise = "h_denoise_utils.__main__:main"
