@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2.0.1] — 2026-07-28
+
+### Changed
+- Windows release packages are now built with Nuitka instead of PyInstaller.
+- The release workflow now bundles the validated Intel OIDN 2.5.0 runtime.
+- The public Windows package name remains `h-denoise-bundled-windows-x64-vX.Y.Z.zip`.
+
+### Improved
+- The Windows download is about 37% smaller and CLI startup is about 56% faster
+  in the same-commit GitHub Actions comparison.
+
 ## [2.0.0] — 2026-05-20
 
 Version 2.0.0: Breaking changes to remove Houdini integration.
