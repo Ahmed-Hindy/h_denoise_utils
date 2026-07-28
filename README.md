@@ -3,8 +3,11 @@
 Standalone EXR denoising for artists and pipeline users.
 
 [![CI](https://github.com/Ahmed-Hindy/h_denoise_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Ahmed-Hindy/h_denoise_utils/actions)
-[![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey)
+![OptiX](https://img.shields.io/badge/OptiX-8.1%20%7C%209.0%20%7C%209.1-76B900?logo=nvidia)
+![C++](https://img.shields.io/badge/C%2B%2B-20-blue)
+[![Python 3.7+](https://img.shields.io/badge/Python-3.7+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 https://github.com/user-attachments/assets/477eec96-684d-40f9-ad18-7ba86055a467
 
