@@ -188,7 +188,7 @@ def test_cli_output_folder_is_optional_and_defaults_to_denoised(monkeypatch, tmp
 
     run_calls = []
 
-    def fake_run_subprocess(cmd, timeout=300):
+    def fake_run_subprocess(cmd, timeout=300, env=None):
         run_calls.append(cmd)
         output_path = cmd[cmd.index("-o") + 1]
         Path(output_path).touch()

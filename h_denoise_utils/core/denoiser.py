@@ -34,6 +34,37 @@ from .config import (
 logger = logging.getLogger(__name__)
 
 
+def _build_denoiser_subprocess_environment(
+    backend: str,
+    denoiser_path: str,
+    *,
+    platform_name: str | None = None,
+    current_env: dict[str, str] | None = None,
+) -> dict[str, str] | None:
+    """Build runtime environment overrides for a denoiser subprocess.
+
+    Args:
+        backend: Denoiser backend key.
+        denoiser_path: Path to the native denoiser executable.
+        platform_name: Optional platform override for tests.
+        current_env: Optional base environment override for tests.
+
+    Returns:
+        Environment mapping for the subprocess, or None when no override is needed.
+    """
+    platform_key = platform_name or os.name
+    if backend != "oidn" or platform_key == "nt":
+        return None
+
+    env = dict(os.environ if current_env is None else current_env)
+    runtime_dir = os.path.dirname(os.path.abspath(denoiser_path))
+    existing = env.get("LD_LIBRARY_PATH")
+    env["LD_LIBRARY_PATH"] = (
+        runtime_dir if not existing else f"{runtime_dir}:{existing}"
+    )
+    return env
+
+
 class Denoiser:
     """Batch image denoiser using bundled multipart Denoiser.exe backends."""
 
@@ -262,7 +293,15 @@ class Denoiser:
         )
 
         # Run denoising
-        success, error = run_subprocess(cmd, timeout=DEFAULT_DENOISER_TIMEOUT_SECONDS)
+        env = _build_denoiser_subprocess_environment(
+            self.denoise_config.backend,
+            self.denoiser_path,
+        )
+        success, error = run_subprocess(
+            cmd,
+            timeout=DEFAULT_DENOISER_TIMEOUT_SECONDS,
+            env=env,
+        )
         if not success:
             return {"status": "error", "message": error}
 
