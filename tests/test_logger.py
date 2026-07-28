@@ -2,7 +2,7 @@
 
 import logging
 import uuid
-from typing import Callable, Iterator, List
+from collections.abc import Callable, Iterator
 
 import pytest
 
@@ -42,7 +42,7 @@ def logger_name() -> Iterator[Callable[[str], str]]:
     Yields:
         Callable that returns a unique logger name for the provided prefix.
     """
-    created: List[str] = []
+    created: list[str] = []
 
     def _make(prefix: str = "logger_test") -> str:
         """Build a unique logger name for a test.

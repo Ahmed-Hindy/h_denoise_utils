@@ -1,7 +1,7 @@
 """Configuration constants and dataclasses for the denoiser."""
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Set
+from typing import Any
 
 # File extensions supported by the bundled multipart denoiser path.
 DEFAULT_INPUT_EXTS = [".exr"]
@@ -10,13 +10,13 @@ DEFAULT_INPUT_EXTS = [".exr"]
 SUPPORTED_BACKENDS = ("optix", "oidn")
 
 # AOVs that should never be denoised (auxiliary data)
-AOVS_NEVER_DENOISE: Set[str] = {"albedo", "normal", "n", "velocity", "motionvectors"}
+AOVS_NEVER_DENOISE: set[str] = {"albedo", "normal", "n", "velocity", "motionvectors"}
 
 # Common beauty/combined plane names across renderers
-BEAUTY_AOV_ALIASES: Set[str] = {"c", "rgba", "rgb", "beauty", "ci"}
+BEAUTY_AOV_ALIASES: set[str] = {"c", "rgba", "rgb", "beauty", "ci"}
 
 # Preset configurations
-PRESETS: Dict[str, Dict[str, any]] = {
+PRESETS: dict[str, dict[str, Any]] = {
     "Beauty": {
         "backend": "optix",
         "temporal": False,
@@ -40,12 +40,12 @@ PRESETS: Dict[str, Dict[str, any]] = {
 class AOVConfig:
     """Configuration for AOV (Arbitrary Output Variable) processing."""
 
-    beauty_plane: Optional[str] = "C"
-    normal_plane: Optional[str] = None
-    albedo_plane: Optional[str] = None
-    motionvectors_plane: Optional[str] = None
-    aovs_to_denoise: Optional[List[str]] = None
-    extra_aovs: Optional[List[str]] = None
+    beauty_plane: str | None = "C"
+    normal_plane: str | None = None
+    albedo_plane: str | None = None
+    motionvectors_plane: str | None = None
+    aovs_to_denoise: list[str] | None = None
+    extra_aovs: list[str] | None = None
 
     def __post_init__(self):
         """Validate configuration after initialization."""
@@ -63,10 +63,10 @@ class DenoiseConfig:
     backend: str = "optix"
     temporal: bool = False
     overwrite: bool = False
-    threads: Optional[int] = None
+    threads: int | None = None
     prefix: str = "den_"
-    exrmode: Optional[int] = None
-    options_json: Optional[str] = None
+    exrmode: int | None = None
+    options_json: str | None = None
 
     def __post_init__(self):
         """Validate configuration after initialization."""
@@ -82,7 +82,7 @@ class DenoiseConfig:
             raise ValueError(f"Invalid threads: {self.threads}. Must be >= 1")
 
 
-def normalize_plane_name(plane: Optional[str]) -> str:
+def normalize_plane_name(plane: str | None) -> str:
     """Normalize plane name to lowercase stripped string.
 
     Args:
@@ -96,7 +96,7 @@ def normalize_plane_name(plane: Optional[str]) -> str:
     return str(plane).strip().lower()
 
 
-def is_beauty_plane(plane: Optional[str]) -> bool:
+def is_beauty_plane(plane: str | None) -> bool:
     """Return True if the plane name matches a common beauty alias.
 
     Args:

@@ -11,14 +11,14 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 import unittest.mock as mock
 
 sys.modules["hou"] = mock.MagicMock()
-sys.modules["PyQt5"] = mock.MagicMock()
-sys.modules["PyQt5.QtCore"] = mock.MagicMock()
-sys.modules["PyQt5.QtGui"] = mock.MagicMock()
-sys.modules["PyQt5.QtWidgets"] = mock.MagicMock()
-sys.modules["PySide2"] = mock.MagicMock()
-sys.modules["PySide2.QtCore"] = mock.MagicMock()
-sys.modules["PySide2.QtGui"] = mock.MagicMock()
-sys.modules["PySide2.QtWidgets"] = mock.MagicMock()
+sys.modules["PySide6"] = mock.MagicMock()
+sys.modules["PySide6.QtCore"] = mock.MagicMock()
+sys.modules["PySide6.QtGui"] = mock.MagicMock()
+sys.modules["PySide6.QtWidgets"] = mock.MagicMock()
+sys.modules["PyQt6"] = mock.MagicMock()
+sys.modules["PyQt6.QtCore"] = mock.MagicMock()
+sys.modules["PyQt6.QtGui"] = mock.MagicMock()
+sys.modules["PyQt6.QtWidgets"] = mock.MagicMock()
 
 # -- Project information
 project = "h_denoise_utils"
@@ -50,7 +50,7 @@ autodoc_default_options = {
     "exclude-members": "__weakref__",
 }
 
-autodoc_mock_imports = ["hou", "PyQt5", "PySide2"]
+autodoc_mock_imports = ["hou", "PySide6", "PyQt6"]
 
 napoleon_google_docstring = True
 napoleon_numpy_docstring = True

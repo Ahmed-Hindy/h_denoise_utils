@@ -3,7 +3,6 @@
 import os
 import sys
 from pathlib import Path
-from typing import Dict, Optional
 
 PINNED_OIDN_VERSION = "2.5.0"
 PINNED_OIDN_RELEASE = "v2.5.0"
@@ -32,7 +31,7 @@ def _oidn_vendor_dir() -> Path:
     return _package_root() / "vendor" / "oidn-denoiser"
 
 
-def _normalize_platform(platform: Optional[str] = None) -> str:
+def _normalize_platform(platform: str | None = None) -> str:
     """Normalize the platform name and validate it.
 
     Args:
@@ -53,7 +52,7 @@ def _normalize_platform(platform: Optional[str] = None) -> str:
     return value
 
 
-def bundled_oidn_root(platform: Optional[str] = None) -> Path:
+def bundled_oidn_root(platform: str | None = None) -> Path:
     """Get the root directory of the bundled OIDN installation.
 
     Args:
@@ -66,7 +65,7 @@ def bundled_oidn_root(platform: Optional[str] = None) -> Path:
     return _oidn_vendor_dir() / platform_key / f"oidn-{PINNED_OIDN_VERSION}"
 
 
-def bundled_oidn_denoiser_path(platform: Optional[str] = None) -> Path:
+def bundled_oidn_denoiser_path(platform: str | None = None) -> Path:
     """Get the path to the bundled OIDN denoiser wrapper executable.
 
     Args:
@@ -78,7 +77,7 @@ def bundled_oidn_denoiser_path(platform: Optional[str] = None) -> Path:
     return bundled_oidn_root(platform) / _exe_name(platform)
 
 
-def bundled_oidn_denoise_path(platform: Optional[str] = None) -> Path:
+def bundled_oidn_denoise_path(platform: str | None = None) -> Path:
     """Return the custom OIDN wrapper path.
 
     Kept as a compatibility alias for the earlier stock oidnDenoise resolver.
@@ -86,7 +85,7 @@ def bundled_oidn_denoise_path(platform: Optional[str] = None) -> Path:
     return bundled_oidn_denoiser_path(platform)
 
 
-def _exe_name(platform: Optional[str] = None) -> str:
+def _exe_name(platform: str | None = None) -> str:
     """Get the OIDN wrapper executable filename.
 
     Args:
@@ -101,7 +100,7 @@ def _exe_name(platform: Optional[str] = None) -> str:
     return "Denoiser"
 
 
-def available_bundled_oidn_runtimes() -> Dict[str, Path]:
+def available_bundled_oidn_runtimes() -> dict[str, Path]:
     """List all available bundled OIDN runtimes.
 
     Returns:
@@ -117,8 +116,8 @@ def available_bundled_oidn_runtimes() -> Dict[str, Path]:
 
 def resolve_bundled_oidn_denoiser(
     required: bool = True,
-    platform: Optional[str] = None,
-) -> Optional[str]:
+    platform: str | None = None,
+) -> str | None:
     """Resolve the path to the bundled OIDN denoiser wrapper.
 
     Args:
@@ -152,7 +151,7 @@ def resolve_bundled_oidn_denoiser(
 
 def resolve_bundled_oidn_denoise(
     required: bool = True,
-    platform: Optional[str] = None,
-) -> Optional[str]:
+    platform: str | None = None,
+) -> str | None:
     """Compatibility alias for the custom OIDN Denoiser.exe resolver."""
     return resolve_bundled_oidn_denoiser(required=required, platform=platform)

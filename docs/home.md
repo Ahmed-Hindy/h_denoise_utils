@@ -10,7 +10,7 @@ using bundled Intel OIDN and NVIDIA OptiX runtimes.
 - Multiple backends (Intel OIDN CPU / NVIDIA OptiX GPU)
 - AOV support with auto-detection
 - Full-featured Qt GUI and headless API
-- Python 3.7+ compatible
+- Python 3.11 and 3.13 compatible
 - Comprehensive test coverage
 
 ## Read This First

@@ -3,7 +3,6 @@
 import os
 import sys
 from pathlib import Path
-from typing import Dict, Optional, Tuple
 
 PINNED_DENOISER_RELEASE = "optix-denoiser-v2026.05.21"
 PINNED_DENOISER_COMMIT = "fc927b7eaa5f0c949226f3d23e302ebb0f4e33cf"
@@ -73,7 +72,7 @@ def _normalize_optix_version(optix_version: str) -> str:
     return value
 
 
-def _requested_optix_version(optix_version: Optional[str]) -> Tuple[str, bool]:
+def _requested_optix_version(optix_version: str | None) -> tuple[str, bool]:
     """Determine the requested OptiX version and if it was explicitly specified.
 
     Args:
@@ -94,7 +93,7 @@ def legacy_bundled_denoiser_path() -> Path:
     return _denoiser_base_dir() / _exe_name()
 
 
-def bundled_denoiser_path(optix_version: Optional[str] = None) -> Path:
+def bundled_denoiser_path(optix_version: str | None = None) -> Path:
     """Get the path to the bundled denoiser for a specific OptiX version.
 
     Args:
@@ -107,7 +106,7 @@ def bundled_denoiser_path(optix_version: Optional[str] = None) -> Path:
     return _denoiser_base_dir() / f"optix-{version}" / _exe_name()
 
 
-def available_bundled_denoisers() -> Dict[str, Path]:
+def available_bundled_denoisers() -> dict[str, Path]:
     """List all available bundled OptiX denoiser executables.
 
     Returns:
@@ -123,8 +122,8 @@ def available_bundled_denoisers() -> Dict[str, Path]:
 
 def resolve_bundled_denoiser(
     required: bool = True,
-    optix_version: Optional[str] = None,
-) -> Optional[str]:
+    optix_version: str | None = None,
+) -> str | None:
     """Resolve the path to the bundled OptiX denoiser.
 
     Args:

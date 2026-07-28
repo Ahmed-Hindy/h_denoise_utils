@@ -6,7 +6,7 @@ Standalone EXR denoising for artists and pipeline users.
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey)
 ![OptiX](https://img.shields.io/badge/OptiX-8.1%20%7C%209.0%20%7C%209.1-76B900?logo=nvidia)
 ![C++](https://img.shields.io/badge/C%2B%2B-20-blue)
-[![Python 3.7+](https://img.shields.io/badge/Python-3.7+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11 | 3.13](https://img.shields.io/badge/Python-3.11%20%7C%203.13-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 https://github.com/user-attachments/assets/477eec96-684d-40f9-ad18-7ba86055a467
@@ -40,7 +40,8 @@ uv sync --extra pyside6
 uv run h-denoise
 ```
 
-If you prefer another Qt binding, use `--extra pyside2` or `--extra pyqt5`.
+Python 3.11 is the default. Python 3.13 is also supported; Python 3.12 is intentionally excluded.
+To use PyQt6 instead of PySide6, run `uv sync --extra pyqt6`.
 
 ## Command Line
 
