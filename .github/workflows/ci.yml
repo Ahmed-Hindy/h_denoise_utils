@@ -41,7 +41,7 @@ jobs:
         run: uv run pytest --tb=short
 
   package-windows:
-    name: "package / Windows portable"
+    name: "package / Windows Nuitka"
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: test
     runs-on: windows-2022
@@ -77,7 +77,7 @@ jobs:
           key: oidn-sdk-${{ runner.os }}-${{ env.OIDN_VERSION }}
 
       - name: Install packaging dependencies
-        run: uv sync --frozen --extra pyside6 --extra package
+        run: uv sync --frozen --extra pyside6 --extra package-nuitka
 
       - name: Fetch bundled OptiX denoiser
         shell: pwsh
@@ -109,9 +109,16 @@ jobs:
             .\tools\validate_oidn_uint_preservation.py `
             --denoiser $denoiser
 
-      - name: Build portable package
+      - name: Build Nuitka release package
         shell: pwsh
-        run: .\tools\build_windows_package.ps1 -Variant bundled
+        run: .\tools\build_windows_nuitka_package.ps1 -IncludeBundledRuntimes -ReleasePackage
+
+      - name: Validate packaged OIDN denoise
+        shell: pwsh
+        run: |
+          uv run --system-certs --with OpenEXR --with numpy python `
+            .\tools\validate_packaged_oidn_denoise.py `
+            --app .\dist\h-denoise\h-denoise.exe
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
@@ -194,6 +201,15 @@ jobs:
       - name: Build portable package
         shell: bash
         run: ./tools/build_linux_package.sh --variant bundled
+
+      - name: Validate packaged OIDN denoise
+        shell: bash
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          uv run --system-certs --with OpenEXR --with numpy python \
+            ./tools/validate_packaged_oidn_denoise.py \
+            --app ./dist/h-denoise/h-denoise
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
