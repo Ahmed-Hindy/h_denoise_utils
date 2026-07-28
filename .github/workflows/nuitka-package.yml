@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/nuitka-package.yml"
+      - ".github/workflows/release.yml"
       - "h_denoise_utils/**"
       - "native/**"
       - "packaging/**"
@@ -82,17 +83,13 @@ jobs:
       - name: Validate OIDN UINT channel preservation
         shell: pwsh
         run: |
-          $denoiser = Get-ChildItem `
-            -LiteralPath ".\h_denoise_utils\vendor\oidn-denoiser\windows-x64\oidn-$env:OIDN_VERSION" `
-            -Filter "Denoiser.exe" `
-            -Recurse |
-            Select-Object -First 1
-          if (-not $denoiser) {
-            throw "Could not find bundled OIDN Denoiser.exe"
+          $denoiser = ".\h_denoise_utils\vendor\oidn-denoiser\windows-x64\oidn-$env:OIDN_VERSION\Denoiser.exe"
+          if (-not (Test-Path -LiteralPath $denoiser)) {
+            throw "Could not find bundled OIDN Denoiser.exe: $denoiser"
           }
           uv run --system-certs --with OpenEXR --with numpy python `
             .\tools\validate_oidn_uint_preservation.py `
-            --denoiser $denoiser.FullName
+            --denoiser $denoiser
 
       - name: Build PyInstaller package
         shell: pwsh
@@ -103,11 +100,20 @@ jobs:
           "PYINSTALLER_BUILD_SECONDS=$($elapsed.TotalSeconds)" |
             Add-Content -LiteralPath $env:GITHUB_ENV
 
-      - name: Build Nuitka package
+      - name: Preserve PyInstaller fallback
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path "pyproject.toml" -Pattern '^version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          Move-Item -LiteralPath ".\dist\h-denoise" -Destination ".\dist\h-denoise-pyinstaller"
+          Move-Item `
+            -LiteralPath ".\dist\h-denoise-bundled-windows-x64-v$version.zip" `
+            -Destination ".\dist\h-denoise-pyinstaller-windows-x64-v$version.zip"
+
+      - name: Build Nuitka release package
         shell: pwsh
         run: |
           $elapsed = Measure-Command {
-            .\tools\build_windows_nuitka_package.ps1 -IncludeBundledRuntimes
+            .\tools\build_windows_nuitka_package.ps1 -IncludeBundledRuntimes -ReleasePackage
           }
           "NUITKA_BUILD_SECONDS=$($elapsed.TotalSeconds)" |
             Add-Content -LiteralPath $env:GITHUB_ENV
@@ -123,14 +129,14 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: h-denoise-nuitka-bundled-windows-x64
-          path: dist/h-denoise-nuitka-windows-x64-v*.zip
+          path: dist/h-denoise-bundled-windows-x64-v*.zip
           if-no-files-found: error
 
       - name: Upload PyInstaller package
         uses: actions/upload-artifact@v7
         with:
           name: h-denoise-pyinstaller-bundled-windows-x64
-          path: dist/h-denoise-bundled-windows-x64-v*.zip
+          path: dist/h-denoise-pyinstaller-windows-x64-v*.zip
           if-no-files-found: error
 
       - name: Upload comparison report

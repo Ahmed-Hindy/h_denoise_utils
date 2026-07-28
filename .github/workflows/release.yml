@@ -17,7 +17,7 @@ jobs:
       contents: write
     env:
       QT_BACKEND: pyside6
-      OIDN_VERSION: "2.4.1"
+      OIDN_VERSION: "2.5.0"
 
     steps:
       - name: Checkout release tag
@@ -77,16 +77,20 @@ jobs:
       - name: Validate OIDN UINT channel preservation
         shell: pwsh
         run: |
-          $denoiser = Get-ChildItem -LiteralPath ".\h_denoise_utils\vendor\oidn-denoiser\windows-x64" -Filter "Denoiser.exe" -Recurse | Select-Object -First 1
-          if (-not $denoiser) { throw "Could not find bundled OIDN Denoiser.exe" }
-          uv run --native-tls --with OpenEXR --with numpy python .\tools\validate_oidn_uint_preservation.py --denoiser $denoiser.FullName
+          $denoiser = ".\h_denoise_utils\vendor\oidn-denoiser\windows-x64\oidn-$env:OIDN_VERSION\Denoiser.exe"
+          if (-not (Test-Path -LiteralPath $denoiser)) {
+            throw "Could not find bundled OIDN Denoiser.exe: $denoiser"
+          }
+          uv run --system-certs --with OpenEXR --with numpy python `
+            .\tools\validate_oidn_uint_preservation.py `
+            --denoiser $denoiser
 
       - name: Install packaging dependencies
-        run: uv sync --frozen --extra pyside6 --extra package
+        run: uv sync --frozen --extra pyside6 --extra package-nuitka
 
-      - name: Build bundled package
+      - name: Build Nuitka bundled package
         shell: pwsh
-        run: .\tools\build_windows_package.ps1 -Variant bundled
+        run: .\tools\build_windows_nuitka_package.ps1 -IncludeBundledRuntimes -ReleasePackage
 
       - name: Publish GitHub release
         shell: pwsh

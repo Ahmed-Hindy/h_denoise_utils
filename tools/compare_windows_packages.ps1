@@ -148,14 +148,14 @@ $version = $versionMatch.Matches[0].Groups[1].Value
 
 $nuitka = Get-PackageMetrics `
     -Name "Nuitka" `
-    -Directory (Join-Path $distDir "h-denoise-nuitka") `
-    -Archive (Join-Path $distDir "h-denoise-nuitka-windows-x64-v$version.zip") `
+    -Directory (Join-Path $distDir "h-denoise") `
+    -Archive (Join-Path $distDir "h-denoise-bundled-windows-x64-v$version.zip") `
     -BuildSeconds $NuitkaBuildSeconds `
     -StartupIterations $Iterations
 $pyinstaller = Get-PackageMetrics `
     -Name "PyInstaller" `
-    -Directory (Join-Path $distDir "h-denoise") `
-    -Archive (Join-Path $distDir "h-denoise-bundled-windows-x64-v$version.zip") `
+    -Directory (Join-Path $distDir "h-denoise-pyinstaller") `
+    -Archive (Join-Path $distDir "h-denoise-pyinstaller-windows-x64-v$version.zip") `
     -BuildSeconds $PyInstallerBuildSeconds `
     -StartupIterations $Iterations
 
