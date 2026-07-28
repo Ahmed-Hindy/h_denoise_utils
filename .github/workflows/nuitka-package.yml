@@ -1,0 +1,117 @@
+name: Nuitka Package
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - experiment/nuitka-packaging
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package-windows:
+    name: "Nuitka / Windows bundled"
+    runs-on: windows-2022
+    permissions:
+      contents: read
+    env:
+      QT_BACKEND: pyside6
+      OIDN_VERSION: "2.5.0"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.11"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: nuitka-oidn-conan-${{ runner.os }}-${{ env.OIDN_VERSION }}-${{ hashFiles('native/oidn-denoiser/conanfile.txt') }}
+          restore-keys: |
+            nuitka-oidn-conan-${{ runner.os }}-${{ env.OIDN_VERSION }}-
+            nuitka-oidn-conan-${{ runner.os }}-
+
+      - name: Cache OIDN SDK package
+        uses: actions/cache@v4
+        with:
+          path: h_denoise_utils/vendor/oidn/windows-x64/oidn-${{ env.OIDN_VERSION }}
+          key: nuitka-oidn-sdk-${{ runner.os }}-${{ env.OIDN_VERSION }}
+
+      - name: Install packaging dependencies
+        run: uv sync --frozen --extra pyside6 --extra package-nuitka
+
+      - name: Fetch bundled OptiX denoisers
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .\tools\fetch_optix_denoiser.ps1
+
+      - name: Fetch or build bundled OIDN denoiser
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          try {
+            .\tools\fetch_oidn_denoiser.ps1 -Version $env:OIDN_VERSION -CopyAssetToDist
+          }
+          catch {
+            Write-Warning "Could not fetch a matching OIDN bundle: $($_.Exception.Message)"
+            .\tools\build_oidn_denoiser.ps1 -Version $env:OIDN_VERSION
+          }
+
+      - name: Validate OIDN UINT channel preservation
+        shell: pwsh
+        run: |
+          $denoiser = Get-ChildItem `
+            -LiteralPath ".\h_denoise_utils\vendor\oidn-denoiser\windows-x64\oidn-$env:OIDN_VERSION" `
+            -Filter "Denoiser.exe" `
+            -Recurse |
+            Select-Object -First 1
+          if (-not $denoiser) {
+            throw "Could not find bundled OIDN Denoiser.exe"
+          }
+          uv run --native-tls --with OpenEXR --with numpy python `
+            .\tools\validate_oidn_uint_preservation.py `
+            --denoiser $denoiser.FullName
+
+      - name: Build Nuitka package
+        shell: pwsh
+        run: .\tools\build_windows_nuitka_package.ps1 -IncludeBundledRuntimes
+
+      - name: Add package summary
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem -LiteralPath ".\dist" -Filter "h-denoise-nuitka-windows-x64-v*.zip" |
+            Select-Object -First 1
+          if (-not $zip) {
+            throw "Nuitka ZIP was not created."
+          }
+          $sizeMb = [math]::Round($zip.Length / 1MB, 2)
+          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "## Nuitka package"
+          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "- Artifact: ``$($zip.Name)``"
+          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "- ZIP size: **$sizeMb MB**"
+          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "- Python: **3.11**"
+          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "- Compiler: **MSVC on windows-2022**"
+
+      - name: Upload Nuitka package
+        uses: actions/upload-artifact@v7
+        with:
+          name: h-denoise-nuitka-bundled-windows-x64
+          path: dist/h-denoise-nuitka-windows-x64-v*.zip
+          if-no-files-found: error
+
+      - name: Upload Nuitka compilation report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: h-denoise-nuitka-compilation-report
+          path: build/nuitka-windows/compilation-report.xml
+          if-no-files-found: warn
