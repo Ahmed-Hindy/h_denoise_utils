@@ -1,5 +1,6 @@
 param(
-    [switch]$IncludeBundledRuntimes
+    [switch]$IncludeBundledRuntimes,
+    [switch]$ReleasePackage
 )
 
 $ErrorActionPreference = "Stop"
@@ -100,6 +101,10 @@ function Invoke-FrozenExecutableCheck {
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+if ($ReleasePackage -and -not $IncludeBundledRuntimes) {
+    throw "ReleasePackage requires IncludeBundledRuntimes."
+}
+
 Push-Location $repoRoot
 try {
     foreach ($name in @(
@@ -153,8 +158,15 @@ try {
 
     $buildRoot = Join-Path $repoRoot "build\nuitka-windows"
     $compiledDir = Join-Path $buildRoot "nuitka_entry.dist"
-    $appDir = Join-Path $repoRoot "dist\h-denoise-nuitka"
-    $zipPath = Join-Path $repoRoot "dist\h-denoise-nuitka-windows-x64-v$version.zip"
+    $appDirectoryName = if ($ReleasePackage) { "h-denoise" } else { "h-denoise-nuitka" }
+    $archiveName = if ($ReleasePackage) {
+        "h-denoise-bundled-windows-x64-v$version.zip"
+    }
+    else {
+        "h-denoise-nuitka-windows-x64-v$version.zip"
+    }
+    $appDir = Join-Path $repoRoot "dist\$appDirectoryName"
+    $zipPath = Join-Path $repoRoot "dist\$archiveName"
 
     Remove-Item -LiteralPath $buildRoot, $appDir -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue
