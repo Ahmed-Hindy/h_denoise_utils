@@ -6,7 +6,10 @@ import pytest
 
 from h_denoise_utils.constants import DEFAULT_DENOISER_TIMEOUT_SECONDS
 from h_denoise_utils.core.config import AOVConfig, DenoiseConfig
-from h_denoise_utils.core.denoiser import Denoiser
+from h_denoise_utils.core.denoiser import (
+    Denoiser,
+    _build_denoiser_subprocess_environment,
+)
 from h_denoise_utils.discovery import bundled_oidn
 
 
@@ -25,6 +28,43 @@ def _write_oidn_runtime(tmp_path):
     exe.parent.mkdir(parents=True)
     exe.write_text("placeholder")
     return root, exe
+
+
+def test_oidn_posix_subprocess_environment_prepends_runtime(tmp_path):
+    runtime = tmp_path / "oidn" / "Denoiser"
+    environment = _build_denoiser_subprocess_environment(
+        "oidn",
+        str(runtime),
+        platform_name="posix",
+        current_env={"LD_LIBRARY_PATH": "/existing", "KEEP": "value"},
+    )
+
+    assert environment is not None
+    assert environment["LD_LIBRARY_PATH"] == f"{runtime.parent}:/existing"
+    assert environment["KEEP"] == "value"
+
+
+def test_denoiser_subprocess_environment_skips_windows_and_optix(tmp_path):
+    runtime = tmp_path / "oidn" / "Denoiser.exe"
+
+    assert (
+        _build_denoiser_subprocess_environment(
+            "oidn",
+            str(runtime),
+            platform_name="nt",
+            current_env={},
+        )
+        is None
+    )
+    assert (
+        _build_denoiser_subprocess_environment(
+            "optix",
+            str(runtime),
+            platform_name="posix",
+            current_env={},
+        )
+        is None
+    )
 
 
 def test_pinned_oidn_release_metadata():
@@ -97,15 +137,24 @@ def test_denoiser_oidn_backend_runs_optix_compatible_command(monkeypatch, tmp_pa
     output_dir = tmp_path / "out"
     captured = {}
 
-    def fake_run_subprocess(cmd, timeout=DEFAULT_DENOISER_TIMEOUT_SECONDS):
+    def fake_run_subprocess(
+        cmd,
+        timeout=DEFAULT_DENOISER_TIMEOUT_SECONDS,
+        env=None,
+    ):
         captured["cmd"] = cmd
         captured["timeout"] = timeout
+        captured["env"] = env
         output_path = cmd[cmd.index("-o") + 1]
         with open(output_path, "wb") as stream:
             stream.write(b"denoised")
         return True, ""
 
     monkeypatch.setattr("h_denoise_utils.core.denoiser.run_subprocess", fake_run_subprocess)
+    monkeypatch.setattr(
+        "h_denoise_utils.core.denoiser._build_denoiser_subprocess_environment",
+        lambda backend, denoiser_path: {"LD_LIBRARY_PATH": str(exe.parent)},
+    )
 
     denoiser = Denoiser(
         input_path=str(input_file),
@@ -128,6 +177,7 @@ def test_denoiser_oidn_backend_runs_optix_compatible_command(monkeypatch, tmp_pa
 
     assert result["status"] == "success"
     assert captured["timeout"] == DEFAULT_DENOISER_TIMEOUT_SECONDS
+    assert captured["env"] == {"LD_LIBRARY_PATH": str(exe.parent)}
     cmd = captured["cmd"]
     assert cmd[0] == str(exe)
     assert cmd[1:4] == ["-v", "1", "-multipart"]

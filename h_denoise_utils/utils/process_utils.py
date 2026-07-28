@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Mapping
 
 from ..constants import DEFAULT_DENOISER_TIMEOUT_SECONDS
 
@@ -27,14 +28,16 @@ def get_subprocess_config() -> tuple[subprocess.STARTUPINFO | None, int]:
 
 
 def run_subprocess(
-    cmd: list,
+    cmd: list[str],
     timeout: int = DEFAULT_DENOISER_TIMEOUT_SECONDS,
+    env: Mapping[str, str] | None = None,
 ) -> tuple[bool, str]:
     """Run a subprocess and return success status and error message.
 
     Args:
-        cmd: Command list to execute
-        timeout: Timeout in seconds (default 5 minutes)
+        cmd: Command list to execute.
+        timeout: Timeout in seconds.
+        env: Optional subprocess environment override.
 
     Returns:
         Tuple of (success, error_message)
@@ -48,6 +51,7 @@ def run_subprocess(
             startupinfo=startupinfo,
             creationflags=creation_flags,
             timeout=timeout,
+            env=env,
         )
         if proc.returncode == 0:
             return True, ""
