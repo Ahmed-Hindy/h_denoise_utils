@@ -49,7 +49,7 @@ jobs:
       contents: write
     env:
       QT_BACKEND: pyside6
-      OIDN_VERSION: "2.4.1"
+      OIDN_VERSION: "2.5.0"
 
     steps:
       - uses: actions/checkout@v6
@@ -101,9 +101,13 @@ jobs:
       - name: Validate OIDN UINT channel preservation
         shell: pwsh
         run: |
-          $denoiser = Get-ChildItem -LiteralPath ".\h_denoise_utils\vendor\oidn-denoiser\windows-x64" -Filter "Denoiser.exe" -Recurse | Select-Object -First 1
-          if (-not $denoiser) { throw "Could not find bundled OIDN Denoiser.exe" }
-          uv run --native-tls --with OpenEXR --with numpy python .\tools\validate_oidn_uint_preservation.py --denoiser $denoiser.FullName
+          $denoiser = ".\h_denoise_utils\vendor\oidn-denoiser\windows-x64\oidn-$env:OIDN_VERSION\Denoiser.exe"
+          if (-not (Test-Path -LiteralPath $denoiser)) {
+            throw "Could not find bundled OIDN Denoiser.exe: $denoiser"
+          }
+          uv run --system-certs --with OpenEXR --with numpy python `
+            .\tools\validate_oidn_uint_preservation.py `
+            --denoiser $denoiser
 
       - name: Build portable package
         shell: pwsh
@@ -125,7 +129,7 @@ jobs:
       contents: write
     env:
       QT_BACKEND: pyside6
-      OIDN_VERSION: "2.4.1"
+      OIDN_VERSION: "2.5.0"
 
     steps:
       - uses: actions/checkout@v6
@@ -179,13 +183,13 @@ jobs:
       - name: Validate OIDN UINT channel preservation
         shell: bash
         run: |
-          DENOISER=$(find ./h_denoise_utils/vendor/oidn-denoiser/linux-x64 -type f -name "Denoiser" | head -n 1)
-          if [ -z "${DENOISER}" ]; then
-            echo "Could not find bundled OIDN Denoiser" >&2
+          DENOISER="./h_denoise_utils/vendor/oidn-denoiser/linux-x64/oidn-${OIDN_VERSION}/Denoiser"
+          if [ ! -x "${DENOISER}" ]; then
+            echo "Could not find bundled OIDN Denoiser: ${DENOISER}" >&2
             exit 1
           fi
           export LD_LIBRARY_PATH="$(dirname "${DENOISER}"):${LD_LIBRARY_PATH:-}"
-          uv run --native-tls --with OpenEXR --with numpy python ./tools/validate_oidn_uint_preservation.py --denoiser "${DENOISER}"
+          uv run --system-certs --with OpenEXR --with numpy python ./tools/validate_oidn_uint_preservation.py --denoiser "${DENOISER}"
 
       - name: Build portable package
         shell: bash
