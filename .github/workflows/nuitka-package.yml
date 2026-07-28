@@ -1,4 +1,4 @@
-name: Nuitka Package
+name: Windows Packaging Comparison
 
 on:
   workflow_dispatch:
@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  package-windows:
-    name: "Nuitka / Windows bundled"
+  compare-windows:
+    name: "Nuitka vs PyInstaller / Windows bundled"
     runs-on: windows-2022
     permissions:
       contents: read
@@ -46,7 +46,7 @@ jobs:
           key: nuitka-oidn-sdk-${{ runner.os }}-${{ env.OIDN_VERSION }}
 
       - name: Install packaging dependencies
-        run: uv sync --frozen --extra pyside6 --extra package-nuitka
+        run: uv sync --frozen --extra pyside6 --extra package --extra package-nuitka
 
       - name: Fetch bundled OptiX denoisers
         shell: pwsh
@@ -78,34 +78,54 @@ jobs:
           if (-not $denoiser) {
             throw "Could not find bundled OIDN Denoiser.exe"
           }
-          uv run --native-tls --with OpenEXR --with numpy python `
+          uv run --system-certs --with OpenEXR --with numpy python `
             .\tools\validate_oidn_uint_preservation.py `
             --denoiser $denoiser.FullName
 
-      - name: Build Nuitka package
-        shell: pwsh
-        run: .\tools\build_windows_nuitka_package.ps1 -IncludeBundledRuntimes
-
-      - name: Add package summary
+      - name: Build PyInstaller package
         shell: pwsh
         run: |
-          $zip = Get-ChildItem -LiteralPath ".\dist" -Filter "h-denoise-nuitka-windows-x64-v*.zip" |
-            Select-Object -First 1
-          if (-not $zip) {
-            throw "Nuitka ZIP was not created."
+          $elapsed = Measure-Command {
+            .\tools\build_windows_package.ps1 -Variant bundled
           }
-          $sizeMb = [math]::Round($zip.Length / 1MB, 2)
-          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "## Nuitka package"
-          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "- Artifact: ``$($zip.Name)``"
-          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "- ZIP size: **$sizeMb MB**"
-          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "- Python: **3.11**"
-          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "- Compiler: **MSVC on windows-2022**"
+          "PYINSTALLER_BUILD_SECONDS=$($elapsed.TotalSeconds)" |
+            Add-Content -LiteralPath $env:GITHUB_ENV
+
+      - name: Build Nuitka package
+        shell: pwsh
+        run: |
+          $elapsed = Measure-Command {
+            .\tools\build_windows_nuitka_package.ps1 -IncludeBundledRuntimes
+          }
+          "NUITKA_BUILD_SECONDS=$($elapsed.TotalSeconds)" |
+            Add-Content -LiteralPath $env:GITHUB_ENV
+
+      - name: Compare packages
+        shell: pwsh
+        run: |
+          .\tools\compare_windows_packages.ps1 `
+            -NuitkaBuildSeconds ([double]$env:NUITKA_BUILD_SECONDS) `
+            -PyInstallerBuildSeconds ([double]$env:PYINSTALLER_BUILD_SECONDS)
 
       - name: Upload Nuitka package
         uses: actions/upload-artifact@v7
         with:
           name: h-denoise-nuitka-bundled-windows-x64
           path: dist/h-denoise-nuitka-windows-x64-v*.zip
+          if-no-files-found: error
+
+      - name: Upload PyInstaller package
+        uses: actions/upload-artifact@v7
+        with:
+          name: h-denoise-pyinstaller-bundled-windows-x64
+          path: dist/h-denoise-bundled-windows-x64-v*.zip
+          if-no-files-found: error
+
+      - name: Upload comparison report
+        uses: actions/upload-artifact@v7
+        with:
+          name: h-denoise-windows-package-comparison
+          path: dist/package-comparison.json
           if-no-files-found: error
 
       - name: Upload Nuitka compilation report
