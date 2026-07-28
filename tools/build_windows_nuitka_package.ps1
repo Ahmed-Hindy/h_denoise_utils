@@ -162,7 +162,8 @@ try {
 
     $env:QT_BACKEND = "pyside6"
     $nuitkaArgs = @(
-        "--mode=standalone"
+        "--mode=standalone",
+        "--assume-yes-for-downloads"
     ) + $nuitkaCompilerArgs + @(
         "--enable-plugin=pyside6",
         "--include-package=h_denoise_utils",
@@ -181,12 +182,13 @@ try {
         "packaging/nuitka_entry.py"
     )
 
+    $compileExitCode = 0
     $elapsed = Measure-Command {
         & uv run --system-certs --frozen --extra pyside6 --extra package-nuitka nuitka @nuitkaArgs
-        $compileExitCode = $LASTEXITCODE
-        if ($compileExitCode -ne 0) {
-            throw "Nuitka compilation failed with exit code $compileExitCode."
-        }
+        $script:compileExitCode = $LASTEXITCODE
+    }
+    if ($compileExitCode -ne 0) {
+        throw "Nuitka compilation failed with exit code $compileExitCode."
     }
 
     if (-not (Test-Path -LiteralPath $compiledDir)) {
