@@ -60,6 +60,8 @@ def test_native_core_uses_cuda_driver_api_only() -> None:
     assert "cuDevicePrimaryCtxRetain" in source
     assert "cuMemcpyHtoDAsync" in source
     assert "optixDenoiserInvoke" in source
+    assert "class DenoiserSession::Impl" in source
+    assert "ensure_buffers(request)" in source
 
 
 def test_nuke_node_exposes_expected_contract() -> None:
@@ -77,5 +79,9 @@ def test_nuke_node_exposes_expected_contract() -> None:
         '"gpu_device"',
         '"normal_encoding"',
         '"passthrough_on_error"',
+        "hdu::optix::DenoiserSession denoiser_session_",
+        "denoiser_session_.denoise(request)",
+        "denoiser_session_.reset()",
+        "abort_requested",
     ):
         assert expected in source

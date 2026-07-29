@@ -49,22 +49,44 @@ def main() -> None:
     node.setInput(2, normal)
     node["normal_encoding"].setValue(1)
 
-    output_path = Path(tempfile.gettempdir()) / "hdu-nuke-optix-validation.exr"
-    output_path.unlink(missing_ok=True)
+    resized_format = nuke.addFormat("24 12 1.0 HOptixDenoiseResizedTest")
+    output_paths = [
+        Path(tempfile.gettempdir()) / f"hdu-nuke-optix-validation-{index}.exr"
+        for index in range(4)
+    ]
+    for output_path in output_paths:
+        output_path.unlink(missing_ok=True)
 
     writer = nuke.nodes.Write()
     writer.setInput(0, node)
-    writer["file"].setValue(output_path.as_posix())
     writer["file_type"].setValue("exr")
     writer["channels"].setValue("rgba")
 
     try:
-        nuke.execute(writer, 1, 1)
-        if not output_path.is_file() or output_path.stat().st_size == 0:
-            raise RuntimeError(f"Nuke did not create a valid output: {output_path}")
-        print(f"HOptixDenoise validation passed: {output_path}")
+        render_cases = (
+            (output_paths[0], [0.25, 0.5, 0.75, 1.0], 2, test_format),
+            (output_paths[1], [0.35, 0.45, 0.65, 1.0], 2, test_format),
+            (output_paths[2], [0.45, 0.35, 0.55, 1.0], 1, test_format),
+            (output_paths[3], [0.55, 0.25, 0.45, 1.0], 1, resized_format),
+        )
+        for output_path, color, tile_size, render_format in render_cases:
+            source["color"].setValue(color)
+            for constant in (source, albedo, normal):
+                constant["format"].setValue(render_format.name())
+            node["tile_size"].setValue(tile_size)
+            writer["file"].setValue(output_path.as_posix())
+            nuke.execute(writer, 1, 1)
+            if not output_path.is_file() or output_path.stat().st_size == 0:
+                raise RuntimeError(
+                    f"Nuke did not create a valid output: {output_path}"
+                )
+        print(
+            "HOptixDenoise repeated-session validation passed: "
+            f"{len(output_paths)} renders"
+        )
     finally:
-        output_path.unlink(missing_ok=True)
+        for output_path in output_paths:
+            output_path.unlink(missing_ok=True)
         nuke.scriptClear(ignoreUnsavedChanges=True)
 
 

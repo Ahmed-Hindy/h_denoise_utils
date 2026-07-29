@@ -26,6 +26,13 @@ All connected inputs must have the same data window and resolution.
   `-1..1`.
 - **passthrough on error** — returns the beauty input if CUDA or OptiX fails.
 
+## Performance
+
+Each node reuses its CUDA context, OptiX denoiser, stream, and GPU buffers
+between compatible renders. Changing the GPU, guides, image size, model/alpha
+mode, or tile size rebuilds only the affected resources. Deleting the node or
+a CUDA/OptiX failure releases the cached resources.
+
 ## Requirements
 
 - A supported NVIDIA GPU and driver.

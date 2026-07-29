@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstddef>
 #include <exception>
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -67,16 +68,20 @@ constexpr const char* kHelp =
     return channel_index >= 0 ? plane.at(x, y, channel_index) : fallback;
 }
 
-void fill_rgba_buffer(
+[[nodiscard]] bool fill_rgba_buffer(
     const ImagePlane& plane,
     const Box& bounds,
     std::vector<float>& destination,
-    bool remap_unsigned_normals = false) {
+    bool remap_unsigned_normals,
+    const std::function<bool()>& abort_requested) {
     const std::size_t pixel_count =
         static_cast<std::size_t>(bounds.w()) * static_cast<std::size_t>(bounds.h());
     destination.assign(pixel_count * 4U, 0.0F);
 
     for (int y = bounds.y(); y < bounds.t(); ++y) {
+        if (abort_requested()) {
+            return false;
+        }
         for (int x = bounds.x(); x < bounds.r(); ++x) {
             const std::size_t pixel =
                 static_cast<std::size_t>(y - bounds.y()) *
@@ -98,6 +103,7 @@ void fill_rgba_buffer(
                 read_channel(plane, x, y, Chan_Alpha, 1.0F);
         }
     }
+    return true;
 }
 
 class HOptixDenoise final : public PlanarIop {
@@ -254,13 +260,24 @@ public:
                 return;
             }
 
+            const std::function<bool()> abort_requested =
+                [this] { return aborted(); };
+
             ChannelSet beauty_channels = available_channels(input0(), Mask_RGBA);
             ImagePlane beauty_plane(bounds, true, beauty_channels);
             input0().fetchPlane(beauty_plane);
 
             std::vector<float> beauty_pixels;
             std::vector<float> output_pixels;
-            fill_rgba_buffer(beauty_plane, bounds, beauty_pixels);
+            if (!fill_rgba_buffer(
+                    beauty_plane,
+                    bounds,
+                    beauty_pixels,
+                    false,
+                    abort_requested)) {
+                passthrough(output_plane);
+                return;
+            }
             output_pixels.resize(beauty_pixels.size());
 
             std::vector<float> albedo_pixels;
@@ -272,7 +289,15 @@ public:
                 ChannelSet channels = available_channels(*input(1), Mask_RGB);
                 ImagePlane albedo_plane(bounds, true, channels);
                 input(1)->fetchPlane(albedo_plane);
-                fill_rgba_buffer(albedo_plane, bounds, albedo_pixels);
+                if (!fill_rgba_buffer(
+                        albedo_plane,
+                        bounds,
+                        albedo_pixels,
+                        false,
+                        abort_requested)) {
+                    passthrough(output_plane);
+                    return;
+                }
                 albedo_view = {
                     albedo_pixels.data(),
                     static_cast<unsigned int>(bounds.w()),
@@ -283,11 +308,15 @@ public:
                 ChannelSet channels = available_channels(*input(2), Mask_RGB);
                 ImagePlane normal_plane(bounds, true, channels);
                 input(2)->fetchPlane(normal_plane);
-                fill_rgba_buffer(
-                    normal_plane,
-                    bounds,
-                    normal_pixels,
-                    normal_encoding_ == 1);
+                if (!fill_rgba_buffer(
+                        normal_plane,
+                        bounds,
+                        normal_pixels,
+                        normal_encoding_ == 1,
+                        abort_requested)) {
+                    passthrough(output_plane);
+                    return;
+                }
                 normal_view = {
                     normal_pixels.data(),
                     static_cast<unsigned int>(bounds.w()),
@@ -313,14 +342,21 @@ public:
             request.options.tile_height = tile_height;
             request.options.denoise_alpha = false;
 
-            hdu::optix::denoise(request);
+            denoiser_session_.denoise(request);
 
             if (aborted()) {
                 passthrough(output_plane);
                 return;
             }
-            write_output(output_plane, beauty_plane, output_pixels);
+            if (!write_output(
+                    output_plane,
+                    beauty_plane,
+                    output_pixels,
+                    abort_requested)) {
+                passthrough(output_plane);
+            }
         } catch (const std::exception& exception) {
+            denoiser_session_.reset();
             if (passthrough_on_error_) {
                 warning("HOptixDenoise: %s", exception.what());
                 passthrough(output_plane);
@@ -357,10 +393,11 @@ private:
         output_plane.copyIntersectionFrom(source, true);
     }
 
-    static void write_output(
+    [[nodiscard]] static bool write_output(
         ImagePlane& output_plane,
         const ImagePlane& beauty_plane,
-        const std::vector<float>& denoised_pixels) {
+        const std::vector<float>& denoised_pixels,
+        const std::function<bool()>& abort_requested) {
         output_plane.makeWritable();
         const Box bounds = output_plane.bounds();
 
@@ -370,6 +407,9 @@ private:
             const int output_channel = output_plane.chanNo(channel);
             const int source_channel = beauty_plane.chanNo(channel);
             for (int y = bounds.y(); y < bounds.t(); ++y) {
+                if (abort_requested()) {
+                    return false;
+                }
                 for (int x = bounds.x(); x < bounds.r(); ++x) {
                     const std::size_t pixel =
                         static_cast<std::size_t>(y - bounds.y()) *
@@ -389,8 +429,10 @@ private:
                 }
             }
         }
+        return true;
     }
 
+    hdu::optix::DenoiserSession denoiser_session_;
     float blend_factor_ = 0.0F;
     int tile_preset_ = 2;
     int gpu_device_ = 0;

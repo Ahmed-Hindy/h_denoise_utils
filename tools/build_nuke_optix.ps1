@@ -78,6 +78,21 @@ function Resolve-Executable {
     throw "Required executable was not found: $Name"
 }
 
+function Get-Sha256Hash {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $stream = [System.IO.File]::OpenRead((Resolve-Path -LiteralPath $Path).Path)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return -join ($sha.ComputeHash($stream) |
+            ForEach-Object { $_.ToString("x2") })
+    }
+    finally {
+        $stream.Dispose()
+        $sha.Dispose()
+    }
+}
+
 function Sync-OptixHeaders {
     param(
         [Parameter(Mandatory = $true)][string]$Destination,
@@ -131,7 +146,7 @@ function Sync-CudaDriverHeaders {
     }
 
     if ($windowsPackage.sha256) {
-        $actualHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        $actualHash = Get-Sha256Hash -Path $archivePath
         if ($actualHash -ne $windowsPackage.sha256.ToLowerInvariant()) {
             throw "CUDA redistributable SHA-256 mismatch: $archivePath"
         }
@@ -277,7 +292,7 @@ $manifest = [ordered]@{
     platform = "windows-x64"
     build_configuration = $Configuration
     stub = $Stub.IsPresent
-    sha256 = (Get-FileHash -LiteralPath $pluginBinary -Algorithm SHA256).Hash.ToLowerInvariant()
+    sha256 = Get-Sha256Hash -Path $pluginBinary
     size = (Get-Item -LiteralPath $pluginBinary).Length
 }
 $manifestPath = Join-Path $pluginRoot "manifest.json"

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 #include <stdexcept>
 #include <string>
 
@@ -38,6 +39,25 @@ struct DenoiseRequest {
 class Error final : public std::runtime_error {
 public:
     explicit Error(const std::string& message) : std::runtime_error(message) {}
+};
+
+class DenoiserSession final {
+public:
+    DenoiserSession();
+    ~DenoiserSession();
+
+    DenoiserSession(DenoiserSession&&) noexcept;
+    DenoiserSession& operator=(DenoiserSession&&) noexcept;
+
+    DenoiserSession(const DenoiserSession&) = delete;
+    DenoiserSession& operator=(const DenoiserSession&) = delete;
+
+    void denoise(const DenoiseRequest& request);
+    void reset() noexcept;
+
+private:
+    class Impl;
+    std::unique_ptr<Impl> impl_;
 };
 
 [[nodiscard]] int device_count();

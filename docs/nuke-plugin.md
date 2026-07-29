@@ -104,8 +104,13 @@ native/optix-denoiser/src/optix_denoiser.cpp
 CUDA Driver API + NVIDIA OptiX
 ```
 
-The new core accepts in-memory float4 buffers. It does not depend on Nuke, Qt,
+The core accepts in-memory float4 buffers. It does not depend on Nuke, Qt,
 Python, OpenImageIO, or OpenEXR. This keeps the Nuke integration separate from
-GPU denoising and provides a stable seam for future native adapters. The
-existing standalone CLI remains on its established implementation in this
-change to avoid regressing multipart, AOV, and temporal behavior.
+GPU denoising and provides a stable seam for future native adapters.
+
+Each Nuke node owns a thread-safe denoiser session. The session retains its CUDA
+primary-context handle, OptiX device context, stream, denoiser, and GPU buffers
+between compatible renders. It rebuilds only when the GPU, guide layout, image
+dimensions, alpha/model mode, or tile settings change, and resets itself after
+CUDA or OptiX failures. The standalone CLI uses the same core for spatial
+beauty denoising while preserving its specialized temporal and multi-AOV path.

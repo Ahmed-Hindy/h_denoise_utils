@@ -14,6 +14,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - One-command Windows build, Nuke terminal validation, manifest generation,
   release ZIP packaging, documentation, and self-hosted CI workflow.
 
+### Changed
+- Nuke nodes now retain a thread-safe OptiX session and reuse compatible CUDA
+  contexts, streams, denoisers, and GPU buffers between renders.
+- Nuke validation now covers repeated renders, tile changes, and image-size
+  changes across the supported Nuke and OptiX versions.
+
+### Fixed
+- Large Nuke plane conversions and output writes now respond to render aborts.
+- The Windows Nuke build script now hashes files correctly under Windows
+  PowerShell 5.1.
+
 ## [2.0.1] — 2026-07-28
 
 ### Changed
