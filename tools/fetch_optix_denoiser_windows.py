@@ -195,6 +195,16 @@ def acquire_asset(
     return destination
 
 
+def safe_extract(archive: zipfile.ZipFile, destination: Path) -> None:
+    """Extract an archive without allowing members to escape the destination."""
+    root = destination.resolve()
+    for member in archive.infolist():
+        target = (root / member.filename).resolve()
+        if not target.is_relative_to(root):
+            raise RuntimeError(f"Archive member escapes destination: {member.filename}")
+    archive.extractall(root)
+
+
 def install_bundle(source: Path, destination: Path) -> None:
     """Replace one installed OptiX variant atomically enough for CI packaging."""
     shutil.rmtree(destination, ignore_errors=True)
@@ -202,8 +212,8 @@ def install_bundle(source: Path, destination: Path) -> None:
 
 
 def remove_legacy_files(vendor_dir: Path) -> None:
-    """Remove obsolete single-variant files from the vendor root."""
-    for name in ("Denoiser.exe", "manifest.json", "LICENSE"):
+    """Remove obsolete single-variant files while preserving the root summary."""
+    for name in ("Denoiser.exe", "LICENSE"):
         path = vendor_dir / name
         if path.is_file():
             path.unlink()
@@ -217,26 +227,66 @@ def write_summary(
     repository: str,
     tag: str,
 ) -> None:
-    """Write the multi-variant vendor manifest."""
+    """Merge installed variants into the multi-variant vendor manifest."""
+    vendor_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = vendor_dir / "manifest.json"
+    existing_default = "9.0"
+    variants_by_version: dict[str, dict[str, object]] = {}
+    if manifest_path.is_file():
+        try:
+            existing = json.loads(manifest_path.read_text(encoding="utf-8"))
+            existing_default = str(existing.get("default_optix_version", "9.0"))
+            for variant in existing.get("variants", []):
+                if not isinstance(variant, dict):
+                    continue
+                version = variant.get("optix_version")
+                source_key_value = variant.get("source_key")
+                if not (
+                    isinstance(version, str)
+                    and version in OPTIX_COMMITS
+                    and isinstance(source_key_value, str)
+                    and source_key_value
+                ):
+                    continue
+                executable = f"optix-{version}/Denoiser.exe"
+                variant_manifest = f"optix-{version}/manifest.json"
+                if (vendor_dir / executable).is_file() and (
+                    vendor_dir / variant_manifest
+                ).is_file():
+                    variants_by_version[version] = {
+                        "optix_version": version,
+                        "optix_dev_commit": OPTIX_COMMITS[version],
+                        "source_key": source_key_value,
+                        "executable": executable,
+                        "manifest": variant_manifest,
+                    }
+        except (OSError, json.JSONDecodeError):
+            variants_by_version = {}
+
+    for version in versions:
+        variants_by_version[version] = {
+            "optix_version": version,
+            "optix_dev_commit": OPTIX_COMMITS[version],
+            "source_key": keys[version],
+            "executable": f"optix-{version}/Denoiser.exe",
+            "manifest": f"optix-{version}/manifest.json",
+        }
+
+    ordered_versions = [version for version in OPTIX_COMMITS if version in variants_by_version]
+    if not ordered_versions:
+        raise RuntimeError("No installed OptiX variants are available for the summary")
+    default_version = (
+        existing_default
+        if existing_default in variants_by_version
+        else "9.0" if "9.0" in variants_by_version else ordered_versions[0]
+    )
     summary = {
         "release_repository": f"https://github.com/{repository}",
         "release_tag": tag,
-        "default_optix_version": "9.0",
-        "variants": [
-            {
-                "optix_version": version,
-                "optix_dev_commit": OPTIX_COMMITS[version],
-                "source_key": keys[version],
-                "executable": f"optix-{version}/Denoiser.exe",
-                "manifest": f"optix-{version}/manifest.json",
-            }
-            for version in versions
-        ],
+        "default_optix_version": default_version,
+        "variants": [variants_by_version[version] for version in ordered_versions],
     }
-    vendor_dir.mkdir(parents=True, exist_ok=True)
-    (vendor_dir / "manifest.json").write_text(
-        json.dumps(summary, indent=2) + "\n", encoding="utf-8"
-    )
+    manifest_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 
 
 def parse_args() -> argparse.Namespace:
@@ -328,7 +378,7 @@ def main() -> int:
             )
             extract_root = temporary_dir / f"extract-{version}"
             with zipfile.ZipFile(archive_path) as archive:
-                archive.extractall(extract_root)
+                safe_extract(archive, extract_root)
             bundle_dir = find_extracted_bundle(extract_root)
             manifest = validate_bundle(
                 bundle_dir,

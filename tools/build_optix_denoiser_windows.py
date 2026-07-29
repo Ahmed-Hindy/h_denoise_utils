@@ -62,7 +62,10 @@ def find_visual_studio() -> Path:
         capture_output=True,
         text=True,
     )
-    installation = Path(result.stdout.strip())
+    installation_text = result.stdout.strip()
+    if not installation_text:
+        raise RuntimeError("Visual Studio with the C++ x64 toolchain was not found")
+    installation = Path(installation_text)
     if not installation.is_dir():
         raise RuntimeError("Visual Studio with the C++ x64 toolchain was not found")
     return installation
@@ -154,19 +157,45 @@ def sync_cuda_driver_files(dependency_root: Path) -> Path:
 
     if not archive_path.is_file():
         url = f"{CUDA_REDIST_BASE_URL}/{relative_path}"
+        partial_path = archive_path.with_suffix(archive_path.suffix + ".part")
+        partial_path.unlink(missing_ok=True)
         print("Downloading minimal CUDA driver headers and import library...", flush=True)
-        urllib.request.urlretrieve(url, archive_path)
+        try:
+            urllib.request.urlretrieve(url, partial_path)
+            partial_path.replace(archive_path)
+        finally:
+            partial_path.unlink(missing_ok=True)
     expected_hash = package.get("sha256", "").lower()
     if expected_hash and sha256_file(archive_path) != expected_hash:
+        archive_path.unlink(missing_ok=True)
+        shutil.rmtree(extract_root, ignore_errors=True)
         raise RuntimeError(f"CUDA redistributable SHA-256 mismatch: {archive_path}")
-    if not extract_root.is_dir():
-        with zipfile.ZipFile(archive_path) as archive:
-            archive.extractall(extract_root)
+    def find_cuda_root() -> Path | None:
+        for cuda_header in extract_root.rglob("include/cuda.h"):
+            candidate = cuda_header.parent.parent
+            if (candidate / "lib" / "x64" / "cuda.lib").is_file():
+                return candidate
+        return None
 
-    for cuda_header in extract_root.rglob("include/cuda.h"):
-        candidate = cuda_header.parent.parent
-        if (candidate / "lib" / "x64" / "cuda.lib").is_file():
-            return candidate
+    existing_root = find_cuda_root()
+    if existing_root is not None:
+        return existing_root
+
+    shutil.rmtree(extract_root, ignore_errors=True)
+    with zipfile.ZipFile(archive_path) as archive:
+        root = extract_root.resolve()
+        for member in archive.infolist():
+            target = (root / member.filename).resolve()
+            if not target.is_relative_to(root):
+                raise RuntimeError(
+                    f"CUDA archive member escapes destination: {member.filename}"
+                )
+        archive.extractall(root)
+
+    extracted_root = find_cuda_root()
+    if extracted_root is not None:
+        return extracted_root
+    shutil.rmtree(extract_root, ignore_errors=True)
     raise FileNotFoundError("cuda.h and cuda.lib were not found in the CUDA archive")
 
 

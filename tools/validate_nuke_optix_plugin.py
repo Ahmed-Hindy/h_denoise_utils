@@ -49,7 +49,7 @@ def main() -> None:
     node.setInput(2, normal)
     node["normal_encoding"].setValue(1)
 
-    resized_format = nuke.addFormat("24 12 1.0 HOptixDenoiseResizedTest")
+    resized_format = nuke.addFormat("520 8 1.0 HOptixDenoiseTiledTest")
     output_paths = [
         Path(tempfile.gettempdir()) / f"hdu-nuke-optix-validation-{index}.exr"
         for index in range(4)

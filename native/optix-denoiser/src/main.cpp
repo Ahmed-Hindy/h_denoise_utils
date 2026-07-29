@@ -1274,11 +1274,12 @@ int main(int argc, char *argv[])
         int sum = 0;
         try
         {
+            hdu::optix::DenoiserSession denoiser_session;
             for (unsigned int i = 0; i < num_runs; ++i)
             {
                 PrintInfo("Denoising...");
                 const clock_t start = clock();
-                hdu::optix::denoise(request);
+                denoiser_session.denoise(request);
                 const clock_t diff = clock() - start;
                 const int msec = diff * 1000 / CLOCKS_PER_SEC;
                 if (num_runs > 1)

@@ -105,7 +105,7 @@ rm -rf "${APP_DIR}" "${BUILD_DIR}/pyinstaller"
 find "${DIST_DIR}" -maxdepth 1 -name "h-denoise-${VARIANT}-linux-x64-v*.tar.gz" -exec rm -f {} +
 
 # Run PyInstaller compilation
-uv run --native-tls --frozen --extra pyside6 --extra package pyinstaller --noconfirm --clean "packaging/h-denoise.spec"
+uv run --system-certs --frozen --extra pyside6 --extra package pyinstaller --noconfirm --clean "packaging/h-denoise.spec"
 
 EXE_PATH="${APP_DIR}/h-denoise"
 if [ ! -f "${EXE_PATH}" ]; then

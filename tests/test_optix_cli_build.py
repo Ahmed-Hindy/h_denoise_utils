@@ -3,16 +3,21 @@
 from __future__ import annotations
 
 import ast
+import io
 import json
 import os
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 import pytest
 
+from tools.build_optix_denoiser_windows import sync_cuda_driver_files
 from tools.fetch_optix_denoiser_windows import (
     _latest_local_asset,
+    remove_legacy_files,
+    safe_extract,
     validate_bundle,
     write_summary,
 )
@@ -197,6 +202,136 @@ def test_vendor_summary_records_installed_source_keys(tmp_path: Path) -> None:
     } == installed_keys
 
 
+def test_safe_extract_rejects_parent_traversal(tmp_path: Path) -> None:
+    """Prevent support archives from writing outside their extraction root."""
+    archive_path = tmp_path / "malicious.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("../escape.txt", "blocked")
+
+    with zipfile.ZipFile(archive_path) as archive:
+        with pytest.raises(RuntimeError, match="escapes destination"):
+            safe_extract(archive, tmp_path / "extract")
+
+    assert not (tmp_path / "escape.txt").exists()
+
+
+def test_vendor_summary_preserves_other_installed_variants(tmp_path: Path) -> None:
+    """Keep partial fetches from dropping already installed runtime variants."""
+    old_variant = tmp_path / "optix-8.1"
+    old_variant.mkdir()
+    (old_variant / "Denoiser.exe").write_bytes(b"old")
+    (old_variant / "manifest.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "default_optix_version": "8.1",
+                "variants": [
+                    {
+                        "optix_version": "8.1",
+                        "optix_dev_commit": OPTIX_COMMITS["8.1"],
+                        "source_key": "old-key",
+                        "executable": "optix-8.1/Denoiser.exe",
+                        "manifest": "optix-8.1/manifest.json",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    (tmp_path / "Denoiser.exe").write_bytes(b"legacy")
+    (tmp_path / "LICENSE").write_text("legacy", encoding="utf-8")
+    remove_legacy_files(tmp_path)
+    assert (tmp_path / "manifest.json").is_file()
+
+    write_summary(
+        tmp_path,
+        ["9.1"],
+        {"9.1": "new-key"},
+        repository="owner/repository",
+        tag="support-tag",
+    )
+
+    summary = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    assert summary["default_optix_version"] == "8.1"
+    assert {
+        variant["optix_version"]: variant["source_key"]
+        for variant in summary["variants"]
+    } == {"8.1": "old-key", "9.1": "new-key"}
+
+
+def test_corrupt_cuda_archive_is_removed_for_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Make a failed cached CUDA download recoverable on the next build."""
+    manifest = {
+        "cuda_cudart": {
+            "windows-x86_64": {
+                "relative_path": "cuda/test.zip",
+                "sha256": "0" * 64,
+            }
+        }
+    }
+
+    monkeypatch.setattr(
+        "tools.build_optix_denoiser_windows.urllib.request.urlopen",
+        lambda _url: io.BytesIO(json.dumps(manifest).encode()),
+    )
+
+    def fake_retrieve(_url: str, destination: Path) -> tuple[str, None]:
+        Path(destination).write_bytes(b"corrupt")
+        return str(destination), None
+
+    monkeypatch.setattr(
+        "tools.build_optix_denoiser_windows.urllib.request.urlretrieve",
+        fake_retrieve,
+    )
+    stale_extract = tmp_path / "test"
+    stale_extract.mkdir()
+    (stale_extract / "stale.txt").write_text("stale", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="SHA-256 mismatch"):
+        sync_cuda_driver_files(tmp_path)
+
+    assert not (tmp_path / "test.zip").exists()
+    assert not (tmp_path / "test.zip.part").exists()
+    assert not stale_extract.exists()
+
+
+def test_partial_cuda_extraction_is_rebuilt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Re-extract a valid cached archive when its directory is incomplete."""
+    archive_path = tmp_path / "test.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("cuda/include/cuda.h", "header")
+        archive.writestr("cuda/lib/x64/cuda.lib", "library")
+    manifest = {
+        "cuda_cudart": {
+            "windows-x86_64": {
+                "relative_path": "cuda/test.zip",
+                "sha256": sha256_file(archive_path),
+            }
+        }
+    }
+    monkeypatch.setattr(
+        "tools.build_optix_denoiser_windows.urllib.request.urlopen",
+        lambda _url: io.BytesIO(json.dumps(manifest).encode()),
+    )
+    stale_extract = tmp_path / "test"
+    stale_extract.mkdir()
+    (stale_extract / "partial.txt").write_text("partial", encoding="utf-8")
+
+    cuda_root = sync_cuda_driver_files(tmp_path)
+
+    assert cuda_root == stale_extract / "cuda"
+    assert (cuda_root / "include" / "cuda.h").is_file()
+    assert (cuda_root / "lib" / "x64" / "cuda.lib").is_file()
+    assert not (stale_extract / "partial.txt").exists()
+
+
 def test_cli_uses_cuda_driver_api_only() -> None:
     """Prevent the legacy temporal and AOV path from restoring CUDART."""
     source = (OPTIX_ROOT / "src" / "main.cpp").read_text(encoding="utf-8")
@@ -227,6 +362,8 @@ def test_cli_uses_cuda_driver_api_only() -> None:
     assert source.index("denoiser_options.denoiseAlpha") < source.index(
         "optixDenoiserCreate"
     )
+    assert "hdu::optix::DenoiserSession denoiser_session" in source
+    assert "denoiser_session.denoise(request)" in source
 
 
 def test_source_key_inputs_match_fetchers() -> None:
@@ -255,6 +392,7 @@ def test_source_key_inputs_match_fetchers() -> None:
     assert "fetch_optix_denoiser.ps1" not in workflow
     assert "ACTUAL_SOURCE_KEYS" in linux_fetcher
     assert "gh release view" in linux_fetcher
+    assert "target.is_relative_to(root)" in linux_fetcher
     assert "installed_keys" in windows_fetcher
     assert "_latest_release_asset" in windows_fetcher
 
@@ -279,6 +417,16 @@ def test_pull_request_packaging_allows_compatible_optix_assets() -> None:
     assert 'github.event_name }}" == "pull_request"' in oidn_workflow
     assert "--allow-source-key-mismatch" not in ci_workflow
     assert "--allow-source-key-mismatch" not in release_workflow
+    assert "--native-tls" not in "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (
+            REPO_ROOT / ".github" / "workflows" / "full-validation.yml",
+            REPO_ROOT / ".github" / "workflows" / "oidn-denoiser.yml",
+            REPO_ROOT / "tools" / "build_linux_package.sh",
+            REPO_ROOT / "tools" / "build_oidn_denoiser.sh",
+            REPO_ROOT / "tools" / "build_windows_package.ps1",
+        )
+    )
 
 
 def test_windows_conan_profile_uses_ninja() -> None:

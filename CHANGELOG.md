@@ -17,8 +17,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 - Nuke nodes now retain a thread-safe OptiX session and reuse compatible CUDA
   contexts, streams, denoisers, and GPU buffers between renders.
-- Nuke validation now covers repeated renders, tile changes, and image-size
-  changes across the supported Nuke and OptiX versions.
+- Nuke validation now covers repeated renders, real tiled invocation, and
+  image-size changes across the supported Nuke and OptiX versions.
+- Standalone CLI repeat runs now reuse one OptiX session for accurate profiling.
 - The Nuke workflow can build one package or the serial 12-package supported
   matrix, reuse pinned SDK caches, and optionally publish manifest-validated
   release assets.
@@ -33,6 +34,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   creation and reports named OptiX initialization errors.
 - Pull-request packaging can reuse a compatible published OptiX runtime when
   native source changes produce a source key that is not released yet.
+- Partial OptiX fetches preserve installed variants, archives reject path
+  traversal, and interrupted CUDA downloads recover without manual cleanup.
 
 ## [2.0.1] — 2026-07-28
 

@@ -40,6 +40,10 @@ def test_nuke_python_hooks_parse() -> None:
     for path in paths:
         ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
+    validator = paths[-1].read_text(encoding="utf-8")
+    assert 'nuke.addFormat("520 8 1.0 HOptixDenoiseTiledTest")' in validator
+    assert "tile_size, render_format in render_cases" in validator
+
 
 def test_cmake_defines_real_and_stub_core_targets() -> None:
     """Ensure hosted checks and production builds use the same adapter."""
@@ -125,5 +129,10 @@ def test_nuke_workflow_supports_single_matrix_and_release_builds() -> None:
     assert '--source-commit "${GITHUB_SHA}"' in workflow
     assert 'commits/${RELEASE_TAG}' in workflow
     assert 'tag_commit' in workflow
+    assert workflow.count("persist-credentials: false") == 3
+    assert "BUILD_SCOPE: ${{ inputs.build_scope }}" in workflow
+    assert "RELEASE_TAG: ${{ inputs.release_tag }}" in workflow
+    assert '--build-scope "${BUILD_SCOPE}"' in workflow
+    assert '--release-tag "${RELEASE_TAG}"' in workflow
     assert "actions/upload-artifact@v7" in workflow
     assert "actions/download-artifact@v7" in workflow

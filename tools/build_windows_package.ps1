@@ -116,7 +116,7 @@ try {
     Get-ChildItem -Path $distDir -Filter "h-denoise-$Variant-windows-x64-v*.zip" -ErrorAction SilentlyContinue |
         Remove-Item -Force
 
-    uv run --native-tls --frozen --extra pyside6 --extra package pyinstaller --noconfirm --clean "packaging/h-denoise.spec"
+    uv run --system-certs --frozen --extra pyside6 --extra package pyinstaller --noconfirm --clean "packaging/h-denoise.spec"
 
     $exePath = Join-Path $appDir "h-denoise.exe"
     if (-not (Test-Path -LiteralPath $exePath)) {

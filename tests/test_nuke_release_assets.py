@@ -159,6 +159,49 @@ def test_validate_release_rejects_cudart_dependency(tmp_path: Path) -> None:
         )
 
 
+def test_validate_release_rejects_missing_required_dependencies(
+    tmp_path: Path,
+) -> None:
+    """Reject packages missing either the Nuke or CUDA Driver import."""
+    for dependencies, expected in (
+        (["nvcuda.dll", "KERNEL32.dll"], "DDImage.dll"),
+        (["DDImage.dll", "KERNEL32.dll"], "nvcuda.dll"),
+    ):
+        package_dir = tmp_path / expected
+        package_dir.mkdir()
+        _write_package(
+            package_dir,
+            nuke_line="17.0",
+            optix_version="9.1",
+            dependencies=dependencies,
+        )
+        with pytest.raises(ValueError, match=expected):
+            VALIDATOR.validate_release_assets(
+                assets_dir=package_dir,
+                build_scope="single",
+                release_tag="nuke-optix-v2.0.1",
+                source_commit="abc123",
+            )
+
+
+def test_validate_release_rejects_binary_size_mismatch(tmp_path: Path) -> None:
+    """Reject a package whose DLL size differs from the manifest."""
+    _write_package(
+        tmp_path,
+        nuke_line="17.0",
+        optix_version="9.1",
+        size=999,
+    )
+
+    with pytest.raises(ValueError, match="size"):
+        VALIDATOR.validate_release_assets(
+            assets_dir=tmp_path,
+            build_scope="single",
+            release_tag="nuke-optix-v2.0.1",
+            source_commit="abc123",
+        )
+
+
 def test_validate_supported_matrix(tmp_path: Path) -> None:
     """Accept the complete four-by-three validated compatibility matrix."""
     for nuke_line in VALIDATOR.SUPPORTED_NUKE_LINES:

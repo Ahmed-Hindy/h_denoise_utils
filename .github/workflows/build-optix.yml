@@ -83,7 +83,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.conan2
-          key: optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-${{ hashFiles('native/optix-denoiser/conanfile.txt', 'native/optix-denoiser/profiles/windows-cmake-3.28', 'tools/optix_source_key.py', 'tools/build_optix_denoiser_windows.py', 'tools/build_optix_denoiser.sh') }}
+          key: optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-${{ hashFiles('native/optix-denoiser/conanfile.txt', 'native/optix-denoiser/profiles/**', 'tools/optix_source_key.py', 'tools/build_optix_denoiser.sh') }}
           restore-keys: |
             optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-
             optix-conan-${{ runner.os }}-

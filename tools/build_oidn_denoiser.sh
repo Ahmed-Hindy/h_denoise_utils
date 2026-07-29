@@ -197,7 +197,7 @@ with open(os.path.join(bundle_root, 'manifest.json'), 'w') as f:
 echo "Validating OIDN wrapper preservation rules..."
 # Explicitly add bundle root to LD_LIBRARY_PATH so dynamic linker can find OpenImageDenoise shared libraries
 export LD_LIBRARY_PATH="${BUNDLE_ROOT}:${LD_LIBRARY_PATH:-}"
-uv run --native-tls --with OpenEXR --with numpy python "${SCRIPT_DIR}/validate_oidn_uint_preservation.py" --denoiser "${EXE_PATH}"
+uv run --system-certs --with OpenEXR --with numpy python "${SCRIPT_DIR}/validate_oidn_uint_preservation.py" --denoiser "${EXE_PATH}"
 
 # Archive package
 ASSET_NAME="oidn-denoiser-${PLATFORM}-oidn-${VERSION}-${SOURCE_KEY_SHORT}.zip"

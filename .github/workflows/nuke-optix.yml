@@ -50,6 +50,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Cache CUDA driver headers
         uses: actions/cache@v4
@@ -104,6 +106,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Cache CUDA driver headers
         uses: actions/cache@v4
@@ -156,6 +160,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Download validated packages
         uses: actions/download-artifact@v7
@@ -166,11 +172,14 @@ jobs:
 
       - name: Validate release packages
         shell: bash
+        env:
+          BUILD_SCOPE: ${{ inputs.build_scope }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: >-
           python tools/validate_nuke_release_assets.py
           --assets-dir release-assets
-          --build-scope "${{ inputs.build_scope }}"
-          --release-tag "${{ inputs.release_tag }}"
+          --build-scope "${BUILD_SCOPE}"
+          --release-tag "${RELEASE_TAG}"
           --source-commit "${GITHUB_SHA}"
 
       - name: Publish release assets

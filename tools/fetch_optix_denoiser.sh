@@ -180,7 +180,7 @@ for version in "${OPTIX_VERSIONS[@]}"; do
 done
 
 if [[ "${all_installed}" == true ]]; then
-  for legacyName in Denoiser manifest.json LICENSE; do
+  for legacyName in Denoiser LICENSE; do
     rm -f "${VENDOR_DIR}/${legacyName}"
   done
   write_vendor_summary
@@ -243,8 +243,20 @@ print(selected['name'])
   fi
 
   EXTRACT_DIR="${DOWNLOAD_DIR}/extract-${version}"
-  mkdir -p "${EXTRACT_DIR}"
-  unzip -q "${ZIP_PATH}" -d "${EXTRACT_DIR}"
+  python3 -c "
+import pathlib
+import sys
+import zipfile
+
+archive_path = pathlib.Path(sys.argv[1])
+root = pathlib.Path(sys.argv[2]).resolve()
+with zipfile.ZipFile(archive_path) as archive:
+    for member in archive.infolist():
+        target = (root / member.filename).resolve()
+        if not target.is_relative_to(root):
+            sys.exit(f'Archive member escapes destination: {member.filename}')
+    archive.extractall(root)
+" "${ZIP_PATH}" "${EXTRACT_DIR}"
 
   FOUND_EXE=$(find "${EXTRACT_DIR}" -type f -name "Denoiser" | head -n 1)
   if [[ -z "${FOUND_EXE}" ]]; then
@@ -274,7 +286,7 @@ print(selected['name'])
   echo "Bundled OptiX ${version} denoiser installed: ${VARIANT_DIR}/Denoiser"
 done
 
-for legacyName in Denoiser manifest.json LICENSE; do
+for legacyName in Denoiser LICENSE; do
   rm -f "${VENDOR_DIR}/${legacyName}"
 done
 

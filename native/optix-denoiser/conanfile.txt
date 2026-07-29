@@ -1,5 +1,5 @@
 [requires]
-openimageio/[>=2.4 <3]
+openimageio/[>=2.5.19.1 <2.6]
 openexr/[>=3.2.3 <4]
 imath/[>3.1.9 <4]
 
