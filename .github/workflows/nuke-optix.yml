@@ -1,0 +1,44 @@
+name: Nuke OptiX Plugin
+
+on:
+  workflow_dispatch:
+    inputs:
+      nuke_version:
+        description: Installed Nuke revision
+        required: true
+        default: 17.0v3
+      optix_version:
+        description: OptiX SDK version
+        required: true
+        type: choice
+        options:
+          - "9.1"
+          - "9.0"
+          - "8.1"
+        default: "9.1"
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: [self-hosted, Windows, X64, nuke-ndk]
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build and validate plugin
+        shell: pwsh
+        run: >-
+          ./tools/build_nuke_optix.ps1
+          -NukeVersion "${{ inputs.nuke_version }}"
+          -OptixVersion "${{ inputs.optix_version }}"
+
+      - name: Upload validated package
+        uses: actions/upload-artifact@v4
+        with:
+          name: h-denoise-nuke-${{ inputs.nuke_version }}-optix-${{ inputs.optix_version }}
+          path: dist/h-denoise-nuke-*.zip
+          if-no-files-found: error

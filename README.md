@@ -15,7 +15,8 @@ https://github.com/user-attachments/assets/477eec96-684d-40f9-ad18-7ba86055a467
 
 - Denoises OpenEXR image sequences.
 - Denoises most AOVs.
-- Supports bundled OptiX and Intel OIDN denoiser.
+- Supports bundled OptiX and Intel OIDN denoisers.
+- Includes a native OptiX plug-in for Foundry Nuke.
 - Does not require Houdini.
 
 ## Download
@@ -50,12 +51,20 @@ uv run h-denoise /path/to/renders --backend optix --optix-version 9.0
 uv run h-denoise /path/to/input.exr --backend oidn
 ```
 
+## Nuke Plug-in
+
+`HOptixDenoise` runs OptiX directly inside Nuke with beauty, albedo, and normal
+inputs. Packages are built per Nuke major/minor version.
+
+See [Nuke plug-in setup and development](docs/nuke-plugin.md).
+
 ## More Help
 
 - [Getting started](docs/getting-started.md)
 - [Common tasks](docs/common-tasks.md)
 - [Release package details](docs/release-variants.md)
 - [Troubleshooting](docs/troubleshooting.md)
+- [Nuke plug-in](docs/nuke-plugin.md)
 
 ## License
 

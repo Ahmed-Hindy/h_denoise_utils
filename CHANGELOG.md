@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+- Native `HOptixDenoise` Nuke `PlanarIop` with beauty, albedo, and normal
+  inputs, OptiX tiling, GPU selection, normal encoding, blend, and safe
+  passthrough controls.
+- Shared in-memory OptiX C++ core built on the CUDA Driver API.
+- One-command Windows build, Nuke terminal validation, manifest generation,
+  release ZIP packaging, documentation, and self-hosted CI workflow.
+
 ## [2.0.1] — 2026-07-28
 
 ### Changed
