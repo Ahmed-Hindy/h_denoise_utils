@@ -79,17 +79,6 @@ DenoiseWorker --> core.Denoiser
 - `core/denoiser.py`: Headless API for batch denoise runs without Qt.
 - `core/config.py`: `DenoiseConfig` and `AOVConfig` inputs for scripted use.
 
-### Native Nuke path
-
-- `native/optix-denoiser/include/hdu/optix_denoiser.h`: Host-neutral in-memory
-  OptiX denoising API.
-- `native/optix-denoiser/src/optix_denoiser.cpp`: CUDA Driver API and OptiX
-  implementation for float4 beauty and guide buffers.
-- `native/nuke-optix/src/HOptixDenoise.cpp`: Nuke `PlanarIop` adapter for image
-  requests, channel conversion, knobs, validation, and passthrough behavior.
-- `tools/build_nuke_optix.ps1`: Dependency fetch, NDK build, Nuke terminal
-  validation, manifest generation, and ZIP packaging.
-
 ## Main data flows
 
 ### AOV scan flow (GUI)
