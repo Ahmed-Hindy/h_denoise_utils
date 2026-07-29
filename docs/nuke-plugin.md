@@ -83,8 +83,17 @@ a denoiser.
 
 The `Nuke OptiX Plugin` workflow targets a Windows self-hosted runner because
 Foundry's Nuke SDK and license are not available on GitHub-hosted runners. The
-runner must have Nuke and the Visual Studio toolchain installed. The workflow
-uses the same build script as local development and uploads the validated ZIP.
+runner must have Nuke and the Visual Studio toolchain installed. A dispatch can
+build one selected Nuke/OptiX pair or the complete validated matrix: Nuke
+`14.1v8`, `15.0v1`, `15.1v4`, and `17.0v3` against OptiX `8.1`, `9.0`, and
+`9.1`. Matrix jobs run serially to avoid concurrent Nuke license and GPU use.
+
+Every job removes stale local ZIPs before building, reuses cached pinned CUDA
+and OptiX headers, and uploads only packages created by that job. An explicit
+`publish_release` dispatch option can create or update a dedicated GitHub
+release after all selected builds validate; normal workflow runs remain
+artifact-only. Before publication, the workflow verifies the expected package
+count and each ZIP's embedded version, production flag, and source commit.
 
 ## Architecture
 

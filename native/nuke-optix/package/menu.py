@@ -2,7 +2,6 @@
 
 import nuke
 
-
 nuke.menu("Nodes").addCommand(
     "Filter/HOptixDenoise",
     lambda: nuke.createNode("HOptixDenoise"),

@@ -19,6 +19,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   contexts, streams, denoisers, and GPU buffers between renders.
 - Nuke validation now covers repeated renders, tile changes, and image-size
   changes across the supported Nuke and OptiX versions.
+- The Nuke workflow can build one package or the serial 12-package supported
+  matrix, reuse pinned SDK caches, and optionally publish manifest-validated
+  release assets.
 
 ### Fixed
 - Large Nuke plane conversions and output writes now respond to render aborts.

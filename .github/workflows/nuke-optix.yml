@@ -3,12 +3,20 @@ name: Nuke OptiX Plugin
 on:
   workflow_dispatch:
     inputs:
+      build_scope:
+        description: Build one package or the full validated matrix
+        required: true
+        type: choice
+        options:
+          - single
+          - supported-matrix
+        default: single
       nuke_version:
-        description: Installed Nuke revision
+        description: Installed Nuke revision for a single build
         required: true
         default: 17.0v3
       optix_version:
-        description: OptiX SDK version
+        description: OptiX SDK version for a single build
         required: true
         type: choice
         options:
@@ -16,18 +24,48 @@ on:
           - "9.0"
           - "8.1"
         default: "9.1"
+      publish_release:
+        description: Upload validated ZIPs to a GitHub release
+        required: true
+        type: boolean
+        default: false
+      release_tag:
+        description: Version tag used when publishing; must match nuke-optix-v<project version>
+        required: true
+        default: nuke-optix-v2.0.1
 
 permissions:
   contents: read
 
+concurrency:
+  group: nuke-optix-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  build-windows:
+  build-single:
+    if: inputs.build_scope == 'single'
     runs-on: [self-hosted, Windows, X64, nuke-ndk]
     timeout-minutes: 30
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      - name: Cache CUDA driver headers
+        uses: actions/cache@v4
+        with:
+          path: build/deps/cuda-redist
+          key: nuke-optix-cuda-windows-12.9.1
+
+      - name: Cache OptiX headers
+        uses: actions/cache@v4
+        with:
+          path: build/deps/optix-${{ inputs.optix_version }}
+          key: nuke-optix-sdk-${{ inputs.optix_version }}
+
+      - name: Remove stale packages
+        shell: pwsh
+        run: Remove-Item -Path dist/h-denoise-nuke-*.zip -Force -ErrorAction SilentlyContinue
 
       - name: Build and validate plugin
         shell: pwsh
@@ -37,8 +75,118 @@ jobs:
           -OptixVersion "${{ inputs.optix_version }}"
 
       - name: Upload validated package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: h-denoise-nuke-${{ inputs.nuke_version }}-optix-${{ inputs.optix_version }}
           path: dist/h-denoise-nuke-*.zip
           if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  build-supported:
+    if: inputs.build_scope == 'supported-matrix'
+    runs-on: [self-hosted, Windows, X64, nuke-ndk]
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        nuke_version:
+          - 14.1v8
+          - 15.0v1
+          - 15.1v4
+          - 17.0v3
+        optix_version:
+          - "8.1"
+          - "9.0"
+          - "9.1"
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Cache CUDA driver headers
+        uses: actions/cache@v4
+        with:
+          path: build/deps/cuda-redist
+          key: nuke-optix-cuda-windows-12.9.1
+
+      - name: Cache OptiX headers
+        uses: actions/cache@v4
+        with:
+          path: build/deps/optix-${{ matrix.optix_version }}
+          key: nuke-optix-sdk-${{ matrix.optix_version }}
+
+      - name: Remove stale packages
+        shell: pwsh
+        run: Remove-Item -Path dist/h-denoise-nuke-*.zip -Force -ErrorAction SilentlyContinue
+
+      - name: Build and validate plugin
+        shell: pwsh
+        run: >-
+          ./tools/build_nuke_optix.ps1
+          -NukeVersion "${{ matrix.nuke_version }}"
+          -OptixVersion "${{ matrix.optix_version }}"
+
+      - name: Upload validated package
+        uses: actions/upload-artifact@v7
+        with:
+          name: h-denoise-nuke-${{ matrix.nuke_version }}-optix-${{ matrix.optix_version }}
+          path: dist/h-denoise-nuke-*.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  publish-release:
+    if: >-
+      ${{
+        always() &&
+        inputs.publish_release &&
+        !cancelled() &&
+        (needs.build-single.result == 'success' ||
+         needs.build-supported.result == 'success')
+      }}
+    needs:
+      - build-single
+      - build-supported
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Download validated packages
+        uses: actions/download-artifact@v7
+        with:
+          pattern: h-denoise-nuke-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Validate release packages
+        shell: bash
+        run: >-
+          python tools/validate_nuke_release_assets.py
+          --assets-dir release-assets
+          --build-scope "${{ inputs.build_scope }}"
+          --release-tag "${{ inputs.release_tag }}"
+          --source-commit "${GITHUB_SHA}"
+
+      - name: Publish release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assets=(release-assets/*.zip)
+
+          if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release create "${RELEASE_TAG}" \
+              --target "${GITHUB_SHA}" \
+              --title "HOptixDenoise ${RELEASE_TAG}" \
+              --notes "Validated native HOptixDenoise packages."
+          fi
+          gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber

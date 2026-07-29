@@ -23,6 +23,7 @@ def test_nuke_plugin_sources_are_present() -> None:
         OPTIX_ROOT / "src" / "optix_denoiser.cpp",
         REPO_ROOT / "tools" / "build_nuke_optix.ps1",
         REPO_ROOT / "tools" / "validate_nuke_optix_plugin.py",
+        REPO_ROOT / "tools" / "validate_nuke_release_assets.py",
     )
 
     missing = [path.relative_to(REPO_ROOT) for path in expected if not path.is_file()]
@@ -85,3 +86,27 @@ def test_nuke_node_exposes_expected_contract() -> None:
         "abort_requested",
     ):
         assert expected in source
+
+
+def test_nuke_workflow_supports_single_matrix_and_release_builds() -> None:
+    """Protect the validated build matrix and opt-in release path."""
+    workflow = (
+        REPO_ROOT / ".github" / "workflows" / "nuke-optix.yml"
+    ).read_text(encoding="utf-8")
+
+    for nuke_version in ("14.1v8", "15.0v1", "15.1v4", "17.0v3"):
+        assert nuke_version in workflow
+    for optix_version in ('"8.1"', '"9.0"', '"9.1"'):
+        assert optix_version in workflow
+
+    assert "supported-matrix" in workflow
+    assert "max-parallel: 1" in workflow
+    assert "publish_release" in workflow
+    assert "gh release upload" in workflow
+    assert "Remove stale packages" in workflow
+    assert "nuke-optix-cuda-windows-12.9.1" in workflow
+    assert "nuke-optix-sdk-${{ matrix.optix_version }}" in workflow
+    assert "tools/validate_nuke_release_assets.py" in workflow
+    assert '--source-commit "${GITHUB_SHA}"' in workflow
+    assert "actions/upload-artifact@v7" in workflow
+    assert "actions/download-artifact@v7" in workflow
