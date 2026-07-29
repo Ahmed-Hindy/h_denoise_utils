@@ -110,6 +110,38 @@ def _validate_binary(
         raise ValueError(f"{asset.name} DLL SHA-256 does not match its manifest")
 
 
+def _validate_dependencies(manifest: dict[str, Any], asset: Path) -> None:
+    """Validate the PE dependency list recorded during packaging.
+
+    Args:
+        manifest: Parsed package manifest.
+        asset: Package path used in error messages.
+
+    Raises:
+        ValueError: If required driver/Nuke imports are absent or CUDART is
+            present.
+    """
+    dependencies = manifest.get("dependencies")
+    if not isinstance(dependencies, list) or not all(
+        isinstance(item, str) and item for item in dependencies
+    ):
+        raise ValueError(f"{asset.name} has an invalid dependency manifest")
+
+    normalized = {dependency.casefold() for dependency in dependencies}
+    if "ddimage.dll" not in normalized:
+        raise ValueError(f"{asset.name} does not import DDImage.dll")
+    if "nvcuda.dll" not in normalized:
+        raise ValueError(f"{asset.name} does not import nvcuda.dll")
+    cudart = sorted(
+        dependency
+        for dependency in dependencies
+        if dependency.casefold().startswith("cudart")
+        and dependency.casefold().endswith(".dll")
+    )
+    if cudart:
+        raise ValueError(f"{asset.name} imports CUDA Runtime DLLs: {cudart}")
+
+
 def validate_release_assets(
     assets_dir: Path,
     build_scope: str,
@@ -146,6 +178,7 @@ def validate_release_assets(
     for asset in assets:
         manifest, binary = _read_package(asset)
         _validate_binary(manifest, binary, asset)
+        _validate_dependencies(manifest, asset)
 
         if manifest.get("name") != "HOptixDenoise":
             raise ValueError(f"{asset.name} has an unexpected package name")
@@ -153,6 +186,8 @@ def validate_release_assets(
             raise ValueError(f"{asset.name} was built from another commit")
         if manifest.get("stub") is not False:
             raise ValueError(f"{asset.name} is not a production package")
+        if manifest.get("validated") is not True:
+            raise ValueError(f"{asset.name} did not complete Nuke render validation")
         if manifest.get("platform") != "windows-x64":
             raise ValueError(f"{asset.name} is not a Windows x64 package")
         if manifest.get("build_configuration") != "Release":

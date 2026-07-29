@@ -27,6 +27,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Large Nuke plane conversions and output writes now respond to render aborts.
 - The Windows Nuke build script now hashes files correctly under Windows
   PowerShell 5.1.
+- Nuke packaging now rejects binaries that omit required Nuke/CUDA Driver
+  imports or accidentally link a CUDA Runtime DLL.
 
 ## [2.0.1] — 2026-07-28
 

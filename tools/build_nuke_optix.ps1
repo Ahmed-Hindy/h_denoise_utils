@@ -93,6 +93,30 @@ function Get-Sha256Hash {
     }
 }
 
+function Get-PeDependencies {
+    param(
+        [Parameter(Mandatory = $true)][string]$Dumpbin,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    $output = & $Dumpbin /dependents $Path
+    if ($LASTEXITCODE -ne 0) {
+        throw "dumpbin failed with exit code ${LASTEXITCODE}: $Path"
+    }
+
+    $dependencies = @($output |
+        ForEach-Object {
+            if ($_ -match '^\s+([A-Za-z0-9_.-]+\.dll)\s*$') {
+                $Matches[1]
+            }
+        } |
+        Sort-Object -Unique)
+    if ($dependencies.Count -eq 0) {
+        throw "No PE dependencies were found for $Path"
+    }
+    return $dependencies
+}
+
 function Sync-OptixHeaders {
     param(
         [Parameter(Mandatory = $true)][string]$Destination,
@@ -208,6 +232,7 @@ $ninja = Resolve-Executable ninja.exe @(
 )
 $cl = (Resolve-Executable cl.exe).Replace("\", "/")
 $rc = (Resolve-Executable rc.exe).Replace("\", "/")
+$dumpbin = Resolve-Executable dumpbin.exe
 $ninjaForCMake = $ninja.Replace("\", "/")
 $env:PATH = "$(Split-Path -Parent $ninja);$env:PATH"
 
@@ -280,6 +305,18 @@ if (-not (Test-Path -LiteralPath $pluginBinary)) {
     throw "Nuke plugin was not created: $pluginBinary"
 }
 
+$dependencies = @(Get-PeDependencies -Dumpbin $dumpbin -Path $pluginBinary)
+if ($dependencies -notcontains "DDImage.dll") {
+    throw "Nuke plugin does not import DDImage.dll."
+}
+if (-not $Stub -and $dependencies -notcontains "nvcuda.dll") {
+    throw "Production Nuke plugin does not import nvcuda.dll."
+}
+$cudartDependencies = @($dependencies | Where-Object { $_ -match '^cudart.*\.dll$' })
+if ($cudartDependencies.Count -gt 0) {
+    throw "Nuke plugin unexpectedly imports CUDA Runtime DLLs: $($cudartDependencies -join ', ')"
+}
+
 $sourceCommit = (& git -C $repoRoot rev-parse HEAD).Trim()
 $manifest = [ordered]@{
     name = "HOptixDenoise"
@@ -292,6 +329,8 @@ $manifest = [ordered]@{
     platform = "windows-x64"
     build_configuration = $Configuration
     stub = $Stub.IsPresent
+    validated = -not $SkipValidation.IsPresent
+    dependencies = $dependencies
     sha256 = Get-Sha256Hash -Path $pluginBinary
     size = (Get-Item -LiteralPath $pluginBinary).Length
 }

@@ -88,6 +88,21 @@ def test_nuke_node_exposes_expected_contract() -> None:
         assert expected in source
 
 
+def test_nuke_build_validates_pe_dependencies() -> None:
+    """Keep production packages on the CUDA Driver API dependency surface."""
+    build_script = (
+        REPO_ROOT / "tools" / "build_nuke_optix.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert "Get-PeDependencies" in build_script
+    assert "dumpbin.exe" in build_script
+    assert '"DDImage.dll"' in build_script
+    assert '"nvcuda.dll"' in build_script
+    assert "cudartDependencies" in build_script
+    assert "validated = -not $SkipValidation.IsPresent" in build_script
+    assert "dependencies = $dependencies" in build_script
+
+
 def test_nuke_workflow_supports_single_matrix_and_release_builds() -> None:
     """Protect the validated build matrix and opt-in release path."""
     workflow = (

@@ -44,8 +44,11 @@ Nuke `14.1v8`, `15.0v1`, `15.1v4`, and `17.0v3`. A package built for Nuke
 h-denoise-nuke-17.0-windows-x64-optix-9.1-vX.Y.Z.zip
 ```
 
-The manifest inside the package records the exact Nuke revision used to build
-it.
+The manifest inside the package records the exact Nuke revision, OptiX commit,
+plugin SHA-256, file size, verified PE dependency list, and whether the Nuke
+render validation ran. Production builds must import `DDImage.dll` and
+`nvcuda.dll`, must not import a CUDART DLL, and cannot be published when built
+with `-SkipValidation`.
 
 ## Build on Windows
 

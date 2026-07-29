@@ -59,6 +59,8 @@ def _write_package(
         "platform": "windows-x64",
         "build_configuration": "Release",
         "stub": False,
+        "validated": True,
+        "dependencies": ["DDImage.dll", "nvcuda.dll", "KERNEL32.dll"],
         "sha256": hashlib.sha256(binary).hexdigest(),
         "size": len(binary),
     }
@@ -113,6 +115,42 @@ def test_validate_release_rejects_tampered_binary(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match="SHA-256"):
+        VALIDATOR.validate_release_assets(
+            assets_dir=tmp_path,
+            build_scope="single",
+            release_tag="nuke-optix-v2.0.1",
+            source_commit="abc123",
+        )
+
+
+def test_validate_release_rejects_unvalidated_package(tmp_path: Path) -> None:
+    """Reject a package built with Nuke render validation disabled."""
+    _write_package(
+        tmp_path,
+        nuke_line="17.0",
+        optix_version="9.1",
+        validated=False,
+    )
+
+    with pytest.raises(ValueError, match="did not complete Nuke render validation"):
+        VALIDATOR.validate_release_assets(
+            assets_dir=tmp_path,
+            build_scope="single",
+            release_tag="nuke-optix-v2.0.1",
+            source_commit="abc123",
+        )
+
+
+def test_validate_release_rejects_cudart_dependency(tmp_path: Path) -> None:
+    """Reject a package that links the CUDA Runtime DLL."""
+    _write_package(
+        tmp_path,
+        nuke_line="17.0",
+        optix_version="9.1",
+        dependencies=["DDImage.dll", "nvcuda.dll", "cudart64_12.dll"],
+    )
+
+    with pytest.raises(ValueError, match="CUDA Runtime DLLs"):
         VALIDATOR.validate_release_assets(
             assets_dir=tmp_path,
             build_scope="single",
