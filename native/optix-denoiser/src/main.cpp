@@ -4,6 +4,7 @@
 #include <optix_stubs.h>
 #include <optix_function_table_definition.h>
 #include <cuda_runtime.h>
+#include <hdu/optix_denoiser.h>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -1164,6 +1165,111 @@ int main(int argc, char *argv[])
     std::vector<float> beauty_pixels(b_width * b_height * beauty_roi.nchannels());
     std::vector<std::vector<float> > aov_pixels(g_input_aov.size());
 
+    const bool requires_legacy_denoiser =
+        denoise_aovs || pi_loaded || mv_loaded || pid_loaded ||
+        !output_internal_data_filename.empty();
+
+    if (!requires_legacy_denoiser)
+    {
+        const unsigned int buffer_size = 4 * b_width * b_height;
+        std::vector<float> beauty_float4(buffer_size, 0.0f);
+        std::vector<float> output_float4(buffer_size, 0.0f);
+        std::vector<float> albedo_float4;
+        std::vector<float> normal_float4;
+
+        g_input_beauty.data->get_pixels(
+            beauty_roi, OIIO::TypeDesc::FLOAT, beauty_pixels.data());
+        imageConvertFormat(
+            beauty_pixels.data(), beauty_roi.nchannels(), beauty_float4.data(),
+            4, b_width, b_height);
+
+        if (a_loaded)
+        {
+            std::vector<float> albedo_pixels(
+                a_width * a_height * albedo_roi.nchannels());
+            albedo_float4.assign(buffer_size, 0.0f);
+            g_input_albedo.data->get_pixels(
+                albedo_roi, OIIO::TypeDesc::FLOAT, albedo_pixels.data());
+            imageConvertFormat(
+                albedo_pixels.data(), albedo_roi.nchannels(), albedo_float4.data(),
+                4, a_width, a_height);
+        }
+
+        if (n_loaded)
+        {
+            std::vector<float> normal_pixels(
+                n_width * n_height * normal_roi.nchannels());
+            normal_float4.assign(buffer_size, 0.0f);
+            g_input_normal.data->get_pixels(
+                normal_roi, OIIO::TypeDesc::FLOAT, normal_pixels.data());
+            imageConvertFormat(
+                normal_pixels.data(), normal_roi.nchannels(), normal_float4.data(),
+                4, n_width, n_height);
+        }
+
+        hdu::optix::DenoiseRequest request;
+        request.beauty = {
+            beauty_float4.data(),
+            static_cast<unsigned int>(b_width),
+            static_cast<unsigned int>(b_height)};
+        if (a_loaded)
+        {
+            request.albedo = {
+                albedo_float4.data(),
+                static_cast<unsigned int>(b_width),
+                static_cast<unsigned int>(b_height)};
+        }
+        if (n_loaded)
+        {
+            request.normal = {
+                normal_float4.data(),
+                static_cast<unsigned int>(b_width),
+                static_cast<unsigned int>(b_height)};
+        }
+        request.output = {
+            output_float4.data(),
+            static_cast<unsigned int>(b_width),
+            static_cast<unsigned int>(b_height)};
+        request.options.gpu_device = selected_device_id;
+        request.options.blend_factor = blend;
+        request.options.hdr = hdr;
+
+        int sum = 0;
+        try
+        {
+            for (unsigned int i = 0; i < num_runs; ++i)
+            {
+                PrintInfo("Denoising...");
+                const clock_t start = clock();
+                hdu::optix::denoise(request);
+                const clock_t diff = clock() - start;
+                const int msec = diff * 1000 / CLOCKS_PER_SEC;
+                if (num_runs > 1)
+                    PrintInfo("Denoising run %d complete in %d.%03d seconds", i, msec/1000, msec%1000);
+                else
+                    PrintInfo("Denoising complete in %d.%03d seconds", msec/1000, msec%1000);
+                sum += msec;
+            }
+        }
+        catch (const hdu::optix::Error& error)
+        {
+            PrintError("OptiX denoising failed: %s", error.what());
+            cleanup();
+            exitfunc(EXIT_FAILURE);
+        }
+
+        if (num_runs > 1)
+        {
+            sum /= num_runs;
+            PrintInfo("Denoising avg of %d complete in %d.%03d seconds", num_runs, sum/1000, sum%1000);
+        }
+
+        imageConvertFormat(
+            output_float4.data(), 4, beauty_pixels.data(),
+            beauty_roi.nchannels(), b_width, b_height);
+    }
+    else
+    {
     // Select the GPU we want to use
     CU_CHECK(cudaSetDevice(selected_device_id));
 
@@ -1509,6 +1615,7 @@ int main(int argc, char *argv[])
     OPTIX_CHECK( optixDeviceContextDestroy(optix_context) );
     // Delete our CUDA stream as well
     CU_CHECK(cudaStreamDestroy(cuda_stream));
+    }
 
 
     const std::string input_path = g_multipart.enabled ? g_multipart.filename : g_input_beauty.filename;

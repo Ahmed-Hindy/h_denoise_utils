@@ -20,10 +20,13 @@ message(STATUS "Found CUDA: ${CUDA_TOOLKIT_ROOT_DIR}"
 
 # Include directories
 include_directories("contrib/optix/include"
+                    "include"
                     ${CUDA_INCLUDE_DIRS})
 
 # Source files
-set(SOURCES src/main.cpp)
+set(SOURCES
+    src/main.cpp
+    src/optix_denoiser.cpp)
 
 # Executable
 add_executable(${PROJECT_NAME} ${SOURCES})
@@ -31,6 +34,7 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 # Link libraries
 target_link_libraries(${PROJECT_NAME}
                       ${CUDA_cudart_static_LIBRARY}
+                      ${CUDA_CUDA_LIBRARY}
                       openimageio::openimageio
                       OpenEXR::OpenEXR
                       Imath::Imath)

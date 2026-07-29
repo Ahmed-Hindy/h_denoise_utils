@@ -24,6 +24,7 @@ struct DenoiseOptions {
     unsigned int tile_width = 0;
     unsigned int tile_height = 0;
     bool denoise_alpha = false;
+    bool hdr = true;
 };
 
 struct DenoiseRequest {

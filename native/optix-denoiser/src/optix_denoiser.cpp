@@ -181,10 +181,13 @@ private:
 
 class Denoiser final {
 public:
-    Denoiser(OptixDeviceContext context, const OptixDenoiserOptions& options) {
+    Denoiser(
+        OptixDeviceContext context,
+        OptixDenoiserModelKind model,
+        const OptixDenoiserOptions& options) {
         HDU_OPTIX_CHECK(optixDenoiserCreate(
             context,
-            OPTIX_DENOISER_MODEL_KIND_HDR,
+            model,
             &options,
             &denoiser_));
     }
@@ -339,7 +342,10 @@ void denoise(const DenoiseRequest& request) {
         request.options.denoise_alpha ? 1 : 0);
 #endif
 
-    Denoiser denoiser(optix_context.get(), denoiser_options);
+    const OptixDenoiserModelKind model = request.options.hdr
+        ? OPTIX_DENOISER_MODEL_KIND_HDR
+        : OPTIX_DENOISER_MODEL_KIND_LDR;
+    Denoiser denoiser(optix_context.get(), model, denoiser_options);
 
     const unsigned int width = request.beauty.width;
     const unsigned int height = request.beauty.height;
