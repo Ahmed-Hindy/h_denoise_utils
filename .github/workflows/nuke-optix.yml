@@ -183,7 +183,15 @@ jobs:
           shopt -s nullglob
           assets=(release-assets/*.zip)
 
-          if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            tag_commit=$(gh api \
+              "repos/${GITHUB_REPOSITORY}/commits/${RELEASE_TAG}" \
+              --jq .sha)
+            if [[ "${tag_commit}" != "${GITHUB_SHA}" ]]; then
+              echo "Release tag ${RELEASE_TAG} points to ${tag_commit}, not ${GITHUB_SHA}." >&2
+              exit 1
+            fi
+          else
             gh release create "${RELEASE_TAG}" \
               --target "${GITHUB_SHA}" \
               --title "HOptixDenoise ${RELEASE_TAG}" \

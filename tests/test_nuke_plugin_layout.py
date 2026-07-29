@@ -108,5 +108,7 @@ def test_nuke_workflow_supports_single_matrix_and_release_builds() -> None:
     assert "nuke-optix-sdk-${{ matrix.optix_version }}" in workflow
     assert "tools/validate_nuke_release_assets.py" in workflow
     assert '--source-commit "${GITHUB_SHA}"' in workflow
+    assert 'commits/${RELEASE_TAG}' in workflow
+    assert 'tag_commit' in workflow
     assert "actions/upload-artifact@v7" in workflow
     assert "actions/download-artifact@v7" in workflow

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import zipfile
@@ -37,6 +38,7 @@ def _write_package(
     optix_version: str,
     version: str = "2.0.1",
     source_commit: str = "abc123",
+    binary: bytes = b"native-plugin",
     **overrides: object,
 ) -> Path:
     """Create a minimal package ZIP with a production manifest."""
@@ -44,10 +46,21 @@ def _write_package(
         "name": "HOptixDenoise",
         "version": version,
         "source_commit": source_commit,
+        "nuke_version": VALIDATOR.SUPPORTED_NUKE_REVISIONS.get(
+            nuke_line,
+            f"{nuke_line}v1",
+        ),
         "nuke_binary_version": nuke_line,
         "optix_version": optix_version,
+        "optix_dev_commit": VALIDATOR.SUPPORTED_OPTIX_COMMITS.get(
+            optix_version,
+            "unsupported",
+        ),
         "platform": "windows-x64",
+        "build_configuration": "Release",
         "stub": False,
+        "sha256": hashlib.sha256(binary).hexdigest(),
+        "size": len(binary),
     }
     manifest.update(overrides)
     asset = directory / (
@@ -59,6 +72,7 @@ def _write_package(
             "HOptixDenoise/manifest.json",
             json.dumps(manifest),
         )
+        archive.writestr("HOptixDenoise/HOptixDenoise.dll", binary)
     return asset
 
 
@@ -89,6 +103,24 @@ def test_validate_release_rejects_wrong_source_commit(tmp_path: Path) -> None:
         )
 
 
+def test_validate_release_rejects_tampered_binary(tmp_path: Path) -> None:
+    """Reject a package whose DLL does not match the manifest digest."""
+    _write_package(
+        tmp_path,
+        nuke_line="17.0",
+        optix_version="9.1",
+        sha256="0" * 64,
+    )
+
+    with pytest.raises(ValueError, match="SHA-256"):
+        VALIDATOR.validate_release_assets(
+            assets_dir=tmp_path,
+            build_scope="single",
+            release_tag="nuke-optix-v2.0.1",
+            source_commit="abc123",
+        )
+
+
 def test_validate_supported_matrix(tmp_path: Path) -> None:
     """Accept the complete four-by-three validated compatibility matrix."""
     for nuke_line in VALIDATOR.SUPPORTED_NUKE_LINES:
@@ -109,8 +141,10 @@ def test_validate_supported_matrix(tmp_path: Path) -> None:
     assert len(result) == 12
 
 
-def test_validate_supported_matrix_rejects_wrong_coverage(tmp_path: Path) -> None:
-    """Reject a 12-file set that does not contain the supported Cartesian matrix."""
+def test_validate_supported_matrix_rejects_unsupported_package(
+    tmp_path: Path,
+) -> None:
+    """Reject a 12-file set containing an unsupported Nuke binary line."""
     for nuke_line in VALIDATOR.SUPPORTED_NUKE_LINES:
         for optix_version in VALIDATOR.SUPPORTED_OPTIX_VERSIONS:
             if (nuke_line, optix_version) != ("14.1", "8.1"):
@@ -121,7 +155,7 @@ def test_validate_supported_matrix_rejects_wrong_coverage(tmp_path: Path) -> Non
                 )
     _write_package(tmp_path, nuke_line="16.0", optix_version="8.1")
 
-    with pytest.raises(ValueError, match="Invalid supported matrix"):
+    with pytest.raises(ValueError, match="Unsupported Nuke binary line"):
         VALIDATOR.validate_release_assets(
             assets_dir=tmp_path,
             build_scope="supported-matrix",

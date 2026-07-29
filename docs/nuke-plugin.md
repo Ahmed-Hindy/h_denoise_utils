@@ -93,7 +93,9 @@ and OptiX headers, and uploads only packages created by that job. An explicit
 `publish_release` dispatch option can create or update a dedicated GitHub
 release after all selected builds validate; normal workflow runs remain
 artifact-only. Before publication, the workflow verifies the expected package
-count and each ZIP's embedded version, production flag, and source commit.
+count, exact Nuke/OptiX matrix, embedded DLL size and SHA-256, pinned SDK
+metadata, version tag, and source commit. Existing release tags must already
+point to the same commit before assets can be replaced.
 
 ## Architecture
 
