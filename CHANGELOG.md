@@ -31,6 +31,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   imports or accidentally link a CUDA Runtime DLL.
 - The legacy standalone CLI now applies its alpha mode before OptiX denoiser
   creation and reports named OptiX initialization errors.
+- Pull-request packaging can reuse a compatible published OptiX runtime when
+  native source changes produce a source key that is not released yet.
 
 ## [2.0.1] — 2026-07-28
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import os
 import shutil
@@ -44,8 +45,8 @@ def validate_bundle(
     expected_key: str,
     *,
     allow_source_key_mismatch: bool,
-) -> None:
-    """Validate a packaged executable and its manifest."""
+) -> dict[str, object]:
+    """Validate a packaged executable and return its manifest."""
     executable_path = bundle_dir / "Denoiser.exe"
     manifest_path = bundle_dir / "manifest.json"
     if not executable_path.is_file() or not manifest_path.is_file():
@@ -74,13 +75,15 @@ def validate_bundle(
     if actual_hash.lower() != str(manifest.get("sha256", "")).lower():
         raise RuntimeError(f"OptiX {version} executable SHA-256 mismatch")
 
-    if not allow_source_key_mismatch:
-        actual_key = manifest.get("source_key")
-        if actual_key != expected_key:
-            raise RuntimeError(
-                f"OptiX {version} source key mismatch: "
-                f"expected {expected_key}, got {actual_key}"
-            )
+    actual_key = manifest.get("source_key")
+    if not isinstance(actual_key, str) or not actual_key:
+        raise RuntimeError(f"OptiX {version} manifest is missing source_key")
+    if not allow_source_key_mismatch and actual_key != expected_key:
+        raise RuntimeError(
+            f"OptiX {version} source key mismatch: "
+            f"expected {expected_key}, got {actual_key}"
+        )
+    return manifest
 
 
 def find_extracted_bundle(extract_root: Path) -> Path:
@@ -94,25 +97,83 @@ def find_extracted_bundle(extract_root: Path) -> Path:
     return executable_paths[0].parent
 
 
-def acquire_asset(
-    destination: Path,
-    name: str,
+def _latest_local_asset(directory: Path, pattern: str) -> Path:
+    """Return the newest local asset matching a filename pattern."""
+    matches = [path for path in directory.glob(pattern) if path.is_file()]
+    if not matches:
+        raise FileNotFoundError(
+            f"HDU_OPTIX_DENOISER_ZIP_DIR has no asset matching {pattern}"
+        )
+    return max(matches, key=lambda path: (path.stat().st_mtime_ns, path.name))
+
+
+def _latest_release_asset(
+    github_cli: str,
     *,
     repository: str,
     tag: str,
-) -> None:
-    """Copy an injected local asset or download it with GitHub CLI."""
+    pattern: str,
+) -> str:
+    """Return the newest release asset name matching a filename pattern."""
+    result = subprocess.run(
+        [
+            github_cli,
+            "release",
+            "view",
+            tag,
+            "--repo",
+            repository,
+            "--json",
+            "assets",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assets = json.loads(result.stdout).get("assets", [])
+    matches = [
+        asset
+        for asset in assets
+        if fnmatch.fnmatchcase(str(asset.get("name", "")), pattern)
+    ]
+    if not matches:
+        raise FileNotFoundError(
+            f"Release {tag} has no denoiser asset matching {pattern}"
+        )
+    selected = max(
+        matches,
+        key=lambda asset: (
+            str(asset.get("updatedAt") or asset.get("createdAt") or ""),
+            str(asset.get("name", "")),
+        ),
+    )
+    return str(selected["name"])
+
+
+def acquire_asset(
+    destination_dir: Path,
+    pattern: str,
+    *,
+    repository: str,
+    tag: str,
+) -> Path:
+    """Copy or download the newest asset matching a filename pattern."""
     local_zip_dir = os.environ.get("HDU_OPTIX_DENOISER_ZIP_DIR")
     if local_zip_dir:
-        local_asset = Path(local_zip_dir) / name
-        if not local_asset.is_file():
-            raise FileNotFoundError(f"HDU_OPTIX_DENOISER_ZIP_DIR is missing {name}")
+        local_asset = _latest_local_asset(Path(local_zip_dir), pattern)
+        destination = destination_dir / local_asset.name
         shutil.copy2(local_asset, destination)
-        return
+        return destination
 
     github_cli = shutil.which("gh.exe") or shutil.which("gh")
     if not github_cli:
         raise FileNotFoundError("GitHub CLI was not found and no local ZIP directory was set")
+    name = _latest_release_asset(
+        github_cli,
+        repository=repository,
+        tag=tag,
+        pattern=pattern,
+    )
     subprocess.run(
         [
             github_cli,
@@ -124,12 +185,14 @@ def acquire_asset(
             "--pattern",
             name,
             "--dir",
-            str(destination.parent),
+            str(destination_dir),
         ],
         check=True,
     )
+    destination = destination_dir / name
     if not destination.is_file():
         raise FileNotFoundError(f"Downloaded denoiser asset was not found: {destination}")
+    return destination
 
 
 def install_bundle(source: Path, destination: Path) -> None:
@@ -219,33 +282,47 @@ def main() -> int:
     }
 
     installed = True
+    installed_keys: dict[str, str] = {}
     for version in versions:
         variant_dir = vendor_dir / f"optix-{version}"
         try:
-            validate_bundle(
+            manifest = validate_bundle(
                 variant_dir,
                 version,
                 keys[version],
                 allow_source_key_mismatch=args.allow_source_key_mismatch,
             )
+            installed_keys[version] = str(manifest["source_key"])
         except (OSError, RuntimeError, json.JSONDecodeError) as error:
             print(f"Existing OptiX {version} bundle requires refresh: {error}")
             installed = False
             break
     if installed:
         remove_legacy_files(vendor_dir)
+        write_summary(
+            vendor_dir,
+            versions,
+            installed_keys,
+            repository=args.repository,
+            tag=args.tag,
+        )
         print(f"Bundled OptiX denoiser variants already exist under: {vendor_dir}")
         return 0
 
     vendor_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="hdu-optix-denoiser-") as temporary:
         temporary_dir = Path(temporary)
+        installed_keys = {}
         for version in versions:
             name = asset_name(version, keys[version])
-            archive_path = temporary_dir / name
-            acquire_asset(
-                archive_path,
-                name,
+            pattern = (
+                f"optix-denoiser-{PLATFORM}-optix-{version}-*.zip"
+                if args.allow_source_key_mismatch
+                else name
+            )
+            archive_path = acquire_asset(
+                temporary_dir,
+                pattern,
                 repository=args.repository,
                 tag=args.tag,
             )
@@ -253,12 +330,13 @@ def main() -> int:
             with zipfile.ZipFile(archive_path) as archive:
                 archive.extractall(extract_root)
             bundle_dir = find_extracted_bundle(extract_root)
-            validate_bundle(
+            manifest = validate_bundle(
                 bundle_dir,
                 version,
                 keys[version],
                 allow_source_key_mismatch=args.allow_source_key_mismatch,
             )
+            installed_keys[version] = str(manifest["source_key"])
             destination = vendor_dir / f"optix-{version}"
             install_bundle(bundle_dir, destination)
             print(f"Bundled OptiX {version} denoiser installed: {destination / 'Denoiser.exe'}")
@@ -267,7 +345,7 @@ def main() -> int:
     write_summary(
         vendor_dir,
         versions,
-        keys,
+        installed_keys,
         repository=args.repository,
         tag=args.tag,
     )

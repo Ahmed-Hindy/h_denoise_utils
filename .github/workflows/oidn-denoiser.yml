@@ -97,7 +97,12 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: uv --system-certs run python .\tools\fetch_optix_denoiser_windows.py
+        run: |
+          $arguments = @()
+          if ("${{ github.event_name }}" -eq "pull_request") {
+            $arguments += "--allow-source-key-mismatch"
+          }
+          uv --system-certs run python .\tools\fetch_optix_denoiser_windows.py @arguments
 
       - name: Build bundled portable package
         if: github.event_name != 'push' || (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/'))
@@ -180,7 +185,12 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: ./tools/fetch_optix_denoiser.sh
+        run: |
+          arguments=()
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            arguments+=(--allow-source-key-mismatch)
+          fi
+          ./tools/fetch_optix_denoiser.sh "${arguments[@]}"
 
       - name: Build bundled portable package
         if: github.event_name != 'push' || (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/'))

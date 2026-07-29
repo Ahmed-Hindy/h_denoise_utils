@@ -70,7 +70,9 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: uv --system-certs run python .\tools\fetch_optix_denoiser_windows.py
+        run: >-
+          uv --system-certs run python .\tools\fetch_optix_denoiser_windows.py
+          --allow-source-key-mismatch
 
       - name: Fetch or build bundled OIDN denoiser
         shell: pwsh

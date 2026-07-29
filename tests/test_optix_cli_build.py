@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-from tools.fetch_optix_denoiser_windows import validate_bundle
+from tools.fetch_optix_denoiser_windows import (
+    _latest_local_asset,
+    validate_bundle,
+    write_summary,
+)
 from tools.optix_source_key import (
     OPTIX_COMMITS,
     SOURCE_KEY_INPUTS,
@@ -101,12 +106,12 @@ def test_fetcher_validates_manifest_and_executable(tmp_path: Path) -> None:
         json.dumps(manifest), encoding="utf-8"
     )
 
-    validate_bundle(
+    assert validate_bundle(
         tmp_path,
         "9.1",
         key,
         allow_source_key_mismatch=False,
-    )
+    ) == manifest
     executable.write_bytes(b"tampered")
     with pytest.raises(RuntimeError, match="SHA-256"):
         validate_bundle(
@@ -115,6 +120,81 @@ def test_fetcher_validates_manifest_and_executable(tmp_path: Path) -> None:
             key,
             allow_source_key_mismatch=False,
         )
+
+
+def test_fetcher_mismatch_mode_uses_actual_manifest_key(tmp_path: Path) -> None:
+    """Allow compatible released assets without falsifying their source key."""
+    executable = tmp_path / "Denoiser.exe"
+    executable.write_bytes(b"compatible-release-binary")
+    manifest = {
+        "name": "hdu-optix-denoiser",
+        "executable": "Denoiser.exe",
+        "optix_version": "9.1",
+        "optix_dev_commit": OPTIX_COMMITS["9.1"],
+        "platform": PLATFORM,
+        "contract": "optix-compatible-multipart-v1",
+        "source_key": "released-key",
+        "sha256": sha256_file(executable),
+    }
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+
+    result = validate_bundle(
+        tmp_path,
+        "9.1",
+        "current-tree-key",
+        allow_source_key_mismatch=True,
+    )
+
+    assert result["source_key"] == "released-key"
+    with pytest.raises(RuntimeError, match="source key mismatch"):
+        validate_bundle(
+            tmp_path,
+            "9.1",
+            "current-tree-key",
+            allow_source_key_mismatch=False,
+        )
+
+
+def test_fetcher_selects_newest_compatible_local_asset(tmp_path: Path) -> None:
+    """Choose one deterministic fallback when multiple released keys exist."""
+    older = tmp_path / "optix-denoiser-windows-x64-optix-9.1-old.zip"
+    newer = tmp_path / "optix-denoiser-windows-x64-optix-9.1-new.zip"
+    older.write_bytes(b"old")
+    newer.write_bytes(b"new")
+    os.utime(older, ns=(1_000_000_000, 1_000_000_000))
+    os.utime(newer, ns=(2_000_000_000, 2_000_000_000))
+
+    selected = _latest_local_asset(
+        tmp_path,
+        "optix-denoiser-windows-x64-optix-9.1-*.zip",
+    )
+
+    assert selected == newer
+
+
+def test_vendor_summary_records_installed_source_keys(tmp_path: Path) -> None:
+    """Keep package metadata honest when a compatible fallback is selected."""
+    installed_keys = {
+        "8.1": "released-81",
+        "9.0": "released-90",
+        "9.1": "released-91",
+    }
+
+    write_summary(
+        tmp_path,
+        list(installed_keys),
+        installed_keys,
+        repository="owner/repository",
+        tag="support-tag",
+    )
+
+    summary = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    assert {
+        variant["optix_version"]: variant["source_key"]
+        for variant in summary["variants"]
+    } == installed_keys
 
 
 def test_cli_uses_cuda_driver_api_only() -> None:
@@ -173,6 +253,32 @@ def test_source_key_inputs_match_fetchers() -> None:
     assert "fetch_optix_denoiser_windows.py" in workflow
     assert "windows-cmake-3.28" in workflow
     assert "fetch_optix_denoiser.ps1" not in workflow
+    assert "ACTUAL_SOURCE_KEYS" in linux_fetcher
+    assert "gh release view" in linux_fetcher
+    assert "installed_keys" in windows_fetcher
+    assert "_latest_release_asset" in windows_fetcher
+
+
+def test_pull_request_packaging_allows_compatible_optix_assets() -> None:
+    """Keep PR packaging unblocked while main and release fetches stay strict."""
+    nuitka_workflow = (
+        REPO_ROOT / ".github" / "workflows" / "nuitka-package.yml"
+    ).read_text(encoding="utf-8")
+    oidn_workflow = (
+        REPO_ROOT / ".github" / "workflows" / "oidn-denoiser.yml"
+    ).read_text(encoding="utf-8")
+    ci_workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+    release_workflow = (
+        REPO_ROOT / ".github" / "workflows" / "release.yml"
+    ).read_text(encoding="utf-8")
+
+    assert "--allow-source-key-mismatch" in nuitka_workflow
+    assert 'github.event_name }}" -eq "pull_request"' in oidn_workflow
+    assert 'github.event_name }}" == "pull_request"' in oidn_workflow
+    assert "--allow-source-key-mismatch" not in ci_workflow
+    assert "--allow-source-key-mismatch" not in release_workflow
 
 
 def test_windows_conan_profile_uses_ninja() -> None:
