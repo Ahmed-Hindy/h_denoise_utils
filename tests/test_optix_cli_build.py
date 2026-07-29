@@ -16,6 +16,7 @@ import pytest
 from tools.build_optix_denoiser_windows import sync_cuda_driver_files
 from tools.fetch_optix_denoiser_windows import (
     _latest_local_asset,
+    acquire_asset,
     remove_legacy_files,
     safe_extract,
     validate_bundle,
@@ -177,6 +178,57 @@ def test_fetcher_selects_newest_compatible_local_asset(tmp_path: Path) -> None:
     )
 
     assert selected == newer
+
+
+def test_release_fallback_downloads_newest_matching_asset(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Select and download the newest compatible GitHub release asset."""
+    older = "optix-denoiser-windows-x64-optix-9.1-old.zip"
+    newer = "optix-denoiser-windows-x64-optix-9.1-new.zip"
+    calls: list[list[str]] = []
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        if "view" in command:
+            payload = {
+                "assets": [
+                    {"name": newer, "updatedAt": "2026-07-29T12:00:00Z"},
+                    {"name": older, "updatedAt": "2026-07-28T12:00:00Z"},
+                ]
+            }
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=json.dumps(payload),
+                stderr="",
+            )
+        name = command[command.index("--pattern") + 1]
+        destination = Path(command[command.index("--dir") + 1]) / name
+        destination.write_bytes(b"downloaded")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.delenv("HDU_OPTIX_DENOISER_ZIP_DIR", raising=False)
+    monkeypatch.setattr(
+        "tools.fetch_optix_denoiser_windows.shutil.which",
+        lambda _name: "gh.exe",
+    )
+    monkeypatch.setattr(
+        "tools.fetch_optix_denoiser_windows.subprocess.run",
+        fake_run,
+    )
+
+    downloaded = acquire_asset(
+        tmp_path,
+        "optix-denoiser-windows-x64-optix-9.1-*.zip",
+        repository="owner/repository",
+        tag="support-tag",
+    )
+
+    assert downloaded == tmp_path / newer
+    assert downloaded.read_bytes() == b"downloaded"
+    assert calls[1][calls[1].index("--pattern") + 1] == newer
 
 
 def test_vendor_summary_records_installed_source_keys(tmp_path: Path) -> None:
@@ -394,7 +446,6 @@ def test_source_key_inputs_match_fetchers() -> None:
     assert "gh release view" in linux_fetcher
     assert "target.is_relative_to(root)" in linux_fetcher
     assert "installed_keys" in windows_fetcher
-    assert "_latest_release_asset" in windows_fetcher
 
 
 def test_pull_request_packaging_allows_compatible_optix_assets() -> None:
