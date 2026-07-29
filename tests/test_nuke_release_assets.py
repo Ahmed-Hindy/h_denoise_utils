@@ -222,6 +222,32 @@ def test_validate_supported_matrix(tmp_path: Path) -> None:
     assert len(result) == 12
 
 
+def test_validate_supported_matrix_rejects_duplicate_pair(tmp_path: Path) -> None:
+    """Reject two packages targeting the same Nuke and OptiX pair."""
+    for nuke_line in VALIDATOR.SUPPORTED_NUKE_LINES:
+        for optix_version in VALIDATOR.SUPPORTED_OPTIX_VERSIONS:
+            if (nuke_line, optix_version) != ("14.1", "8.1"):
+                _write_package(
+                    tmp_path,
+                    nuke_line=nuke_line,
+                    optix_version=optix_version,
+                )
+    _write_package(
+        tmp_path,
+        nuke_line="17.0",
+        optix_version="9.1",
+        version="2.0.2",
+    )
+
+    with pytest.raises(ValueError, match="Duplicate Nuke/OptiX package pair"):
+        VALIDATOR.validate_release_assets(
+            assets_dir=tmp_path,
+            build_scope="supported-matrix",
+            release_tag="nuke-optix-v2.0.1",
+            source_commit="abc123",
+        )
+
+
 def test_validate_supported_matrix_rejects_unsupported_package(
     tmp_path: Path,
 ) -> None:

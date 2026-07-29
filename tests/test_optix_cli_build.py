@@ -271,8 +271,23 @@ def test_vendor_summary_preserves_other_installed_variants(tmp_path: Path) -> No
     """Keep partial fetches from dropping already installed runtime variants."""
     old_variant = tmp_path / "optix-8.1"
     old_variant.mkdir()
-    (old_variant / "Denoiser.exe").write_bytes(b"old")
-    (old_variant / "manifest.json").write_text("{}", encoding="utf-8")
+    old_executable = old_variant / "Denoiser.exe"
+    old_executable.write_bytes(b"old")
+    (old_variant / "manifest.json").write_text(
+        json.dumps(
+            {
+                "name": "hdu-optix-denoiser",
+                "executable": "Denoiser.exe",
+                "optix_version": "8.1",
+                "optix_dev_commit": OPTIX_COMMITS["8.1"],
+                "platform": PLATFORM,
+                "contract": "optix-compatible-multipart-v1",
+                "source_key": "old-key",
+                "sha256": sha256_file(old_executable),
+            }
+        ),
+        encoding="utf-8",
+    )
     (tmp_path / "manifest.json").write_text(
         json.dumps(
             {

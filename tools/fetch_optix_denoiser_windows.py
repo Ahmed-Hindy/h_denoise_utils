@@ -250,16 +250,22 @@ def write_summary(
                     continue
                 executable = f"optix-{version}/Denoiser.exe"
                 variant_manifest = f"optix-{version}/manifest.json"
-                if (vendor_dir / executable).is_file() and (
-                    vendor_dir / variant_manifest
-                ).is_file():
-                    variants_by_version[version] = {
-                        "optix_version": version,
-                        "optix_dev_commit": OPTIX_COMMITS[version],
-                        "source_key": source_key_value,
-                        "executable": executable,
-                        "manifest": variant_manifest,
-                    }
+                try:
+                    validate_bundle(
+                        vendor_dir / f"optix-{version}",
+                        version,
+                        source_key_value,
+                        allow_source_key_mismatch=False,
+                    )
+                except (OSError, RuntimeError, json.JSONDecodeError):
+                    continue
+                variants_by_version[version] = {
+                    "optix_version": version,
+                    "optix_dev_commit": OPTIX_COMMITS[version],
+                    "source_key": source_key_value,
+                    "executable": executable,
+                    "manifest": variant_manifest,
+                }
         except (OSError, json.JSONDecodeError):
             variants_by_version = {}
 
