@@ -29,6 +29,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   PowerShell 5.1.
 - Nuke packaging now rejects binaries that omit required Nuke/CUDA Driver
   imports or accidentally link a CUDA Runtime DLL.
+- The legacy standalone CLI now applies its alpha mode before OptiX denoiser
+  creation and reports named OptiX initialization errors.
 
 ## [2.0.1] — 2026-07-28
 

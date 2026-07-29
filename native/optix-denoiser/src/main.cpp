@@ -678,9 +678,10 @@ int main(int argc, char *argv[])
     OptixResult result = optixInit();
     if (result != OPTIX_SUCCESS)
     {
-        // TODO: It would be nice to get the actual error string here, but how do
-        //       we get that if we can't dlopen OptiX?
-        PrintError("Cannot initialize OptiX library (%d)", result);
+        PrintError(
+            "Cannot initialize OptiX library: (%d) %s",
+            result,
+            optixGetErrorName(result));
         exitfunc(EXIT_FAILURE);
     }
 
@@ -1333,11 +1334,15 @@ int main(int argc, char *argv[])
     OptixDenoiserOptions denoiser_options = {};
     denoiser_options.guideAlbedo = a_loaded;
     denoiser_options.guideNormal = n_loaded;
+#if OPTIX_VERSION >= 80000
+    // Preserve the input alpha channel in the legacy CLI path.
+    denoiser_options.denoiseAlpha = OptixDenoiserAlphaMode(0);
+#endif
 
-    // Iniitalize the OptiX denoiser
+    // Initialize the OptiX denoiser
     OptixDenoiser optix_denoiser = nullptr;
     OptixDenoiserModelKind model = (hdr) ? OPTIX_DENOISER_MODEL_KIND_HDR : OPTIX_DENOISER_MODEL_KIND_LDR;
-    // TODO: supprt temporal AOV denoising
+    // Temporal denoising with additional AOV layers is intentionally rejected.
     if (denoise_aovs && pi_loaded)
     {
         PrintError("Temporal AOV denoising not yet supported");
@@ -1356,7 +1361,7 @@ int main(int argc, char *argv[])
     OptixDenoiserSizes denoiser_sizes;
     memset(&denoiser_sizes, 0, sizeof(OptixDenoiserSizes));
     OPTIX_CHECK( optixDenoiserComputeMemoryResources(optix_denoiser, b_width, b_height, &denoiser_sizes) );
-    // Allocate this space on the GPu
+    // Allocate this space on the GPU
     CUdeviceptr denoiser_state_buffer = 0;
     CUdeviceptr denoiser_scratch_buffer = 0;
     CU_CHECK(cuMemAlloc(&denoiser_state_buffer, denoiser_sizes.stateSizeInBytes));
@@ -1367,14 +1372,11 @@ int main(int argc, char *argv[])
                                             denoiser_state_buffer, denoiser_sizes.stateSizeInBytes,
                                             denoiser_scratch_buffer, denoiser_sizes.withoutOverlapScratchSizeInBytes) );
 
-    // Set the denoiser parameters
+    // Set the denoiser parameters.
     OptixDenoiserParams denoiser_params = {};
-    // TODO: Expose option for this
-#if OPTIX_VERSION >= 80000
-    denoiser_options.denoiseAlpha = OptixDenoiserAlphaMode(0);
-#elif OPTIX_VERSION >= 70600
+#if OPTIX_VERSION >= 70600 && OPTIX_VERSION < 80000
     denoiser_params.denoiseAlpha = OptixDenoiserAlphaMode(0);
-#else
+#elif OPTIX_VERSION < 70600
     denoiser_params.denoiseAlpha = 0;
 #endif
     denoiser_params.blendFactor = blend;

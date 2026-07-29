@@ -144,6 +144,9 @@ def test_cli_uses_cuda_driver_api_only() -> None:
     assert "cuda_runtime.h" not in cmake
     assert "cudart" not in cmake.lower()
     assert "cuda.lib" in cmake
+    assert source.index("denoiser_options.denoiseAlpha") < source.index(
+        "optixDenoiserCreate"
+    )
 
 
 def test_source_key_inputs_match_fetchers() -> None:
