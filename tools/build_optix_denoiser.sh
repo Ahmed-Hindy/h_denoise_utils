@@ -85,53 +85,12 @@ sync_optix_dev() {
 }
 
 calculate_source_key() {
-  python3 -c "
-import hashlib
-import os
-import sys
-
-repo_root = sys.argv[1]
-optix_version = sys.argv[2]
-optix_dev_commit = sys.argv[3]
-platform = sys.argv[4]
-configuration = sys.argv[5]
-
-payload = [
-    f'optix_version={optix_version}',
-    f'optix_dev_commit={optix_dev_commit}',
-    f'platform={platform}',
-    f'configuration={configuration}',
-]
-inputs = [
-    'native/optix-denoiser/CMakeLists.txt',
-    'native/optix-denoiser/conanfile.txt',
-    'native/optix-denoiser/cmake',
-    'native/optix-denoiser/src',
-    'tools/build_optix_denoiser.ps1',
-    'tools/build_optix_denoiser.sh',
-]
-
-for inp in inputs:
-    path = os.path.join(repo_root, inp)
-    if not os.path.exists(path):
-        print(f'Input missing: {path}', file=sys.stderr)
-        sys.exit(1)
-    if os.path.isdir(path):
-        files = []
-        for root, _dirs, names in os.walk(path):
-            for name in names:
-                files.append(os.path.join(root, name))
-    else:
-        files = [path]
-    for file_path in sorted(files):
-        rel = os.path.relpath(file_path, repo_root).replace(os.sep, '/')
-        with open(file_path, 'rb') as stream:
-            digest = hashlib.sha256(stream.read()).hexdigest().lower()
-        payload.append(f'{rel}={digest}')
-
-joined = '\n'.join(payload)
-print(hashlib.sha256(joined.encode('utf-8')).hexdigest().lower())
-" "${REPO_ROOT}" "${OPTIX_VERSION}" "${OPTIX_DEV_COMMIT}" "${PLATFORM}" "${CONFIGURATION}"
+  python3 "${SCRIPT_DIR}/optix_source_key.py" \
+    --repo-root "${REPO_ROOT}" \
+    --optix-version "${OPTIX_VERSION}" \
+    --optix-commit "${OPTIX_DEV_COMMIT}" \
+    --platform "${PLATFORM}" \
+    --configuration "${CONFIGURATION}"
 }
 
 if [[ -z "${SKIP_OPTIX_FETCH}" ]]; then
@@ -150,8 +109,8 @@ rm -rf "${BUILD_ROOT}" "${BUNDLE_ROOT}"
 mkdir -p "${BUILD_ROOT}" "${BUNDLE_ROOT}" "${DIST_ROOT}"
 
 cd "${NATIVE_DIR}"
-uv run --native-tls --with conan conan profile detect --force
-uv run --native-tls --with conan conan install . --output-folder "${BUILD_ROOT}" --build=missing -s build_type="${CONFIGURATION}" -s compiler.cppstd=20 -o openimageio/*:with_ffmpeg=False -o openimageio/*:with_opencolorio=False -c tools.system.package_manager:mode=install -c tools.system.package_manager:sudo=True
+uv --system-certs run --with conan conan profile detect --force
+uv --system-certs run --with conan conan install . --output-folder "${BUILD_ROOT}" --build=missing -s build_type="${CONFIGURATION}" -s compiler.cppstd=20 -c tools.system.package_manager:mode=install -c tools.system.package_manager:sudo=True
 
 TOOLCHAIN=$(find "${BUILD_ROOT}" -name conan_toolchain.cmake | head -n 1)
 if [[ -z "${TOOLCHAIN}" ]] || [[ ! -f "${TOOLCHAIN}" ]]; then

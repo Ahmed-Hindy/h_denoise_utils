@@ -12,7 +12,11 @@ on:
       - "tools/build_windows_nuitka_package.ps1"
       - "tools/build_windows_package.ps1"
       - "tools/compare_windows_packages.ps1"
-      - "tools/fetch_optix_denoiser.ps1"
+      - "tools/optix_source_key.py"
+      - "tools/build_optix_denoiser_windows.py"
+      - "tools/build_optix_denoiser.sh"
+      - "tools/fetch_optix_denoiser_windows.py"
+      - "tools/fetch_optix_denoiser.sh"
       - "tools/fetch_oidn_denoiser.ps1"
       - "tools/build_oidn_denoiser.ps1"
       - "tools/validate_oidn_uint_preservation.py"
@@ -66,7 +70,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: .\tools\fetch_optix_denoiser.ps1
+        run: uv --system-certs run python .\tools\fetch_optix_denoiser_windows.py
 
       - name: Fetch or build bundled OIDN denoiser
         shell: pwsh

@@ -1,0 +1,5 @@
+[replace_tool_requires]
+cmake/*: cmake/3.28.6
+
+[conf]
+tools.cmake.cmaketoolchain:generator=Ninja

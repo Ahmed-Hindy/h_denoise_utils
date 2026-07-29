@@ -97,7 +97,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: .\tools\fetch_optix_denoiser.ps1
+        run: uv --system-certs run python .\tools\fetch_optix_denoiser_windows.py
 
       - name: Build bundled portable package
         if: github.event_name != 'push' || (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/'))

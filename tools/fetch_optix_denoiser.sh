@@ -46,53 +46,12 @@ VENDOR_DIR="${REPO_ROOT}/h_denoise_utils/vendor/optix-denoiser/${PLATFORM}"
 calculate_source_key() {
   local version="$1"
   local optix_commit="$2"
-  python3 -c "
-import hashlib
-import os
-import sys
-
-repo_root = sys.argv[1]
-optix_version = sys.argv[2]
-optix_dev_commit = sys.argv[3]
-platform = sys.argv[4]
-configuration = sys.argv[5]
-
-payload = [
-    f'optix_version={optix_version}',
-    f'optix_dev_commit={optix_dev_commit}',
-    f'platform={platform}',
-    f'configuration={configuration}',
-]
-inputs = [
-    'native/optix-denoiser/CMakeLists.txt',
-    'native/optix-denoiser/conanfile.txt',
-    'native/optix-denoiser/cmake',
-    'native/optix-denoiser/src',
-    'tools/build_optix_denoiser.ps1',
-    'tools/build_optix_denoiser.sh',
-]
-
-for inp in inputs:
-    path = os.path.join(repo_root, inp)
-    if not os.path.exists(path):
-        print(f'Input missing: {path}', file=sys.stderr)
-        sys.exit(1)
-    if os.path.isdir(path):
-        files = []
-        for root, _dirs, names in os.walk(path):
-            for name in names:
-                files.append(os.path.join(root, name))
-    else:
-        files = [path]
-    for file_path in sorted(files):
-        rel = os.path.relpath(file_path, repo_root).replace(os.sep, '/')
-        with open(file_path, 'rb') as stream:
-            digest = hashlib.sha256(stream.read()).hexdigest().lower()
-        payload.append(f'{rel}={digest}')
-
-joined = '\n'.join(payload)
-print(hashlib.sha256(joined.encode('utf-8')).hexdigest().lower())
-" "${REPO_ROOT}" "${version}" "${optix_commit}" "${PLATFORM}" "${CONFIGURATION}"
+  python3 "${SCRIPT_DIR}/optix_source_key.py" \
+    --repo-root "${REPO_ROOT}" \
+    --optix-version "${version}" \
+    --optix-commit "${optix_commit}" \
+    --platform "${PLATFORM}" \
+    --configuration "${CONFIGURATION}"
 }
 
 get_optix_asset_name() {

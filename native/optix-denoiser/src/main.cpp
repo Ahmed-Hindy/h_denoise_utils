@@ -2,8 +2,7 @@
 #define NOMINMAX
 #include <optix.h>
 #include <optix_stubs.h>
-#include <optix_function_table_definition.h>
-#include <cuda_runtime.h>
+#include <cuda.h>
 #include <hdu/optix_denoiser.h>
 #include <iostream>
 #include <fstream>
@@ -69,6 +68,14 @@ struct MultipartOptions
     std::vector<SubimageInfo> subimages;
 };
 
+struct DeviceInfo
+{
+    char name[256] = {};
+    int major = 0;
+    int minor = 0;
+    std::size_t totalGlobalMem = 0;
+};
+
 // Our global image handles
 ImageInfo g_input_beauty;
 ImageInfo g_input_prev_denoised_frame;
@@ -92,7 +99,7 @@ int g_verbosity = 2;
 std::chrono::high_resolution_clock::time_point g_app_start_time;
 
 // Device count
-std::vector<cudaDeviceProp> g_device_props;
+std::vector<DeviceInfo> g_device_props;
 MultipartOptions g_multipart;
 
 void cleanup()
@@ -111,8 +118,8 @@ std::string getTime()
 {
     std::chrono::duration<double, std::milli> time_span = std::chrono::high_resolution_clock::now() - g_app_start_time;
     double milliseconds = time_span.count();
-    int seconds = floor(milliseconds / 1000.0);
-    int minutes = floor((float(seconds) / 60.f));
+    int seconds = static_cast<int>(std::floor(milliseconds / 1000.0));
+    int minutes = static_cast<int>(std::floor(static_cast<double>(seconds) / 60.0));
     milliseconds -= seconds * 1000.0;
     seconds -= minutes * 60;
     char s[9];
@@ -182,11 +189,22 @@ void exitfunc(int exit_code)
 	exit(exit_code);
 }
 
-inline void cudaCheckReportError(cudaError_t result, char const *const func, const char *const file, int const line)
+inline void cudaCheckReportError(CUresult result, char const *const func, const char *const file, int const line)
 {
-    if (result)
+    if (result != CUDA_SUCCESS)
     {
-        PrintError("CUDA error at %s:%d code=%d(%s) \"%s\"", file, line, static_cast<unsigned int>(result), cudaGetErrorName(result), func);
+        const char* error_name = "unknown";
+        const char* error_message = "unknown CUDA driver error";
+        cuGetErrorName(result, &error_name);
+        cuGetErrorString(result, &error_message);
+        PrintError(
+            "CUDA error at %s:%d code=%d(%s): %s \"%s\"",
+            file,
+            line,
+            static_cast<unsigned int>(result),
+            error_name,
+            error_message,
+            func);
         cleanup();
         exitfunc(EXIT_FAILURE);
     }
@@ -578,15 +596,15 @@ void printParams()
     PrintInfo("-v [int]         : log verbosity level 0:disabled 1:simple 2:full (default 2)");
     PrintInfo("-i [string]      : path to input image");
     PrintInfo("-pi [string]     : path previous denoised result (optional, required for temporal denoising)");
-    PrintInfo("-aov%d [string]  : path to additional input AOV image to denoise");
-    PrintInfo("-oaov%d [string] : path to additional AOV output image to denoise");
+    PrintInfo("-aov%%d [string]  : path to additional input AOV image to denoise");
+    PrintInfo("-oaov%%d [string] : path to additional AOV output image to denoise");
     PrintInfo("-o [string]      : path to output image");
     PrintInfo("-os [string]     : output suffix appended to input filename to create output image filename");
     PrintInfo("-multipart [string]    : path to multipart EXR input; loads planes by subimage name");
     PrintInfo("-beauty-name [string]  : beauty subimage name for -multipart (default C)");
     PrintInfo("-albedo-name [string]  : albedo subimage name for -multipart (default albedo)");
     PrintInfo("-normal-name [string]  : normal subimage name for -multipart (default N)");
-    PrintInfo("-aov-name%d [string]   : additional multipart AOV subimage name to denoise");
+    PrintInfo("-aov-name%%d [string]   : additional multipart AOV subimage name to denoise");
     PrintInfo("-a [string]      : path to input albedo AOV (optional)");
     PrintInfo("-n [string]      : path to input normal AOV (optional, requires albedo AOV)");
     PrintInfo("-mv [string]     : path to motion vector AOV (optional, required for temporal denoising)");
@@ -601,13 +619,10 @@ void printParams()
 
 bool discoverDevices()
 {
-    //Lets test some cuda stuff
+    CU_CHECK(cuInit(0));
+
     int device_count = 0;
-    if (cudaGetDeviceCount(&device_count))
-    {
-        PrintError("Failed to get device information");
-        return false;
-    }
+    CU_CHECK(cuDeviceGetCount(&device_count));
     PrintInfo("Found %d CUDA device(s)", device_count);
     if(device_count == 0){
         PrintError("No Nvidia GPUs found");
@@ -615,9 +630,22 @@ bool discoverDevices()
     }
     for (int i=0; i < device_count; i++)
     {
-        cudaDeviceProp prop;
-        cudaGetDeviceProperties(&prop, i);
-        PrintInfo("GPU %d: %s (compute %d.%d) with %dMB memory", i, prop.name, prop.major, prop.minor, prop.totalGlobalMem / 1024 / 1024);
+        CUdevice device = 0;
+        DeviceInfo prop;
+        CU_CHECK(cuDeviceGet(&device, i));
+        CU_CHECK(cuDeviceGetName(prop.name, sizeof(prop.name), device));
+        CU_CHECK(cuDeviceGetAttribute(
+            &prop.major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, device));
+        CU_CHECK(cuDeviceGetAttribute(
+            &prop.minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, device));
+        CU_CHECK(cuDeviceTotalMem(&prop.totalGlobalMem, device));
+        PrintInfo(
+            "GPU %d: %s (compute %d.%d) with %lluMB memory",
+            i,
+            prop.name,
+            prop.major,
+            prop.minor,
+            static_cast<unsigned long long>(prop.totalGlobalMem / 1024 / 1024));
         g_device_props.push_back(prop);
     }
     return true;
@@ -1039,9 +1067,17 @@ int main(int argc, char *argv[])
     }
 
     if (g_verbosity >= 2)
-        PrintInfo("Using GPU %d: %s (compute %d.%d) with %dMB memory", selected_device_id, g_device_props[selected_device_id].name,
-                                                                    g_device_props[selected_device_id].major, g_device_props[selected_device_id].minor,
-                                                                    g_device_props[selected_device_id].totalGlobalMem / 1024 / 1024);
+    {
+        const auto& selected_device = g_device_props[selected_device_id];
+        PrintInfo(
+            "Using GPU %d: %s (compute %d.%d) with %lluMB memory",
+            selected_device_id,
+            selected_device.name,
+            selected_device.major,
+            selected_device.minor,
+            static_cast<unsigned long long>(
+                selected_device.totalGlobalMem / 1024 / 1024));
+    }
 
     // Check if a beauty has been loaded
     if (!b_loaded)
@@ -1270,22 +1306,22 @@ int main(int argc, char *argv[])
     }
     else
     {
-    // Select the GPU we want to use
-    CU_CHECK(cudaSetDevice(selected_device_id));
+    // Select the GPU and retain its primary CUDA context.
+    CUdevice cuda_device = 0;
+    CUcontext cuda_context = nullptr;
+    CUcontext previous_context = nullptr;
+    CU_CHECK(cuDeviceGet(&cuda_device, static_cast<int>(selected_device_id)));
+    CU_CHECK(cuDevicePrimaryCtxRetain(&cuda_context, cuda_device));
+    CU_CHECK(cuCtxGetCurrent(&previous_context));
+    CU_CHECK(cuCtxSetCurrent(cuda_context));
 
-    // The runtime API lazily initializes its CUDA context on first usage
-    // Calling cudaFree here forces our context to initialize
-    // TODO: Time this?
-    CU_CHECK(cudaFree(0));
+    // Create a stream to run the denoiser on.
+    CUstream cuda_stream = nullptr;
+    CU_CHECK(cuStreamCreate(&cuda_stream, CU_STREAM_DEFAULT));
 
-    // Create a stream to run the denoiser on
-    cudaStream_t cuda_stream;
-    CU_CHECK(cudaStreamCreate(&cuda_stream));
-
-    // Initialize our optix context
-    CUcontext cuCtx = 0; // Zero means take the current context
+    // Initialize our OptiX context from the retained CUDA primary context.
     OptixDeviceContext optix_context = nullptr;
-    result = optixDeviceContextCreate(cuCtx, nullptr, &optix_context);
+    result = optixDeviceContextCreate(cuda_context, nullptr, &optix_context);
     if (result != OPTIX_SUCCESS)
     {
         PrintError("Could not create OptiX context: (%d) %s", result, optixGetErrorName(result));
@@ -1321,15 +1357,15 @@ int main(int argc, char *argv[])
     memset(&denoiser_sizes, 0, sizeof(OptixDenoiserSizes));
     OPTIX_CHECK( optixDenoiserComputeMemoryResources(optix_denoiser, b_width, b_height, &denoiser_sizes) );
     // Allocate this space on the GPu
-    void* denoiser_state_buffer = nullptr;
-    void* denoiser_scratch_buffer = nullptr;
-    CU_CHECK(cudaMalloc(&denoiser_state_buffer, denoiser_sizes.stateSizeInBytes));
-    CU_CHECK(cudaMalloc(&denoiser_scratch_buffer, denoiser_sizes.withoutOverlapScratchSizeInBytes));
+    CUdeviceptr denoiser_state_buffer = 0;
+    CUdeviceptr denoiser_scratch_buffer = 0;
+    CU_CHECK(cuMemAlloc(&denoiser_state_buffer, denoiser_sizes.stateSizeInBytes));
+    CU_CHECK(cuMemAlloc(&denoiser_scratch_buffer, denoiser_sizes.withoutOverlapScratchSizeInBytes));
     // Setup the denoiser
     OPTIX_CHECK( optixDenoiserSetup(optix_denoiser, cuda_stream,
                                             b_width, b_height,
-                                            (CUdeviceptr)denoiser_state_buffer,   denoiser_sizes.stateSizeInBytes,
-                                            (CUdeviceptr)denoiser_scratch_buffer, denoiser_sizes.withoutOverlapScratchSizeInBytes) );
+                                            denoiser_state_buffer, denoiser_sizes.stateSizeInBytes,
+                                            denoiser_scratch_buffer, denoiser_sizes.withoutOverlapScratchSizeInBytes) );
 
     // Set the denoiser parameters
     OptixDenoiserParams denoiser_params = {};
@@ -1356,7 +1392,7 @@ int main(int argc, char *argv[])
     for (auto& l : layers)
     {
         // Input
-        CU_CHECK(cudaMalloc(((void**)&(l.input.data)), sizeof(float) * 4 * b_width * b_height));
+        CU_CHECK(cuMemAlloc(&l.input.data, sizeof(float) * 4 * b_width * b_height));
         l.input.width              = b_width;
         l.input.height             = b_height;
         l.input.rowStrideInBytes   = b_width * sizeof(float) * 4;
@@ -1364,7 +1400,7 @@ int main(int argc, char *argv[])
         l.input.format             = OPTIX_PIXEL_FORMAT_FLOAT4;
 
         // Output
-        CU_CHECK(cudaMalloc(((void**)&(l.output.data)), sizeof(float) * 4 * b_width * b_height));
+        CU_CHECK(cuMemAlloc(&l.output.data, sizeof(float) * 4 * b_width * b_height));
         l.output.width              = b_width;
         l.output.height             = b_height;
         l.output.rowStrideInBytes   = b_width * sizeof(float) * 4;
@@ -1376,7 +1412,7 @@ int main(int argc, char *argv[])
     if (pi_loaded)
     {
         auto& l = layers[0];
-        CU_CHECK(cudaMalloc(((void**)&l.previousOutput.data), sizeof(float) * 4 * b_width * b_height));
+        CU_CHECK(cuMemAlloc(&l.previousOutput.data, sizeof(float) * 4 * b_width * b_height));
         l.previousOutput.width              = b_width;
         l.previousOutput.height             = b_height;
         l.previousOutput.rowStrideInBytes   = b_width * sizeof(float) * 4;
@@ -1388,7 +1424,7 @@ int main(int argc, char *argv[])
     // albedo
     if (a_loaded)
     {
-        CU_CHECK(cudaMalloc(((void**)&guide_layer.albedo.data), sizeof(float) * 4 * b_width * b_height));
+        CU_CHECK(cuMemAlloc(&guide_layer.albedo.data, sizeof(float) * 4 * b_width * b_height));
         // guide_layer.albedo.data               = (CUdeviceptr)albedo_buffer;
         guide_layer.albedo.width              = a_width;
         guide_layer.albedo.height             = a_height;
@@ -1400,7 +1436,7 @@ int main(int argc, char *argv[])
     // normal
     if (n_loaded)
     {
-        CU_CHECK(cudaMalloc(((void**)&guide_layer.normal.data), sizeof(float) * 4 * b_width * b_height));
+        CU_CHECK(cuMemAlloc(&guide_layer.normal.data, sizeof(float) * 4 * b_width * b_height));
         // guide_layer.normal.data               = (CUdeviceptr)normal_buffer;
         guide_layer.normal.width              = n_width;
         guide_layer.normal.height             = n_height;
@@ -1414,14 +1450,14 @@ int main(int argc, char *argv[])
     // assume temporal mode if previous denoised image is given
     if (mv_loaded || pi_loaded)
     {
-        CU_CHECK(cudaMalloc(((void**)&guide_layer.flow.data), sizeof(float) * 2 * b_width * b_height));
+        CU_CHECK(cuMemAlloc(&guide_layer.flow.data, sizeof(float) * 2 * b_width * b_height));
         guide_layer.flow.width              = b_width;
         guide_layer.flow.height             = b_height;
         guide_layer.flow.rowStrideInBytes   = b_width * sizeof(float) * 2;
         guide_layer.flow.pixelStrideInBytes = sizeof(float) * 2;
         guide_layer.flow.format             = OPTIX_PIXEL_FORMAT_FLOAT2;
         if (!mv_loaded)
-            CU_CHECK(cudaMemset((void*)guide_layer.flow.data, 0, sizeof(float) * 2 * b_width * b_height));
+            CU_CHECK(cuMemsetD8(guide_layer.flow.data, 0, sizeof(float) * 2 * b_width * b_height));
     }
 
     // Set up denoiser-internal data for temporal denoising. Assume temporal mode if previous denoised image is given.
@@ -1436,13 +1472,13 @@ int main(int argc, char *argv[])
         guide_layer.previousOutputInternalGuideLayer.format = OPTIX_PIXEL_FORMAT_INTERNAL_GUIDE_LAYER;
 
         // Allocate device memory for internal guide layer data
-        CU_CHECK(cudaMalloc(((void**)&guide_layer.previousOutputInternalGuideLayer.data), internal_size));
+        CU_CHECK(cuMemAlloc(&guide_layer.previousOutputInternalGuideLayer.data, internal_size));
 
         // Clear for first frame use. Might be overwritten with saved internal data (-pid).
-        CU_CHECK(cudaMemset((void*)guide_layer.previousOutputInternalGuideLayer.data, 0, internal_size));
+        CU_CHECK(cuMemsetD8(guide_layer.previousOutputInternalGuideLayer.data, 0, internal_size));
 
         guide_layer.outputInternalGuideLayer = guide_layer.previousOutputInternalGuideLayer;
-        CU_CHECK(cudaMalloc(((void**)&guide_layer.outputInternalGuideLayer.data), internal_size));
+        CU_CHECK(cuMemAlloc(&guide_layer.outputInternalGuideLayer.data, internal_size));
     }
 
     unsigned int buffer_size = 4 * b_width * b_height;
@@ -1454,7 +1490,7 @@ int main(int argc, char *argv[])
     imageConvertFormat(&beauty_pixels[0], beauty_roi.nchannels(), &host_scratch[0], 4, b_width, b_height);
     // Copy our data to the GPU
     // First layer must always be beauty AOV
-    CU_CHECK(cudaMemcpy((void*)layers[0].input.data, &host_scratch[0], sizeof(float) * buffer_size, cudaMemcpyHostToDevice));
+    CU_CHECK(cuMemcpyHtoD(layers[0].input.data, host_scratch.data(), sizeof(float) * buffer_size));
 
     // Copy our previous denoised frane data to the GPU
     if (pi_loaded)
@@ -1465,14 +1501,18 @@ int main(int argc, char *argv[])
         imageConvertFormat(&pi_pixels[0], pi_roi.nchannels(), &host_scratch[0], 4, b_width, b_height);
         // Copy our data to the GPU
         // First layer must always be beauty AOV
-        CU_CHECK(cudaMemcpy((void*)layers[0].previousOutput.data, &host_scratch[0], sizeof(float) * buffer_size, cudaMemcpyHostToDevice));
+        CU_CHECK(cuMemcpyHtoD(layers[0].previousOutput.data, host_scratch.data(), sizeof(float) * buffer_size));
     }
 
     // Copy previous denoiser-internal data to the GPU
     if (pid_loaded)
     {
         size_t internal_size = b_width * b_height * denoiser_sizes.internalGuideLayerPixelSizeInBytes;
-        CU_CHECK(cudaMemcpy((void*)guide_layer.previousOutputInternalGuideLayer.data, (void*)prev_internal_data.str().c_str(), internal_size, cudaMemcpyHostToDevice));
+        const std::string previous_internal_data = prev_internal_data.str();
+        CU_CHECK(cuMemcpyHtoD(
+            guide_layer.previousOutputInternalGuideLayer.data,
+            previous_internal_data.data(),
+            internal_size));
     }
 
     if (a_loaded)
@@ -1484,7 +1524,7 @@ int main(int argc, char *argv[])
         // Convert image to float4 to use with the denoiser
         imageConvertFormat(&albedo_pixels[0], albedo_roi.nchannels(), &host_scratch[0], 4, a_width, a_height);
         // Copy our data to the GPU
-        CU_CHECK(cudaMemcpy((void*)guide_layer.albedo.data, &host_scratch[0], sizeof(float) * buffer_size, cudaMemcpyHostToDevice));
+        CU_CHECK(cuMemcpyHtoD(guide_layer.albedo.data, host_scratch.data(), sizeof(float) * buffer_size));
     }
 
     if (n_loaded)
@@ -1496,7 +1536,7 @@ int main(int argc, char *argv[])
         // Convert image to float4 to use with the denoiser
         imageConvertFormat(&normal_pixels[0], normal_roi.nchannels(), &host_scratch[0], 4, n_width, n_height);
         // Copy our data to the GPU
-        CU_CHECK(cudaMemcpy((void*)guide_layer.normal.data, &host_scratch[0], sizeof(float) * buffer_size, cudaMemcpyHostToDevice));
+        CU_CHECK(cuMemcpyHtoD(guide_layer.normal.data, host_scratch.data(), sizeof(float) * buffer_size));
     }
 
     if (mv_loaded)
@@ -1509,23 +1549,29 @@ int main(int argc, char *argv[])
         // Convert image to float4 to use with the denoiser
         imageConvertFormat(&mv_pixels[0], mv_roi.nchannels(), &host_scratch[0], 2, mv_width, mv_height);
         // Copy our data to the GPU
-        CU_CHECK(cudaMemcpy((void*)guide_layer.flow.data, &host_scratch[0], sizeof(float) * mv_buffer_size, cudaMemcpyHostToDevice));
+        CU_CHECK(cuMemcpyHtoD(guide_layer.flow.data, host_scratch.data(), sizeof(float) * mv_buffer_size));
     }
 
-    // Any additional AOVs that need to be denoised
+    // Any additional AOVs that need to be denoised.
     int aov = 1;
     for (auto& it : g_input_aov)
     {
         auto& a = it.second;
-        // Copy normal image data to the GPU
-        OIIO::ROI aov_roi = OIIO::get_roi_full(a.data->spec());
-        aov_pixels[aov - 1] = std::vector<float>(albedo_roi.width() * albedo_roi.height() * aov_roi.nchannels());
-        a.data->get_pixels(aov_roi, OIIO::TypeDesc::FLOAT, &aov_pixels[aov - 1][0]);
-        memset(&host_scratch[0], 0, sizeof(float) * buffer_size);
-        // Convert image to float4 to use with the denoiser
-        imageConvertFormat(&aov_pixels[aov - 1][0], aov_roi.nchannels(), &host_scratch[0], 4, albedo_roi.width(), albedo_roi.height());
-        // Copy our data to the GPU
-        CU_CHECK(cudaMemcpy((void*)layers[aov].input.data, &host_scratch[0], sizeof(float) * buffer_size, cudaMemcpyHostToDevice));
+        const OIIO::ROI aov_roi = OIIO::get_roi_full(a.data->spec());
+        auto& pixels = aov_pixels[aov - 1];
+        pixels.resize(
+            static_cast<std::size_t>(aov_roi.width()) *
+            static_cast<std::size_t>(aov_roi.height()) *
+            static_cast<std::size_t>(aov_roi.nchannels()));
+        a.data->get_pixels(aov_roi, OIIO::TypeDesc::FLOAT, pixels.data());
+        std::fill(host_scratch.begin(), host_scratch.end(), 0.0F);
+        imageConvertFormat(
+            pixels.data(), aov_roi.nchannels(), host_scratch.data(), 4,
+            aov_roi.width(), aov_roi.height());
+        CU_CHECK(cuMemcpyHtoD(
+            layers[aov].input.data,
+            host_scratch.data(),
+            sizeof(float) * buffer_size));
         aov++;
     }
 
@@ -1538,9 +1584,10 @@ int main(int argc, char *argv[])
 
         // Execute the denoiser
         OPTIX_CHECK( optixDenoiserInvoke(optix_denoiser, cuda_stream, &denoiser_params,
-                                            (CUdeviceptr)denoiser_state_buffer, denoiser_sizes.stateSizeInBytes,
-                                            &guide_layer, &layers[0], layers.size(), 0, 0,
-                                            (CUdeviceptr)denoiser_scratch_buffer, denoiser_sizes.withoutOverlapScratchSizeInBytes) );
+                                            denoiser_state_buffer, denoiser_sizes.stateSizeInBytes,
+                                            &guide_layer, &layers[0],
+                                            static_cast<unsigned int>(layers.size()), 0, 0,
+                                            denoiser_scratch_buffer, denoiser_sizes.withoutOverlapScratchSizeInBytes) );
         diff = clock() - start;
         int msec = diff * 1000 / CLOCKS_PER_SEC;
         if (num_runs > 1)
@@ -1556,7 +1603,7 @@ int main(int argc, char *argv[])
     }
 
     // Copy denoised images back to the CPU
-    unsigned int num_layers = layers.size();
+    const auto num_layers = static_cast<unsigned int>(layers.size());
     auto aov_it = g_input_aov.begin();
     for (unsigned int i = 0; i < num_layers; i++)
     {
@@ -1572,7 +1619,7 @@ int main(int argc, char *argv[])
             num_channels = aov_roi.nchannels();
             aov_it++;
         }
-        CU_CHECK(cudaMemcpy(&host_scratch[0], (void*)layers[i].output.data, sizeof(float) * buffer_size, cudaMemcpyDeviceToHost));
+        CU_CHECK(cuMemcpyDtoH(host_scratch.data(), layers[i].output.data, sizeof(float) * buffer_size));
         imageConvertFormat(&host_scratch[0], 4, &output[0], num_channels, b_width, b_height);
     }
 
@@ -1581,7 +1628,8 @@ int main(int argc, char *argv[])
     {
         size_t internal_size = b_width * b_height * denoiser_sizes.internalGuideLayerPixelSizeInBytes;
         std::vector<char> idata(internal_size);
-        CU_CHECK(cudaMemcpy((void*)&idata[0], (void*)guide_layer.outputInternalGuideLayer.data, internal_size, cudaMemcpyDeviceToHost));
+        CU_CHECK(cuMemcpyDtoH(
+            idata.data(), guide_layer.outputInternalGuideLayer.data, internal_size));
 
         std::ofstream file( output_internal_data_filename.c_str(), std::ios::binary);
         if (file.is_open())
@@ -1598,23 +1646,29 @@ int main(int argc, char *argv[])
     // Remove our gpu buffers
     for (auto& l : layers)
     {
-        CU_CHECK(cudaFree((void*)l.input.data));
-        CU_CHECK(cudaFree((void*)l.previousOutput.data));
-        CU_CHECK(cudaFree((void*)l.output.data));
+        if (l.input.data != 0) CU_CHECK(cuMemFree(l.input.data));
+        if (l.previousOutput.data != 0) CU_CHECK(cuMemFree(l.previousOutput.data));
+        if (l.output.data != 0) CU_CHECK(cuMemFree(l.output.data));
     }
-    CU_CHECK(cudaFree((void*)guide_layer.albedo.data));
-    CU_CHECK(cudaFree((void*)guide_layer.normal.data));
-    CU_CHECK(cudaFree((void*)guide_layer.flow.data));
-    CU_CHECK(cudaFree((void*)guide_layer.previousOutputInternalGuideLayer.data));
-    CU_CHECK(cudaFree((void*)guide_layer.outputInternalGuideLayer.data));
-    // Destroy the denoiser
-    CU_CHECK(cudaFree(denoiser_state_buffer));
-    CU_CHECK(cudaFree(denoiser_scratch_buffer));
+    if (guide_layer.albedo.data != 0) CU_CHECK(cuMemFree(guide_layer.albedo.data));
+    if (guide_layer.normal.data != 0) CU_CHECK(cuMemFree(guide_layer.normal.data));
+    if (guide_layer.flow.data != 0) CU_CHECK(cuMemFree(guide_layer.flow.data));
+    if (guide_layer.previousOutputInternalGuideLayer.data != 0) {
+        CU_CHECK(cuMemFree(guide_layer.previousOutputInternalGuideLayer.data));
+    }
+    if (guide_layer.outputInternalGuideLayer.data != 0) {
+        CU_CHECK(cuMemFree(guide_layer.outputInternalGuideLayer.data));
+    }
+    // Destroy the denoiser.
+    if (denoiser_state_buffer != 0) CU_CHECK(cuMemFree(denoiser_state_buffer));
+    if (denoiser_scratch_buffer != 0) CU_CHECK(cuMemFree(denoiser_scratch_buffer));
     OPTIX_CHECK( optixDenoiserDestroy(optix_denoiser) );
     // Destroy the OptiX context
     OPTIX_CHECK( optixDeviceContextDestroy(optix_context) );
-    // Delete our CUDA stream as well
-    CU_CHECK(cudaStreamDestroy(cuda_stream));
+    // Delete our CUDA stream, restore the caller's context, and release the primary context.
+    CU_CHECK(cuStreamDestroy(cuda_stream));
+    CU_CHECK(cuCtxSetCurrent(previous_context));
+    CU_CHECK(cuDevicePrimaryCtxRelease(cuda_device));
     }
 
 
@@ -1653,8 +1707,8 @@ int main(int argc, char *argv[])
         PrintError("[OIIO]: %s", g_input_beauty.data->geterror().c_str());
     }
 
-    // Save all the additional AOVs that have been denoised
-    aov = 0;
+    // Save all the additional AOVs that have been denoised.
+    std::size_t aov = 0;
     for (auto& it : g_input_aov)
     {
         auto& a = it.second;
