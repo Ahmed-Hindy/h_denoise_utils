@@ -548,6 +548,13 @@ def test_source_key_inputs_match_fetchers() -> None:
     assert "installed_keys" in windows_fetcher
 
 
+def test_native_conan_options_include_static_link_dependencies() -> None:
+    """Prevent system libraries from leaking into static OpenImageIO builds."""
+    conanfile = (OPTIX_ROOT / "conanfile.txt").read_text(encoding="utf-8")
+    assert "openimageio/*:shared=False" in conanfile
+    assert "openimageio/*:with_libpng=True" in conanfile
+
+
 def test_native_optix_workflow_builds_source_changes() -> None:
     """Compile every supported native variant before source changes merge."""
     workflow = (REPO_ROOT / ".github" / "workflows" / "build-optix.yml").read_text(
@@ -565,6 +572,9 @@ def test_native_optix_workflow_builds_source_changes() -> None:
     assert "'tools/build_optix_denoiser_windows.py') }}" in workflow
     assert "'tools/build_optix_denoiser.sh') }}" in workflow
     assert "'native/optix-denoiser/profiles/**'" not in workflow
+    assert workflow.count("max-parallel: 1") == 2
+    assert "key: optix-conan-${{ runner.os }}-${{ hashFiles" in workflow
+    assert "optix-conan-${{ runner.os }}-${{ matrix.optix-version }}" not in workflow
 
 
 def test_pull_request_packaging_allows_compatible_optix_assets() -> None:

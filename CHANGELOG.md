@@ -40,6 +40,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   traversal, and interrupted CUDA downloads recover without manual cleanup.
 - RGB and other sub-four-channel standalone outputs no longer write beyond
   their pixel stride, and legacy AOV output paths no longer assume an extension.
+- Static Linux OpenImageIO builds now link their PNG dependency explicitly
+  instead of accidentally discovering an untracked system library.
 
 ## [2.0.1] — 2026-07-28
 

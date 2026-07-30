@@ -14,7 +14,7 @@ cmake_layout
 openimageio/*:shared=False
 openimageio/*:with_libjpeg=libjpeg-turbo
 openimageio/*:with_libjxl=False
-openimageio/*:with_libpng=False
+openimageio/*:with_libpng=True
 openimageio/*:with_freetype=False
 openimageio/*:with_opencolorio=False
 openimageio/*:with_opencv=False

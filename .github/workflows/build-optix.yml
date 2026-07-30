@@ -42,6 +42,7 @@ jobs:
     runs-on: windows-2022
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         optix-version: ["8.1", "9.0", "9.1"]
 
@@ -61,9 +62,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.conan2
-          key: optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-${{ hashFiles('native/optix-denoiser/conanfile.txt', 'native/optix-denoiser/profiles/windows-cmake-3.28', 'tools/optix_source_key.py', 'tools/build_optix_denoiser_windows.py') }}
+          key: optix-conan-${{ runner.os }}-${{ hashFiles('native/optix-denoiser/conanfile.txt', 'native/optix-denoiser/profiles/windows-cmake-3.28', 'tools/optix_source_key.py', 'tools/build_optix_denoiser_windows.py') }}
           restore-keys: |
-            optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-
             optix-conan-${{ runner.os }}-
 
       - name: Build OptiX denoiser bundle
@@ -82,6 +82,7 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         optix-version: ["8.1", "9.0", "9.1"]
 
@@ -106,9 +107,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.conan2
-          key: optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-${{ hashFiles('native/optix-denoiser/conanfile.txt', 'tools/optix_source_key.py', 'tools/build_optix_denoiser.sh') }}
+          key: optix-conan-${{ runner.os }}-${{ hashFiles('native/optix-denoiser/conanfile.txt', 'tools/optix_source_key.py', 'tools/build_optix_denoiser.sh') }}
           restore-keys: |
-            optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-
             optix-conan-${{ runner.os }}-
 
       - name: Build OptiX denoiser bundle
