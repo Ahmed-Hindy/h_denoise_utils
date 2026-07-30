@@ -6,6 +6,7 @@ import ast
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -23,12 +24,14 @@ from tools.fetch_optix_denoiser_windows import (
     write_summary,
 )
 from tools.optix_source_key import (
+    COMMON_SOURCE_KEY_INPUTS,
+    LINUX_PLATFORM,
     OPTIX_COMMITS,
-    SOURCE_KEY_INPUTS,
     WINDOWS_PLATFORM,
     sha256_file,
     sha256_source_file,
     source_key,
+    source_key_inputs,
 )
 
 PLATFORM = WINDOWS_PLATFORM
@@ -60,6 +63,81 @@ def test_source_hash_normalizes_line_endings(tmp_path: Path) -> None:
     crlf_path.write_bytes(b"first\r\nsecond\r\n")
 
     assert sha256_source_file(lf_path) == sha256_source_file(crlf_path)
+
+
+def test_source_keys_only_include_relevant_platform_build_inputs(
+    tmp_path: Path,
+) -> None:
+    """Avoid invalidating one platform when only the other builder changes."""
+    all_inputs = set(source_key_inputs(WINDOWS_PLATFORM)) | set(
+        source_key_inputs(LINUX_PLATFORM)
+    )
+    for relative in all_inputs:
+        source = REPO_ROOT / relative
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if source.is_dir():
+            shutil.copytree(source, destination)
+        else:
+            shutil.copy2(source, destination)
+
+    windows_before = source_key(
+        tmp_path,
+        "9.1",
+        OPTIX_COMMITS["9.1"],
+        WINDOWS_PLATFORM,
+        "Release",
+    )
+    linux_before = source_key(
+        tmp_path,
+        "9.1",
+        OPTIX_COMMITS["9.1"],
+        LINUX_PLATFORM,
+        "Release",
+    )
+
+    windows_builder = tmp_path / "tools" / "build_optix_denoiser_windows.py"
+    windows_builder.write_text(
+        windows_builder.read_text(encoding="utf-8") + "\n# windows-only change\n",
+        encoding="utf-8",
+    )
+
+    windows_after = source_key(
+        tmp_path,
+        "9.1",
+        OPTIX_COMMITS["9.1"],
+        WINDOWS_PLATFORM,
+        "Release",
+    )
+    assert windows_after != windows_before
+    assert source_key(
+        tmp_path,
+        "9.1",
+        OPTIX_COMMITS["9.1"],
+        LINUX_PLATFORM,
+        "Release",
+    ) == linux_before
+
+    linux_builder = tmp_path / "tools" / "build_optix_denoiser.sh"
+    linux_builder.write_text(
+        linux_builder.read_text(encoding="utf-8") + "\n# linux-only change\n",
+        encoding="utf-8",
+    )
+
+    assert source_key(
+        tmp_path,
+        "9.1",
+        OPTIX_COMMITS["9.1"],
+        WINDOWS_PLATFORM,
+        "Release",
+    ) == windows_after
+    assert source_key(
+        tmp_path,
+        "9.1",
+        OPTIX_COMMITS["9.1"],
+        LINUX_PLATFORM,
+        "Release",
+    ) != linux_before
 
 
 def test_source_key_cli_matches_library() -> None:
@@ -426,11 +504,17 @@ def test_cli_uses_cuda_driver_api_only() -> None:
     assert "cuda_runtime.h" not in cmake
     assert "cudart" not in cmake.lower()
     assert "cuda.lib" in cmake
+    assert "project(Denoiser LANGUAGES CXX)" in cmake
+    assert "target_include_directories" in cmake
+    assert "/W4" in cmake
+    assert "-Wall -Wextra -Wpedantic" in cmake
     assert source.index("denoiser_options.denoiseAlpha") < source.index(
         "optixDenoiserCreate"
     )
     assert "hdu::optix::DenoiserSession denoiser_session" in source
     assert "denoiser_session.denoise(request)" in source
+    assert "std::min(in_size, out_size)" in source
+    assert "outputPathFor(a.filename, a.output_filename, out_suffix)" in source
 
 
 def test_source_key_inputs_match_fetchers() -> None:
@@ -446,12 +530,13 @@ def test_source_key_inputs_match_fetchers() -> None:
         encoding="utf-8"
     )
 
-    assert "native/optix-denoiser/include" in SOURCE_KEY_INPUTS
-    assert "native/optix-denoiser/profiles" in SOURCE_KEY_INPUTS
+    assert "native/optix-denoiser/include" in COMMON_SOURCE_KEY_INPUTS
+    assert "native/optix-denoiser/profiles" in source_key_inputs(WINDOWS_PLATFORM)
+    assert "native/optix-denoiser/profiles" not in source_key_inputs(LINUX_PLATFORM)
     for text in (linux_builder, linux_fetcher):
         assert "optix_source_key.py" in text
     assert "optix_source_key" in windows_fetcher
-    assert "tools/optix_source_key.py" in SOURCE_KEY_INPUTS
+    assert "tools/optix_source_key.py" in COMMON_SOURCE_KEY_INPUTS
     assert "optix_source_key.py" in workflow
     assert "build_optix_denoiser_windows.py" in workflow
     assert "fetch_optix_denoiser_windows.py" in workflow
@@ -461,6 +546,25 @@ def test_source_key_inputs_match_fetchers() -> None:
     assert "gh release view" in linux_fetcher
     assert "target.is_relative_to(root)" in linux_fetcher
     assert "installed_keys" in windows_fetcher
+
+
+def test_native_optix_workflow_builds_source_changes() -> None:
+    """Compile every supported native variant before source changes merge."""
+    workflow = (REPO_ROOT / ".github" / "workflows" / "build-optix.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "pull_request:" in workflow
+    assert "push:" in workflow
+    assert '"native/optix-denoiser/**"' in workflow
+    assert workflow.count("persist-credentials: false") == 3
+    assert "permissions:\n  contents: read" in workflow
+    assert "github.event_name == 'workflow_dispatch'" in workflow
+    assert "RELEASE_TAG: ${{ inputs.release_tag }}" in workflow
+    assert '$tag = "${{ github.event.inputs.release_tag }}"' not in workflow
+    assert "'tools/build_optix_denoiser_windows.py') }}" in workflow
+    assert "'tools/build_optix_denoiser.sh') }}" in workflow
+    assert "'native/optix-denoiser/profiles/**'" not in workflow
 
 
 def test_pull_request_packaging_allows_compatible_optix_assets() -> None:

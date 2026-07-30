@@ -1,6 +1,22 @@
 name: Build OptiX Denoiser
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/build-optix.yml"
+      - "native/optix-denoiser/**"
+      - "tools/build_optix_denoiser_windows.py"
+      - "tools/build_optix_denoiser.sh"
+      - "tools/optix_source_key.py"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/build-optix.yml"
+      - "native/optix-denoiser/**"
+      - "tools/build_optix_denoiser_windows.py"
+      - "tools/build_optix_denoiser.sh"
+      - "tools/optix_source_key.py"
   workflow_dispatch:
     inputs:
       release_tag:
@@ -14,8 +30,11 @@ on:
         default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.inputs.release_tag || 'default' }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.release_tag || 'default' }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   build-windows:
@@ -28,6 +47,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -40,7 +61,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.conan2
-          key: optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-${{ hashFiles('native/optix-denoiser/conanfile.txt', 'native/optix-denoiser/profiles/windows-cmake-3.28', 'tools/optix_source_key.py', 'tools/build_optix_denoiser_windows.py', 'tools/build_optix_denoiser.sh') }}
+          key: optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-${{ hashFiles('native/optix-denoiser/conanfile.txt', 'native/optix-denoiser/profiles/windows-cmake-3.28', 'tools/optix_source_key.py', 'tools/build_optix_denoiser_windows.py') }}
           restore-keys: |
             optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-
             optix-conan-${{ runner.os }}-
@@ -66,6 +87,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up CUDA
         uses: Jimver/cuda-toolkit@v0.2.29
@@ -83,7 +106,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.conan2
-          key: optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-${{ hashFiles('native/optix-denoiser/conanfile.txt', 'native/optix-denoiser/profiles/**', 'tools/optix_source_key.py', 'tools/build_optix_denoiser.sh') }}
+          key: optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-${{ hashFiles('native/optix-denoiser/conanfile.txt', 'tools/optix_source_key.py', 'tools/build_optix_denoiser.sh') }}
           restore-keys: |
             optix-conan-${{ runner.os }}-${{ matrix.optix-version }}-
             optix-conan-${{ runner.os }}-
@@ -101,7 +124,7 @@ jobs:
 
   publish-release:
     name: "publish / OptiX support release"
-    if: ${{ github.event.inputs.upload_to_release == 'true' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_to_release }}
     needs:
       - build-windows
       - build-linux
@@ -111,6 +134,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Download build artifacts
         uses: actions/download-artifact@v7
@@ -123,13 +148,16 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_COMMIT: ${{ github.sha }}
         run: |
           $ErrorActionPreference = "Stop"
           if ($PSVersionTable.PSVersion.Major -ge 7) {
             $PSNativeCommandUseErrorActionPreference = $true
           }
-          $tag = "${{ github.event.inputs.release_tag }}"
-          $repo = "${{ github.repository }}"
+          $tag = $env:RELEASE_TAG
+          $repo = $env:REPOSITORY
           $title = "OptiX Denoiser Support Assets $tag"
           $notes = @"
           Support release for h_denoise_utils bundled OptiX denoiser assets.
@@ -150,7 +178,7 @@ jobs:
             gh release edit $tag --repo $repo --title $title --notes $notes --latest=false
           }
           else {
-            gh release create $tag --repo $repo --title $title --notes $notes --target "${{ github.sha }}" --latest=false
+            gh release create $tag --repo $repo --title $title --notes $notes --target $env:SOURCE_COMMIT --latest=false
           }
 
           $assets = Get-ChildItem -LiteralPath "artifacts" -Filter "optix-denoiser-*.zip" -File

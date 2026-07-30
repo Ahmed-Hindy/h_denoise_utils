@@ -13,17 +13,30 @@ OPTIX_COMMITS = {
 }
 WINDOWS_PLATFORM = "windows-x64"
 LINUX_PLATFORM = "linux-x64"
-SOURCE_KEY_INPUTS = (
+COMMON_SOURCE_KEY_INPUTS = (
     "native/optix-denoiser/CMakeLists.txt",
     "native/optix-denoiser/conanfile.txt",
     "native/optix-denoiser/cmake",
     "native/optix-denoiser/include",
-    "native/optix-denoiser/profiles",
     "native/optix-denoiser/src",
     "tools/optix_source_key.py",
-    "tools/build_optix_denoiser_windows.py",
-    "tools/build_optix_denoiser.sh",
 )
+PLATFORM_SOURCE_KEY_INPUTS = {
+    WINDOWS_PLATFORM: (
+        "native/optix-denoiser/profiles",
+        "tools/build_optix_denoiser_windows.py",
+    ),
+    LINUX_PLATFORM: ("tools/build_optix_denoiser.sh",),
+}
+
+
+def source_key_inputs(platform: str) -> tuple[str, ...]:
+    """Return common and platform-specific inputs for one native asset key."""
+    try:
+        platform_inputs = PLATFORM_SOURCE_KEY_INPUTS[platform]
+    except KeyError as error:
+        raise ValueError(f"Unsupported source-key platform: {platform}") from error
+    return COMMON_SOURCE_KEY_INPUTS + platform_inputs
 
 
 def sha256_file(path: Path) -> str:
@@ -55,7 +68,7 @@ def source_key(
         f"platform={platform}",
         f"configuration={configuration}",
     ]
-    for relative in SOURCE_KEY_INPUTS:
+    for relative in source_key_inputs(platform):
         input_path = repo_root / relative
         if not input_path.exists():
             raise FileNotFoundError(f"Source-key input is missing: {input_path}")

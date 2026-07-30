@@ -1,13 +1,15 @@
 cmake_minimum_required(VERSION 3.18)
-project(Denoiser)
+project(Denoiser LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
 include(GNUInstallDirs)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 
 set(CUDA_REDIST_ROOT "" CACHE PATH "Minimal CUDA redistributable root")
 if(CUDA_REDIST_ROOT)
+    if(NOT WIN32)
+        message(FATAL_ERROR "CUDA_REDIST_ROOT currently supports Windows packages only")
+    endif()
     set(CUDA_INCLUDE_DIRS "${CUDA_REDIST_ROOT}/include")
     set(CUDA_DRIVER_LIBRARY "${CUDA_REDIST_ROOT}/lib/x64/cuda.lib")
     foreach(required_path
@@ -32,25 +34,31 @@ message(STATUS "Found OpenImageIO: ${OpenImageIO_DIR}"
 message(STATUS "CUDA includes: ${CUDA_INCLUDE_DIRS}")
 message(STATUS "CUDA driver library: ${CUDA_DRIVER_LIBRARY}")
 
-# Include directories
-include_directories("contrib/optix/include"
-                    "include"
-                    ${CUDA_INCLUDE_DIRS})
-
-# Source files
-set(SOURCES
+add_executable(
+    ${PROJECT_NAME}
     src/main.cpp
     src/optix_denoiser.cpp)
 
-# Executable
-add_executable(${PROJECT_NAME} ${SOURCES})
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
+target_include_directories(${PROJECT_NAME} PRIVATE "include")
+target_include_directories(
+    ${PROJECT_NAME}
+    SYSTEM PRIVATE
+    "contrib/optix/include"
+    ${CUDA_INCLUDE_DIRS})
+target_link_libraries(
+    ${PROJECT_NAME}
+    PRIVATE
+    ${CUDA_DRIVER_LIBRARY}
+    openimageio::openimageio
+    OpenEXR::OpenEXR
+    Imath::Imath)
 
-# Link libraries
-target_link_libraries(${PROJECT_NAME}
-                      ${CUDA_DRIVER_LIBRARY}
-                      openimageio::openimageio
-                      OpenEXR::OpenEXR
-                      Imath::Imath)
+if(MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE /W4 /permissive- /EHsc)
+else()
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
+endif()
 
 # Install app and Conan OpenImageIO artifacts explicitly.
 install(TARGETS ${PROJECT_NAME}

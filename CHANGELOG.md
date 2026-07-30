@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Nuke validation now covers repeated renders, real tiled invocation, and
   image-size changes across the supported Nuke and OptiX versions.
 - Standalone CLI repeat runs now reuse one OptiX session for accurate profiling.
+- Native OptiX source changes now compile on Windows and Linux pull requests,
+  with platform-specific source keys and cache inputs.
 - The Nuke workflow can build one package or the serial 12-package supported
   matrix, reuse pinned SDK caches, and optionally publish manifest-validated
   release assets.
@@ -36,6 +38,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   native source changes produce a source key that is not released yet.
 - Partial OptiX fetches preserve installed variants, archives reject path
   traversal, and interrupted CUDA downloads recover without manual cleanup.
+- RGB and other sub-four-channel standalone outputs no longer write beyond
+  their pixel stride, and legacy AOV output paths no longer assume an extension.
 
 ## [2.0.1] — 2026-07-28
 

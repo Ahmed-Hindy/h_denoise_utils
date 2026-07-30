@@ -228,12 +228,16 @@ inline void optixCheckReportError(OptixResult result, char const *const func, co
 // that a OptiX host call returns an error
 #define OPTIX_CHECK(val) optixCheckReportError((val), #val, __FILE__, __LINE__)
 
-inline void imageConvertFormat(float* in_ptr, uint8_t in_size, float* out_ptr, uint8_t out_size, unsigned int width, unsigned int height)
+inline void imageConvertFormat(float* in_ptr, int in_size, float* out_ptr, int out_size, unsigned int width, unsigned int height)
 {
+    if (in_size <= 0 || out_size <= 0)
+        return;
+
+    const int copy_channels = std::min(in_size, out_size);
     for (unsigned int y=0; y<height; y++)
     for (unsigned int x=0; x<width; x++)
     {
-        memcpy(out_ptr, in_ptr, sizeof(float) * in_size);
+        memcpy(out_ptr, in_ptr, sizeof(float) * copy_channels);
         out_ptr += out_size;
         in_ptr += in_size;
     }
@@ -1623,7 +1627,9 @@ int main(int argc, char *argv[])
             aov_it++;
         }
         CU_CHECK(cuMemcpyDtoH(host_scratch.data(), layers[i].output.data, sizeof(float) * buffer_size));
-        imageConvertFormat(&host_scratch[0], 4, &output[0], num_channels, b_width, b_height);
+        imageConvertFormat(
+            &host_scratch[0], 4, &output[0],
+            static_cast<int>(num_channels), b_width, b_height);
     }
 
     // Copy internal data back to the CPU
@@ -1719,17 +1725,14 @@ int main(int argc, char *argv[])
         OIIO::ROI aov_roi = OIIO::get_roi_full(a.data->spec());
         if (!a.data->set_pixels(aov_roi, OIIO::TypeDesc::FLOAT, &aov_pixels[aov][0]))
             PrintError("Something went wrong setting pixels of file %s", a.filename.c_str());
-        std::string out_path = a.output_filename;
-        int ext_loc = (int)a.output_filename.find_last_of(".");
-        const char* ext_c = out_path.c_str()+ext_loc;
-        std::string ext(ext_c);
-        out_path = out_path.substr(0, ext_loc) + out_suffix + ext_c;
+        const std::string aov_out_path =
+            outputPathFor(a.filename, a.output_filename, out_suffix);
 
-        if (a.data->write(out_path))
-            PrintInfo("Written out: %s", out_path.c_str());
+        if (a.data->write(aov_out_path))
+            PrintInfo("Written out: %s", aov_out_path.c_str());
         else
         {
-            PrintError("Could not save file %s", out_path.c_str());
+            PrintError("Could not save file %s", aov_out_path.c_str());
             PrintError("[OIIO]: %s", a.data->geterror().c_str());
         }
         aov++;

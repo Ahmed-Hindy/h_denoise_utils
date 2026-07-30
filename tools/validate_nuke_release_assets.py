@@ -142,6 +142,71 @@ def _validate_dependencies(manifest: dict[str, Any], asset: Path) -> None:
         raise ValueError(f"{asset.name} imports CUDA Runtime DLLs: {cudart}")
 
 
+def _validate_package_manifest(
+    manifest: dict[str, Any],
+    asset: Path,
+    source_commit: str,
+) -> tuple[str, str, str]:
+    """Validate production metadata and return version compatibility fields."""
+    expected_fields = {
+        "name": ("HOptixDenoise", "has an unexpected package name"),
+        "source_commit": (source_commit, "was built from another commit"),
+        "stub": (False, "is not a production package"),
+        "validated": (True, "did not complete Nuke render validation"),
+        "platform": ("windows-x64", "is not a Windows x64 package"),
+        "build_configuration": ("Release", "is not a Release build"),
+    }
+    for field, (expected, message) in expected_fields.items():
+        if manifest.get(field) != expected:
+            raise ValueError(f"{asset.name} {message}")
+
+    version = _require_text(manifest, "version", asset)
+    nuke_line = _require_text(manifest, "nuke_binary_version", asset)
+    optix_version = _require_text(manifest, "optix_version", asset)
+    if nuke_line not in SUPPORTED_NUKE_REVISIONS:
+        raise ValueError(f"Unsupported Nuke binary line in {asset.name}: {nuke_line}")
+    if optix_version not in SUPPORTED_OPTIX_COMMITS:
+        raise ValueError(f"Unsupported OptiX version in {asset.name}: {optix_version}")
+    if manifest.get("nuke_version") != SUPPORTED_NUKE_REVISIONS[nuke_line]:
+        raise ValueError(f"{asset.name} was built with the wrong Nuke revision")
+    if manifest.get("optix_dev_commit") != SUPPORTED_OPTIX_COMMITS[optix_version]:
+        raise ValueError(f"{asset.name} was built with the wrong OptiX commit")
+
+    expected_name = (
+        f"h-denoise-nuke-{nuke_line}-windows-x64-"
+        f"optix-{optix_version}-v{version}.zip"
+    )
+    if asset.name != expected_name:
+        raise ValueError(
+            f"Package filename mismatch: expected {expected_name}, got {asset.name}"
+        )
+    return version, nuke_line, optix_version
+
+
+def _validate_release_identity(versions: set[str], release_tag: str) -> None:
+    """Require one package version and its matching GitHub release tag."""
+    if len(versions) != 1:
+        raise ValueError(f"Release packages have inconsistent versions: {versions}")
+    expected_tag = f"nuke-optix-v{next(iter(versions))}"
+    if release_tag != expected_tag:
+        raise ValueError(f"Release tag must be {expected_tag}, got {release_tag}")
+
+
+def _validate_supported_matrix(package_pairs: set[tuple[str, str]]) -> None:
+    """Require every supported Nuke and OptiX package combination exactly once."""
+    expected_pairs = {
+        (nuke_line, optix_version)
+        for nuke_line in SUPPORTED_NUKE_LINES
+        for optix_version in SUPPORTED_OPTIX_VERSIONS
+    }
+    if package_pairs != expected_pairs:
+        missing = sorted(expected_pairs - package_pairs)
+        unexpected = sorted(package_pairs - expected_pairs)
+        raise ValueError(
+            f"Invalid supported matrix; missing={missing}, unexpected={unexpected}"
+        )
+
+
 def validate_release_assets(
     assets_dir: Path,
     build_scope: str,
@@ -179,40 +244,11 @@ def validate_release_assets(
         manifest, binary = _read_package(asset)
         _validate_binary(manifest, binary, asset)
         _validate_dependencies(manifest, asset)
-
-        if manifest.get("name") != "HOptixDenoise":
-            raise ValueError(f"{asset.name} has an unexpected package name")
-        if manifest.get("source_commit") != source_commit:
-            raise ValueError(f"{asset.name} was built from another commit")
-        if manifest.get("stub") is not False:
-            raise ValueError(f"{asset.name} is not a production package")
-        if manifest.get("validated") is not True:
-            raise ValueError(f"{asset.name} did not complete Nuke render validation")
-        if manifest.get("platform") != "windows-x64":
-            raise ValueError(f"{asset.name} is not a Windows x64 package")
-        if manifest.get("build_configuration") != "Release":
-            raise ValueError(f"{asset.name} is not a Release build")
-
-        version = _require_text(manifest, "version", asset)
-        nuke_line = _require_text(manifest, "nuke_binary_version", asset)
-        optix_version = _require_text(manifest, "optix_version", asset)
-        if nuke_line not in SUPPORTED_NUKE_REVISIONS:
-            raise ValueError(f"Unsupported Nuke binary line in {asset.name}: {nuke_line}")
-        if optix_version not in SUPPORTED_OPTIX_COMMITS:
-            raise ValueError(f"Unsupported OptiX version in {asset.name}: {optix_version}")
-        if manifest.get("nuke_version") != SUPPORTED_NUKE_REVISIONS[nuke_line]:
-            raise ValueError(f"{asset.name} was built with the wrong Nuke revision")
-        if manifest.get("optix_dev_commit") != SUPPORTED_OPTIX_COMMITS[optix_version]:
-            raise ValueError(f"{asset.name} was built with the wrong OptiX commit")
-
-        expected_name = (
-            f"h-denoise-nuke-{nuke_line}-windows-x64-"
-            f"optix-{optix_version}-v{version}.zip"
+        version, nuke_line, optix_version = _validate_package_manifest(
+            manifest,
+            asset,
+            source_commit,
         )
-        if asset.name != expected_name:
-            raise ValueError(
-                f"Package filename mismatch: expected {expected_name}, got {asset.name}"
-            )
 
         pair = (nuke_line, optix_version)
         if pair in package_pairs:
@@ -220,25 +256,9 @@ def validate_release_assets(
         package_pairs.add(pair)
         versions.add(version)
 
-    if len(versions) != 1:
-        raise ValueError(f"Release packages have inconsistent versions: {versions}")
-    expected_tag = f"nuke-optix-v{next(iter(versions))}"
-    if release_tag != expected_tag:
-        raise ValueError(f"Release tag must be {expected_tag}, got {release_tag}")
-
+    _validate_release_identity(versions, release_tag)
     if build_scope == "supported-matrix":
-        expected_pairs = {
-            (nuke_line, optix_version)
-            for nuke_line in SUPPORTED_NUKE_LINES
-            for optix_version in SUPPORTED_OPTIX_VERSIONS
-        }
-        if package_pairs != expected_pairs:
-            missing = sorted(expected_pairs - package_pairs)
-            unexpected = sorted(package_pairs - expected_pairs)
-            raise ValueError(
-                f"Invalid supported matrix; missing={missing}, unexpected={unexpected}"
-            )
-
+        _validate_supported_matrix(package_pairs)
     return assets
 
 
