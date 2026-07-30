@@ -573,6 +573,8 @@ def test_native_optix_workflow_builds_source_changes() -> None:
     assert "'tools/build_optix_denoiser.sh') }}" in workflow
     assert "'native/optix-denoiser/profiles/**'" not in workflow
     assert workflow.count("max-parallel: 1") == 2
+    assert workflow.count("actions/cache@v5") == 2
+    assert "Jimver/cuda-toolkit@v0.2.35" in workflow
     assert "key: optix-conan-${{ runner.os }}-${{ hashFiles" in workflow
     assert "optix-conan-${{ runner.os }}-${{ matrix.optix-version }}" not in workflow
 
