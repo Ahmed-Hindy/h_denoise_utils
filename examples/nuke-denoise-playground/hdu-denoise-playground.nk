@@ -1,0 +1,21 @@
+set cut_paste_input [stack 0]
+version 14.1 v8
+Root {
+ inputs 0
+ first_frame 1
+ last_frame 1
+ lock_range true
+ fps 24
+ format "1920 1080 0 0 1920 1080 1 HD_1080"
+ onScriptLoad "import hdu_playground; hdu_playground.configure()"
+ name hdu-denoise-playground.nk
+}
+StickyNote {
+ inputs 0
+ name HDU_PLAYGROUND_START_HERE
+ label "h_denoise_utils OptiX + OIDN playground\n\nLaunch this file with launch-nuke-playground.ps1.\nThe graph is generated from the selected multipart EXR and matching native runtimes.\nOpen HDU_PLAYGROUND_CONTROLS after startup, then inspect the source, guide, OptiX, OIDN, and difference branches."
+ note_font_size 24
+ tile_color 1063413247
+ xpos 760
+ ypos -80
+}

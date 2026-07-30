@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Shared in-memory OptiX C++ core built on the CUDA Driver API.
 - One-command Windows build, Nuke terminal validation, manifest generation,
   release ZIP packaging, documentation, and self-hosted CI workflow.
+- A Nuke playground for comparing live native OptiX nodes with the bundled OIDN
+  wrapper on production multipart EXRs, including guide extraction, differences,
+  write nodes, runtime selection, and a PowerShell launcher.
 
 ### Changed
 - Nuke nodes now retain a thread-safe OptiX session and reuse compatible CUDA
