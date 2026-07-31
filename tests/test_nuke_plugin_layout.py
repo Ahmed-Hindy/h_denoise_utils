@@ -164,6 +164,8 @@ def test_nuke_build_validates_pe_dependencies() -> None:
     assert "OpenImageDenoise_device_cpu.dll" not in build_script
     assert 'oidn_version = if ($buildOidn)' in build_script
     assert "HDU_NUKE_VALIDATE_OIDN" in build_script
+    assert "$env:VSCMD_VER" in build_script
+    assert "-notcontains $ninjaDirectory" in build_script
 
 
 def test_nuke_workflow_supports_single_matrix_and_release_builds() -> None:

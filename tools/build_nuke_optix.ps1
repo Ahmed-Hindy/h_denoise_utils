@@ -36,6 +36,13 @@ function Invoke-Native {
 }
 
 function Import-VisualStudioEnvironment {
+    if ($env:VSCMD_VER -and
+        (Get-Command cl.exe -ErrorAction SilentlyContinue) -and
+        (Get-Command link.exe -ErrorAction SilentlyContinue) -and
+        (Get-Command dumpbin.exe -ErrorAction SilentlyContinue)) {
+        return
+    }
+
     $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
     if (-not (Test-Path -LiteralPath $vswhere)) {
         throw "Visual Studio Installer's vswhere.exe was not found."
@@ -283,7 +290,10 @@ $cl = (Resolve-Executable cl.exe).Replace("\", "/")
 $rc = (Resolve-Executable rc.exe).Replace("\", "/")
 $dumpbin = Resolve-Executable dumpbin.exe
 $ninjaForCMake = $ninja.Replace("\", "/")
-$env:PATH = "$(Split-Path -Parent $ninja);$env:PATH"
+$ninjaDirectory = Split-Path -Parent $ninja
+if (($env:PATH -split [IO.Path]::PathSeparator) -notcontains $ninjaDirectory) {
+    $env:PATH = "$ninjaDirectory$([IO.Path]::PathSeparator)$env:PATH"
+}
 
 $dependencyRoot = Join-Path $repoRoot "build\deps"
 $optixRoot = Join-Path $dependencyRoot "optix-$OptixVersion"
