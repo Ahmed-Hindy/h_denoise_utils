@@ -102,6 +102,15 @@ def _add_text_knob(node, name, label, value):
         node[name].setValue(value)
 
 
+def _enumeration_index(knob):
+    try:
+        return int(knob.getValue())
+    except (AttributeError, TypeError, ValueError):
+        values = list(knob.values()) if hasattr(knob, "values") else []
+        value = knob.value()
+        return values.index(value) if value in values else 0
+
+
 def _configure_controls(switch_node, layers, x, y):
     node = _get_or_create("NoOp", "HDU_PLAYGROUND_CONTROLS")
     node["label"].setValue("PLAYGROUND CONTROLS\nOpen properties")
@@ -157,7 +166,7 @@ def _configure_controls(switch_node, layers, x, y):
     )
 
     node["knobChanged"].setValue("import hdu_playground; hdu_playground.on_controls_changed()")
-    switch_node["which"].setValue(int(node["view"].value()))
+    switch_node["which"].setValue(_enumeration_index(node["view"]))
     return node
 
 
@@ -246,6 +255,13 @@ def configure():
         280,
         520,
     )
+    _configure_write(
+        "HDU_WRITE_OPTIX_OIDN_DIFFERENCE",
+        difference_gain,
+        os.path.join(output_dir, stem + ".optix-vs-oidn-difference-x20.exr"),
+        500,
+        520,
+    )
 
     _configure_controls(switch_node, layers, 760, 120)
     _configure_backdrop(
@@ -293,7 +309,7 @@ def on_controls_changed():
         return
     switch_node = _node("HDU_VIEW_SWITCH")
     if switch_node is not None:
-        switch_node["which"].setValue(int(knob.value()))
+        switch_node["which"].setValue(_enumeration_index(knob))
 
 
 def reload_reads():
@@ -346,10 +362,44 @@ def run_oidn():
     nuke.message(f"OIDN output refreshed:\n{output_path}")
 
 
+def _validate_write_output(node_name, expected_width, expected_height):
+    node = _node(node_name)
+    if node is None:
+        raise RuntimeError(f"Playground write node is missing: {node_name}")
+
+    output_path = node["file"].evaluate()
+    output_dir = os.path.dirname(output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+    if os.path.exists(output_path):
+        os.remove(output_path)
+
+    nuke.execute(node, 1, 1)
+    if not os.path.isfile(output_path) or os.path.getsize(output_path) == 0:
+        raise RuntimeError(f"Nuke did not create a valid output: {output_path}")
+
+    probe = nuke.nodes.Read(file=output_path.replace("\\", "/"))
+    try:
+        if probe.width() != expected_width or probe.height() != expected_height:
+            raise RuntimeError(
+                f"Output dimensions changed for {node_name}: "
+                f"{probe.width()}x{probe.height()} instead of "
+                f"{expected_width}x{expected_height}"
+            )
+        required_channels = {"rgba.red", "rgba.green", "rgba.blue"}
+        if not required_channels.issubset(set(probe.channels())):
+            raise RuntimeError(f"Output is missing RGB channels: {output_path}")
+    finally:
+        nuke.delete(probe)
+
+    print(f"Validated {node_name}: {output_path}")
+
+
 def validate_playground():
     script_path = _env("HDU_PLAYGROUND_NK")
     nuke.scriptOpen(script_path)
-    configure()
+    if _node("HDU_SOURCE_MULTIPART") is None:
+        configure()
     required = [
         "HDU_SOURCE_MULTIPART",
         "HDU_BEAUTY",
@@ -361,12 +411,24 @@ def validate_playground():
         "HDU_OIDN_MULTIPART",
         "HDU_OIDN_BEAUTY",
         "HDU_OPTIX_OIDN_DIFFERENCE",
+        "HDU_WRITE_OPTIX_BEAUTY",
+        "HDU_WRITE_OPTIX_GUIDED",
+        "HDU_WRITE_OPTIX_OIDN_DIFFERENCE",
         "HDU_PLAYGROUND_CONTROLS",
         "HDU_PLAYGROUND_VIEWER",
     ]
     missing = [name for name in required if _node(name) is None]
     if missing:
         raise RuntimeError(f"Playground nodes are missing: {', '.join(missing)}")
+
+    source = _node("HDU_SOURCE_MULTIPART")
+    for node_name in (
+        "HDU_WRITE_OPTIX_BEAUTY",
+        "HDU_WRITE_OPTIX_GUIDED",
+        "HDU_WRITE_OPTIX_OIDN_DIFFERENCE",
+    ):
+        _validate_write_output(node_name, source.width(), source.height())
+
     print(f"HDU Nuke playground validation passed: {len(nuke.allNodes())} nodes")
 
 

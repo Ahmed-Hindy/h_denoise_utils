@@ -10,6 +10,7 @@ PLAYGROUND = REPO_ROOT / "examples" / "nuke-denoise-playground"
 def test_playground_files_exist_and_python_parses() -> None:
     """Keep the user-facing launcher, Nuke script, and helper together."""
     expected = {
+        PLAYGROUND / "README.md",
         PLAYGROUND / "hdu-denoise-playground.nk",
         PLAYGROUND / "launch-nuke-playground.ps1",
         PLAYGROUND / "hdu_playground.py",
@@ -41,6 +42,7 @@ def test_launcher_selects_matching_native_runtimes_without_downloading() -> None
     assert "$env:NUKE_PATH" in launcher
     assert "$env:HDU_PLAYGROUND_INPUT" in launcher
     assert "$env:HDU_PLAYGROUND_OIDN_OUTPUT" in launcher
+    assert "Remove-Item -Path Env:CUDA_CACHE_MAXSIZE" in launcher
     assert "$PrepareOnly" in launcher
     assert "Invoke-WebRequest" not in launcher
     assert "curl" not in launcher.lower()
@@ -63,6 +65,7 @@ def test_helper_builds_comparison_and_write_branches() -> None:
         "HDU_DIFFERENCE_X20",
         "HDU_WRITE_OPTIX_BEAUTY",
         "HDU_WRITE_OPTIX_GUIDED",
+        "HDU_WRITE_OPTIX_OIDN_DIFFERENCE",
         "HDU_PLAYGROUND_CONTROLS",
         "HDU_PLAYGROUND_VIEWER",
     }
@@ -72,3 +75,6 @@ def test_helper_builds_comparison_and_write_branches() -> None:
     assert '"-beauty-name"' in helper
     assert '"-albedo-name"' in helper
     assert '"-normal-name"' in helper
+    assert "_enumeration_index" in helper
+    assert "_validate_write_output" in helper
+    assert "nuke.execute(node, 1, 1)" in helper

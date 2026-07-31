@@ -199,6 +199,9 @@ $env:HDU_PLAYGROUND_OIDN_EXE = $oidnExe
 $env:HDU_PLAYGROUND_REPO_ROOT = $repoRoot
 $env:HDU_PLAYGROUND_NK = $nukeScript
 
+# Let Nuke choose a cache size appropriate for the installed GPU and AIR/Blink.
+Remove-Item -Path Env:CUDA_CACHE_MAXSIZE -ErrorAction SilentlyContinue
+
 $nukePaths = @($pluginDir, $playgroundRoot)
 if (-not [string]::IsNullOrWhiteSpace($env:NUKE_PATH)) {
     $nukePaths += $env:NUKE_PATH
