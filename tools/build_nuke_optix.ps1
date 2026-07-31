@@ -329,6 +329,7 @@ if (-not $Stub) {
     }
 }
 
+$packageName = "HDenoiseNodes"
 $variant = if ($Stub) { "stub" } else { "optix-$OptixVersion" }
 $buildRoot = Join-Path $repoRoot "build\nuke-optix\nuke-$NukeVersion\$variant"
 $packageRoot = Join-Path $repoRoot "build\nuke-optix-package\nuke-$NukeVersion\$variant"
@@ -371,7 +372,7 @@ Invoke-Native -Command $cmake -Arguments @(
     "--install", $buildRoot, "--prefix", $packageRoot
 )
 
-$pluginRoot = Join-Path $packageRoot "HOptixDenoise"
+$pluginRoot = Join-Path $packageRoot $packageName
 $pluginBinary = Join-Path $pluginRoot "HOptixDenoise.dll"
 if (-not (Test-Path -LiteralPath $pluginBinary)) {
     throw "Nuke plugin was not created: $pluginBinary"
@@ -451,7 +452,7 @@ if ($buildOidn) {
 
 $sourceCommit = (& git -C $repoRoot rev-parse HEAD).Trim()
 $manifest = [ordered]@{
-    name = "HOptixDenoise"
+    name = $packageName
     version = $projectVersion
     source_commit = $sourceCommit
     nuke_version = $NukeVersion

@@ -83,7 +83,7 @@ def _write_package(
         oidn_node.update(oidn_node_overrides)
 
     manifest: dict[str, object] = {
-        "name": "HOptixDenoise",
+        "name": "HDenoiseNodes",
         "version": version,
         "source_commit": source_commit,
         "nuke_version": VALIDATOR.SUPPORTED_NUKE_REVISIONS.get(
@@ -112,13 +112,13 @@ def _write_package(
         f"optix-{optix_version}-v{version}.zip"
     )
     with zipfile.ZipFile(asset, "w") as archive:
-        archive.writestr("HOptixDenoise/manifest.json", json.dumps(manifest))
-        archive.writestr("HOptixDenoise/HOptixDenoise.dll", optix_binary)
+        archive.writestr("HDenoiseNodes/manifest.json", json.dumps(manifest))
+        archive.writestr("HDenoiseNodes/HOptixDenoise.dll", optix_binary)
         if include_oidn_binary:
-            archive.writestr("HOptixDenoise/HOidnDenoise.dll", oidn_binary)
-        archive.writestr("HOptixDenoise/HOidnBridge.exe", helper_binary)
+            archive.writestr("HDenoiseNodes/HOidnDenoise.dll", oidn_binary)
+        archive.writestr("HDenoiseNodes/HOidnBridge.exe", helper_binary)
         for name, binary in runtime_binaries.items():
-            archive.writestr(f"HOptixDenoise/{name}", binary)
+            archive.writestr(f"HDenoiseNodes/{name}", binary)
     return asset
 
 

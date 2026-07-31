@@ -39,7 +39,7 @@ function Resolve-DenoisePluginDirectory {
         [Parameter(Mandatory = $true)][string]$Optix
     )
 
-    $candidate = Join-Path $RepoRoot "build\nuke-optix-package\nuke-$Version\optix-$Optix\HOptixDenoise"
+    $candidate = Join-Path $RepoRoot "build\nuke-optix-package\nuke-$Version\optix-$Optix\HDenoiseNodes"
     $requiredFiles = @(
         "HOptixDenoise.dll",
         "HOidnDenoise.dll",

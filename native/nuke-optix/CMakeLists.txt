@@ -13,6 +13,7 @@ set(NUKE_ROOT "" CACHE PATH "Nuke installation root")
 set(OPTIX_ROOT "" CACHE PATH "OptiX SDK or optix-dev checkout root")
 set(CUDA_REDIST_ROOT "" CACHE PATH "Minimal CUDA redistributable root containing cuda.h and cuda.lib")
 set(OIDN_ROOT "" CACHE PATH "Intel Open Image Denoise package root")
+set(HDU_NUKE_PACKAGE_DIR "HDenoiseNodes")
 option(HDU_NUKE_STUB_OPTIX "Build a compile-check plugin without CUDA or OptiX" OFF)
 if(WIN32)
     set(HDU_NUKE_BUILD_OIDN_DEFAULT ON)
@@ -223,13 +224,13 @@ endif()
 
 install(
     TARGETS HOptixDenoise
-    RUNTIME DESTINATION HOptixDenoise
-    LIBRARY DESTINATION HOptixDenoise)
+    RUNTIME DESTINATION "${HDU_NUKE_PACKAGE_DIR}"
+    LIBRARY DESTINATION "${HDU_NUKE_PACKAGE_DIR}")
 if(HDU_NUKE_BUILD_OIDN)
     install(
         TARGETS HOidnDenoise HOidnBridge
-        RUNTIME DESTINATION HOptixDenoise
-        LIBRARY DESTINATION HOptixDenoise)
+        RUNTIME DESTINATION "${HDU_NUKE_PACKAGE_DIR}"
+        LIBRARY DESTINATION "${HDU_NUKE_PACKAGE_DIR}")
 endif()
 install(
     FILES
@@ -237,11 +238,12 @@ install(
     "package/menu.py"
     "package/README.md"
     "${CMAKE_CURRENT_LIST_DIR}/../../LICENSE"
-    DESTINATION HOptixDenoise)
+    DESTINATION "${HDU_NUKE_PACKAGE_DIR}")
 
 message(STATUS "Nuke root: ${NUKE_ROOT}")
 message(STATUS "Nuke version: ${NUKE_VERSION}")
 message(STATUS "OptiX stub build: ${HDU_NUKE_STUB_OPTIX}")
+message(STATUS "Package directory: ${HDU_NUKE_PACKAGE_DIR}")
 message(STATUS "OIDN node build: ${HDU_NUKE_BUILD_OIDN}")
 if(HDU_NUKE_BUILD_OIDN)
     message(STATUS "OIDN root: ${OIDN_ROOT}")

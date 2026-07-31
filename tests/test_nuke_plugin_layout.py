@@ -60,6 +60,7 @@ def test_cmake_defines_real_and_stub_core_targets() -> None:
     assert "HDU_NUKE_STUB_OPTIX" in cmake
     assert "optix_denoiser_stub.cpp" in cmake
     assert "optix_denoiser.cpp" in cmake
+    assert 'set(HDU_NUKE_PACKAGE_DIR "HDenoiseNodes")' in cmake
     assert "add_library(HOptixDenoise SHARED" in cmake
     assert "add_library(HOidnDenoise SHARED" in cmake
     assert "add_executable(HOidnBridge" in cmake
@@ -150,6 +151,7 @@ def test_nuke_build_validates_pe_dependencies() -> None:
         REPO_ROOT / "tools" / "build_nuke_optix.ps1"
     ).read_text(encoding="utf-8")
 
+    assert '$packageName = "HDenoiseNodes"' in build_script
     assert "Get-PeDependencies" in build_script
     assert "dumpbin.exe" in build_script
     assert '"DDImage.dll"' in build_script

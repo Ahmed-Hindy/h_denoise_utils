@@ -203,7 +203,7 @@ def _validate_package_manifest(
 ) -> tuple[str, str, str]:
     """Validate production metadata and return compatibility fields."""
     expected_fields = {
-        "name": ("HOptixDenoise", "has an unexpected package name"),
+        "name": ("HDenoiseNodes", "has an unexpected package name"),
         "source_commit": (source_commit, "was built from another commit"),
         "stub": (False, "is not a production package"),
         "validated": (True, "did not complete Nuke render validation"),

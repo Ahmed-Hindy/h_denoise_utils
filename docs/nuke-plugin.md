@@ -10,8 +10,9 @@ three-input image contract:
 The Nuke adapters own NDK image requests, channels, knobs, abort handling, and
 error reporting. Alpha and non-RGB beauty channels pass through unchanged.
 
-For the current branch state, validation evidence, known limitations, and the
-pre-release work sequence, see the [Nuke denoiser nodes handoff](nuke-plugin-handoff.md).
+Read the [architecture](nuke-plugin-architecture.md) for process and package
+boundaries, the [onboarding guide](nuke-plugin-onboarding.md) for development
+workflow, and the [handoff](nuke-plugin-handoff.md) for current branch evidence.
 
 ## Supported inputs
 
@@ -72,7 +73,7 @@ modules are intentionally excluded from Nuke packages.
 ## Install a packaged build
 
 Unzip the package matching the Nuke major/minor version. Add the extracted
-`HOptixDenoise` directory to `NUKE_PATH`, or copy the complete directory into
+`HDenoiseNodes` directory to `NUKE_PATH`, or copy the complete directory into
 the user's `.nuke` directory. Keep both node DLLs, `HOidnBridge.exe`, and all
 packaged runtime DLLs together.
 
@@ -144,12 +145,10 @@ and must not be distributed as a production denoiser.
 - Both nodes currently require an NVIDIA GPU.
 - OptiX temporal denoising is not implemented.
 - OIDN process isolation adds helper startup and host-buffer I/O overhead.
-- The combined package still uses the `HOptixDenoise` directory and manifest
-  identity even though it contains both nodes.
 
-These constraints are intentional for the first implementation. Benchmarking,
-package naming, and manual Nuke acceptance should be resolved before the first
-public Nuke release.
+These constraints are intentional for the first implementation. The combined
+package now uses the neutral `HDenoiseNodes` directory and manifest identity;
+the individual Nuke node class names remain unchanged.
 
 ## Build automation
 

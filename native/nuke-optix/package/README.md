@@ -1,6 +1,6 @@
-# h_denoise_utils native nodes for Nuke
+# HDenoiseNodes for Nuke
 
-This package provides two native Nuke denoiser nodes:
+This `HDenoiseNodes` package provides two native Nuke denoiser nodes:
 
 - **Filter > HOptixDenoise** — NVIDIA OptiX spatial denoising.
 - **Filter > HOidnDenoise** — Intel Open Image Denoise using its CUDA backend.

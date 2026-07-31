@@ -1,7 +1,8 @@
 # Nuke OptiX + OIDN playground
 
 This folder provides a ready Nuke graph for comparing the live native
-`HOptixDenoise` and `HOidnDenoise` nodes on production EXR renders.
+`HOptixDenoise` and `HOidnDenoise` nodes from the combined `HDenoiseNodes`
+package on production EXR renders.
 
 ## Launch
 
@@ -78,4 +79,4 @@ Generated files are stored under:
 
 The launcher performs no downloads and does not modify the global Nuke plugin
 path. It sets `NUKE_PATH` only for the child Nuke process and requires an
-existing combined package for the selected Nuke and OptiX versions.
+existing `HDenoiseNodes` package for the selected Nuke and OptiX versions.

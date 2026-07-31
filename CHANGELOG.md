@@ -32,6 +32,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The Nuke workflow can build one package or the serial 12-package supported
   matrix, reuse pinned SDK caches, and optionally publish manifest-validated
   release assets.
+- The combined Nuke package directory and manifest identity are now the neutral
+  `HDenoiseNodes`; the public node class names remain `HOptixDenoise` and
+  `HOidnDenoise`.
 
 ### Fixed
 - Large Nuke plane conversions and output writes now respond to render aborts.

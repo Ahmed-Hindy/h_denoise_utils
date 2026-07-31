@@ -37,6 +37,7 @@ def test_launcher_selects_one_combined_native_package_without_downloading() -> N
     for version in ("8.1", "9.0", "9.1"):
         assert f'"{version}"' in launcher
     assert "build\\nuke-optix-package\\nuke-$Version\\optix-$Optix" in launcher
+    assert "HDenoiseNodes" in launcher
     for name in (
         "HOptixDenoise.dll",
         "HOidnDenoise.dll",

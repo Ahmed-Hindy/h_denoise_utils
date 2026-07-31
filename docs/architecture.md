@@ -81,6 +81,10 @@ DenoiseWorker --> core.Denoiser
 
 ### Native Nuke path
 
+The complete subsystem design is documented in
+[Nuke denoiser architecture](nuke-plugin-architecture.md), with setup and
+validation steps in [Nuke denoiser onboarding](nuke-plugin-onboarding.md).
+
 - `native/optix-denoiser/include/hdu/optix_denoiser.h`: Host-neutral in-memory
   OptiX denoising API.
 - `native/optix-denoiser/src/optix_denoiser.cpp`: CUDA Driver API and OptiX
