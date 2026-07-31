@@ -185,10 +185,20 @@ def configure():
     input_path = _env("HDU_PLAYGROUND_INPUT")
     oidn_output = _env("HDU_PLAYGROUND_OIDN_OUTPUT")
     output_dir = _env("HDU_PLAYGROUND_OUTPUT_DIR")
-    if not input_path:
+    missing_settings = [
+        name
+        for name, value in (
+            ("HDU_PLAYGROUND_INPUT", input_path),
+            ("HDU_PLAYGROUND_OIDN_OUTPUT", oidn_output),
+            ("HDU_PLAYGROUND_OUTPUT_DIR", output_dir),
+        )
+        if not value
+    ]
+    if missing_settings:
         nuke.message(
-            "HDU_PLAYGROUND_INPUT is not set. Launch this script with "
-            "launch-nuke-playground.ps1."
+            "Missing playground environment settings: "
+            + ", ".join(missing_settings)
+            + ". Launch this script with launch-nuke-playground.ps1."
         )
         return
 
@@ -398,8 +408,6 @@ def _validate_write_output(node_name, expected_width, expected_height):
 def validate_playground():
     script_path = _env("HDU_PLAYGROUND_NK")
     nuke.scriptOpen(script_path)
-    if _node("HDU_SOURCE_MULTIPART") is None:
-        configure()
     required = [
         "HDU_SOURCE_MULTIPART",
         "HDU_BEAUTY",
@@ -418,6 +426,9 @@ def validate_playground():
         "HDU_PLAYGROUND_VIEWER",
     ]
     missing = [name for name in required if _node(name) is None]
+    if missing:
+        configure()
+        missing = [name for name in required if _node(name) is None]
     if missing:
         raise RuntimeError(f"Playground nodes are missing: {', '.join(missing)}")
 

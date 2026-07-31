@@ -43,6 +43,8 @@ def test_launcher_selects_matching_native_runtimes_without_downloading() -> None
     assert "$env:HDU_PLAYGROUND_INPUT" in launcher
     assert "$env:HDU_PLAYGROUND_OIDN_OUTPUT" in launcher
     assert "Remove-Item -Path Env:CUDA_CACHE_MAXSIZE" in launcher
+    assert "New-Item -ItemType Directory -Path $OutputDirectory -Force" in launcher
+    assert "[IO.Directory]::CreateDirectory($OutputDirectory)" not in launcher
     assert "$PrepareOnly" in launcher
     assert "Invoke-WebRequest" not in launcher
     assert "curl" not in launcher.lower()
@@ -76,5 +78,9 @@ def test_helper_builds_comparison_and_write_branches() -> None:
     assert '"-albedo-name"' in helper
     assert '"-normal-name"' in helper
     assert "_enumeration_index" in helper
+    assert "missing_settings" in helper
+    assert '"HDU_PLAYGROUND_OIDN_OUTPUT"' in helper
+    assert '"HDU_PLAYGROUND_OUTPUT_DIR"' in helper
     assert "_validate_write_output" in helper
+    assert "if missing:\n        configure()" in helper
     assert "nuke.execute(node, 1, 1)" in helper

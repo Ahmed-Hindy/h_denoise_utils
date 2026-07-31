@@ -165,7 +165,7 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $sceneName = [IO.Path]::GetFileNameWithoutExtension($InputExr)
     $OutputDirectory = Join-Path $env:TEMP "hdu-nuke-playground\$sceneName"
 }
-[IO.Directory]::CreateDirectory($OutputDirectory) | Out-Null
+New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 $OutputDirectory = (Resolve-Path -LiteralPath $OutputDirectory).Path
 
 $inputItem = Get-Item -LiteralPath $InputExr
