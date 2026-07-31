@@ -85,10 +85,16 @@ DenoiseWorker --> core.Denoiser
   OptiX denoising API.
 - `native/optix-denoiser/src/optix_denoiser.cpp`: CUDA Driver API and OptiX
   implementation for float4 beauty and guide buffers.
-- `native/nuke-optix/src/HOptixDenoise.cpp`: Nuke `PlanarIop` adapter for image
-  requests, channel conversion, knobs, validation, and passthrough behavior.
-- `tools/build_nuke_optix.ps1`: Dependency fetch, NDK build, Nuke terminal
-  validation, manifest generation, and ZIP packaging.
+- `native/nuke-optix/src/HOptixDenoise.cpp`: In-process OptiX Nuke `PlanarIop`
+  adapter for image requests, channel conversion, controls, and passthrough.
+- `native/nuke-optix/src/HOidnDenoise.cpp`: OIDN Nuke `PlanarIop` adapter that
+  exchanges raw float buffers with an isolated helper process.
+- `native/nuke-optix/src/HOidnBridge.cpp`: CUDA-only OIDN worker executable that
+  avoids loading Intel's runtime DLLs into Nuke's process.
+- `native/nuke-optix/src/oidn_bridge_protocol.h`: Versioned raw-buffer exchange
+  header shared by the OIDN node and helper.
+- `tools/build_nuke_optix.ps1`: Dependency fetch, dual-node NDK build, Nuke
+  terminal validation, manifest generation, and ZIP packaging.
 
 ## Main data flows
 

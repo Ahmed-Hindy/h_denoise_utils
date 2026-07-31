@@ -1,7 +1,7 @@
 # Nuke OptiX + OIDN playground
 
-This folder provides a ready Nuke graph for comparing the native
-`HOptixDenoise` node with the bundled OIDN multipart EXR wrapper.
+This folder provides a ready Nuke graph for comparing the live native
+`HOptixDenoise` and `HOidnDenoise` nodes on production EXR renders.
 
 ## Launch
 
@@ -16,11 +16,11 @@ The default setup uses:
 
 - Nuke 17.0v3
 - OptiX 9.1
-- OIDN 2.5.0
+- OIDN 2.5.0 on CUDA
 - the Canyon Run production multipart EXR
 - beauty `C` (exposed by Nuke as `rgba`), albedo `albedo`, and normal `N`
 
-Select another validated runtime pair:
+Select another built runtime pair:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass `
@@ -37,8 +37,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
   -InputExr "H:\renders\shot.1001.exr" `
   -BeautyLayer "C" `
   -AlbedoLayer "albedo" `
-  -NormalLayer "N" `
-  -RefreshOidn
+  -NormalLayer "N"
 ```
 
 ## Graph
@@ -46,22 +45,24 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 Open `HDU_PLAYGROUND_CONTROLS` to switch the Viewer between:
 
 - source beauty
-- OptiX beauty only
-- OptiX with albedo
-- OptiX with albedo and normal
-- OIDN with guides
-- amplified OptiX/OIDN difference
+- live OptiX beauty only
+- live guided OptiX
+- live OIDN beauty only
+- live guided OIDN
+- amplified live OptiX/OIDN difference
 
-The graph also contains write nodes for the beauty-only OptiX result, the fully
-guided OptiX result, and the amplified difference image.
+The graph contains Write nodes for both denoisers' beauty-only and guided
+results, plus the amplified difference image.
 
-OIDN is currently run by the bundled multipart command-line wrapper. Use the
-**rerun OIDN and reload** button on the controls node after replacing the input
-EXR or changing guide-layer arguments in the launcher.
+`HOidnDenoise` is a normal Nuke image node with beauty, albedo, and normal
+inputs. Its OIDN execution is delegated to the packaged `HOidnBridge.exe`
+process to prevent Intel runtime DLLs from colliding with Nuke's private Visual
+C++ and oneTBB libraries. The exchange uses raw float buffers, not cached EXRs.
 
 ## Validation
 
-Run the same graph headlessly and render all comparison outputs:
+Run the graph headlessly and render the guided OptiX result, guided OIDN result,
+and their difference:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass `
@@ -75,6 +76,6 @@ Generated files are stored under:
 %TEMP%\hdu-nuke-playground\<scene-name>\
 ```
 
-The launcher does not download dependencies or modify the global Nuke plugin
-path. It sets `NUKE_PATH` only for the child Nuke process and selects an existing
-validated native package matching the requested Nuke and OptiX versions.
+The launcher performs no downloads and does not modify the global Nuke plugin
+path. It sets `NUKE_PATH` only for the child Nuke process and requires an
+existing combined package for the selected Nuke and OptiX versions.

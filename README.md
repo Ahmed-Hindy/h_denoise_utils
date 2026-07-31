@@ -53,8 +53,10 @@ uv run h-denoise /path/to/input.exr --backend oidn
 
 ## Nuke Plug-in
 
-`HOptixDenoise` runs OptiX directly inside Nuke with beauty, albedo, and normal
-inputs. Packages are built per Nuke major/minor version.
+The native Nuke package includes `HOptixDenoise` and `HOidnDenoise`, both with
+beauty, albedo, and normal inputs. OptiX runs in-process; OIDN uses an isolated
+CUDA helper to avoid conflicts with Nuke's private runtime DLLs. Packages are
+built per Nuke major/minor version.
 
 See [Nuke plug-in setup and development](docs/nuke-plugin.md).
 

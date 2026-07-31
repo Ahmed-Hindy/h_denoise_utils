@@ -1,4 +1,4 @@
-"""Structural tests for the Nuke OptiX and OIDN playground."""
+"""Structural tests for the live Nuke OptiX and OIDN playground."""
 
 import ast
 from pathlib import Path
@@ -8,7 +8,7 @@ PLAYGROUND = REPO_ROOT / "examples" / "nuke-denoise-playground"
 
 
 def test_playground_files_exist_and_python_parses() -> None:
-    """Keep the user-facing launcher, Nuke script, and helper together."""
+    """Keep the user-facing launcher, Nuke script, helper, and guide together."""
     expected = {
         PLAYGROUND / "README.md",
         PLAYGROUND / "hdu-denoise-playground.nk",
@@ -27,8 +27,8 @@ def test_nuke_script_bootstraps_the_generated_graph() -> None:
     assert "launch-nuke-playground.ps1" in script
 
 
-def test_launcher_selects_matching_native_runtimes_without_downloading() -> None:
-    """Use existing validated bundles and avoid hidden network work at launch."""
+def test_launcher_selects_one_combined_native_package_without_downloading() -> None:
+    """Require the matching OptiX/OIDN package and avoid hidden network work."""
     launcher = (PLAYGROUND / "launch-nuke-playground.ps1").read_text(
         encoding="utf-8"
     )
@@ -37,21 +37,32 @@ def test_launcher_selects_matching_native_runtimes_without_downloading() -> None
     for version in ("8.1", "9.0", "9.1"):
         assert f'"{version}"' in launcher
     assert "build\\nuke-optix-package\\nuke-$Version\\optix-$Optix" in launcher
-    assert "oidn-2.5.0\\Denoiser.exe" in launcher
-    assert launcher.index("oidn-2.5.0") < launcher.index("oidn-2.4.1")
-    assert "$env:NUKE_PATH" in launcher
+    for name in (
+        "HOptixDenoise.dll",
+        "HOidnDenoise.dll",
+        "HOidnBridge.exe",
+        "OpenImageDenoise.dll",
+        "OpenImageDenoise_core.dll",
+        "OpenImageDenoise_device_cuda.dll",
+    ):
+        assert name in launcher
+    assert "ConvertFrom-Json" in launcher
+    assert "$env:HDU_PLAYGROUND_OIDN_VERSION" in launcher
     assert "$env:HDU_PLAYGROUND_INPUT" in launcher
-    assert "$env:HDU_PLAYGROUND_OIDN_OUTPUT" in launcher
+    assert "$env:HDU_PLAYGROUND_OUTPUT_DIR" in launcher
+    assert "$env:NUKE_PATH" in launcher
     assert "Remove-Item -Path Env:CUDA_CACHE_MAXSIZE" in launcher
+    assert '"$nukeScript.autosave"' in launcher
+    assert "Remove-Item -LiteralPath $autosavePath -Force" in launcher
     assert "New-Item -ItemType Directory -Path $OutputDirectory -Force" in launcher
-    assert "[IO.Directory]::CreateDirectory($OutputDirectory)" not in launcher
     assert "$PrepareOnly" in launcher
+    assert "Denoiser.exe" not in launcher
     assert "Invoke-WebRequest" not in launcher
     assert "curl" not in launcher.lower()
 
 
-def test_helper_builds_comparison_and_write_branches() -> None:
-    """Expose source, OptiX variants, OIDN, differences, and render outputs."""
+def test_helper_builds_live_comparison_and_write_branches() -> None:
+    """Expose live OptiX/OIDN nodes, differences, and render outputs."""
     helper = (PLAYGROUND / "hdu_playground.py").read_text(encoding="utf-8")
     expected_nodes = {
         "HDU_SOURCE_MULTIPART",
@@ -59,28 +70,29 @@ def test_helper_builds_comparison_and_write_branches() -> None:
         "HDU_ALBEDO",
         "HDU_NORMAL",
         "HDU_OPTIX_BEAUTY",
-        "HDU_OPTIX_ALBEDO",
         "HDU_OPTIX_GUIDED",
-        "HDU_OIDN_MULTIPART",
         "HDU_OIDN_BEAUTY",
+        "HDU_OIDN_GUIDED",
         "HDU_OPTIX_OIDN_DIFFERENCE",
         "HDU_DIFFERENCE_X20",
         "HDU_WRITE_OPTIX_BEAUTY",
         "HDU_WRITE_OPTIX_GUIDED",
+        "HDU_WRITE_OIDN_BEAUTY",
+        "HDU_WRITE_OIDN_GUIDED",
         "HDU_WRITE_OPTIX_OIDN_DIFFERENCE",
         "HDU_PLAYGROUND_CONTROLS",
         "HDU_PLAYGROUND_VIEWER",
     }
     assert all(name in helper for name in expected_nodes)
     assert '"HOptixDenoise"' in helper
-    assert '"-multipart"' in helper
-    assert '"-beauty-name"' in helper
-    assert '"-albedo-name"' in helper
-    assert '"-normal-name"' in helper
+    assert '"HOidnDenoise"' in helper
+    assert 'node["quality"].setValue("High")' in helper
+    assert 'node["hdr"].setValue(True)' in helper
+    assert 'node["clean_aux"].setValue(True)' in helper
+    assert "subprocess" not in helper
+    assert "Denoiser.exe" not in helper
     assert "_enumeration_index" in helper
-    assert "missing_settings" in helper
-    assert '"HDU_PLAYGROUND_OIDN_OUTPUT"' in helper
     assert '"HDU_PLAYGROUND_OUTPUT_DIR"' in helper
     assert "_validate_write_output" in helper
-    assert "if missing:\n        configure()" in helper
+    assert "if any(_node(name) is None for name in required)" in helper
     assert "nuke.execute(node, 1, 1)" in helper

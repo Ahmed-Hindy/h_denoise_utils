@@ -1,4 +1,4 @@
-"""Validate HOptixDenoise packages before GitHub release publication."""
+"""Validate combined OptiX and OIDN Nuke packages before publication."""
 
 from __future__ import annotations
 
@@ -22,124 +22,178 @@ SUPPORTED_OPTIX_COMMITS = {
 }
 SUPPORTED_NUKE_LINES = tuple(SUPPORTED_NUKE_REVISIONS)
 SUPPORTED_OPTIX_VERSIONS = tuple(SUPPORTED_OPTIX_COMMITS)
+EXPECTED_OIDN_VERSION = "2.5.0"
+EXPECTED_OIDN_RUNTIME_DLLS = {
+    "OpenImageDenoise.dll",
+    "OpenImageDenoise_core.dll",
+    "OpenImageDenoise_device_cuda.dll",
+}
 EXPECTED_PACKAGE_COUNTS = {
     "single": 1,
     "supported-matrix": len(SUPPORTED_NUKE_LINES) * len(SUPPORTED_OPTIX_VERSIONS),
 }
 
 
-def _read_package(asset: Path) -> tuple[dict[str, Any], bytes]:
-    """Read the manifest and plugin binary from a release ZIP.
+def _read_unique(archive: zipfile.ZipFile, suffix: str, asset: Path) -> bytes:
+    """Read exactly one archive member ending with ``suffix``."""
+    matches = [name for name in archive.namelist() if name.endswith(suffix)]
+    if len(matches) != 1:
+        raise ValueError(
+            f"{asset.name} contains {len(matches)} entries ending in {suffix}; expected 1"
+        )
+    return archive.read(matches[0])
 
-    Args:
-        asset: Path to an HOptixDenoise release ZIP.
 
-    Returns:
-        Parsed manifest data and packaged DLL bytes.
-
-    Raises:
-        ValueError: If the archive does not contain exactly one manifest and
-            one plugin DLL.
-    """
+def _read_package(asset: Path) -> tuple[dict[str, Any], dict[str, bytes]]:
+    """Read the manifest and all security-sensitive package binaries."""
     with zipfile.ZipFile(asset) as archive:
-        manifests = [
-            name for name in archive.namelist() if name.endswith("/manifest.json")
-        ]
-        binaries = [
-            name
-            for name in archive.namelist()
-            if name.endswith("/HOptixDenoise.dll")
-        ]
-        if len(manifests) != 1:
-            raise ValueError(
-                f"{asset.name} contains {len(manifests)} manifests; expected 1"
-            )
-        if len(binaries) != 1:
-            raise ValueError(
-                f"{asset.name} contains {len(binaries)} plugin DLLs; expected 1"
-            )
-        return json.loads(archive.read(manifests[0])), archive.read(binaries[0])
+        manifest = json.loads(_read_unique(archive, "/manifest.json", asset))
+        files = {
+            "HOptixDenoise.dll": _read_unique(
+                archive, "/HOptixDenoise.dll", asset
+            ),
+            "HOidnDenoise.dll": _read_unique(archive, "/HOidnDenoise.dll", asset),
+            "HOidnBridge.exe": _read_unique(archive, "/HOidnBridge.exe", asset),
+        }
+        for name in EXPECTED_OIDN_RUNTIME_DLLS:
+            files[name] = _read_unique(archive, f"/{name}", asset)
+        return manifest, files
 
 
 def _require_text(manifest: dict[str, Any], key: str, asset: Path) -> str:
-    """Return a required non-empty manifest string.
-
-    Args:
-        manifest: Parsed package manifest.
-        key: Manifest key to retrieve.
-        asset: Package path used in error messages.
-
-    Returns:
-        Non-empty manifest value.
-
-    Raises:
-        ValueError: If the value is absent or not a non-empty string.
-    """
+    """Return a required non-empty manifest string."""
     value = manifest.get(key)
     if not isinstance(value, str) or not value:
         raise ValueError(f"{asset.name} has an invalid {key!r} manifest value")
     return value
 
 
-def _validate_binary(
-    manifest: dict[str, Any],
+def _validate_file_record(
+    record: dict[str, Any],
     binary: bytes,
     asset: Path,
+    label: str,
 ) -> None:
-    """Verify the packaged DLL against its manifest digest and size.
-
-    Args:
-        manifest: Parsed package manifest.
-        binary: Packaged plugin DLL bytes.
-        asset: Package path used in error messages.
-
-    Raises:
-        ValueError: If the recorded size or SHA-256 digest is invalid.
-    """
-    expected_size = manifest.get("size")
+    """Verify a packaged file against its recorded size and SHA-256."""
+    expected_size = record.get("size")
     if (
         not isinstance(expected_size, int)
         or isinstance(expected_size, bool)
         or expected_size != len(binary)
     ):
-        raise ValueError(f"{asset.name} DLL size does not match its manifest")
+        raise ValueError(f"{asset.name} {label} size does not match its manifest")
 
-    expected_hash = _require_text(manifest, "sha256", asset).lower()
-    actual_hash = hashlib.sha256(binary).hexdigest()
-    if actual_hash != expected_hash:
-        raise ValueError(f"{asset.name} DLL SHA-256 does not match its manifest")
+    expected_hash = record.get("sha256")
+    if not isinstance(expected_hash, str) or not expected_hash:
+        raise ValueError(f"{asset.name} has an invalid {label} SHA-256")
+    if hashlib.sha256(binary).hexdigest() != expected_hash.lower():
+        raise ValueError(f"{asset.name} {label} SHA-256 does not match its manifest")
 
 
-def _validate_dependencies(manifest: dict[str, Any], asset: Path) -> None:
-    """Validate the PE dependency list recorded during packaging.
-
-    Args:
-        manifest: Parsed package manifest.
-        asset: Package path used in error messages.
-
-    Raises:
-        ValueError: If required driver/Nuke imports are absent or CUDART is
-            present.
-    """
-    dependencies = manifest.get("dependencies")
+def _dependency_set(
+    record: dict[str, Any],
+    asset: Path,
+    label: str,
+) -> set[str]:
+    """Return a normalized dependency set from a manifest record."""
+    dependencies = record.get("dependencies")
     if not isinstance(dependencies, list) or not all(
         isinstance(item, str) and item for item in dependencies
     ):
-        raise ValueError(f"{asset.name} has an invalid dependency manifest")
+        raise ValueError(f"{asset.name} has an invalid {label} dependency manifest")
+    return {dependency.casefold() for dependency in dependencies}
 
-    normalized = {dependency.casefold() for dependency in dependencies}
-    if "ddimage.dll" not in normalized:
+
+def _validate_optix_binary(
+    manifest: dict[str, Any],
+    binary: bytes,
+    asset: Path,
+) -> None:
+    """Validate the OptiX plugin binary and PE dependencies."""
+    _validate_file_record(manifest, binary, asset, "HOptixDenoise.dll")
+    dependencies = _dependency_set(manifest, asset, "OptiX plugin")
+    if "ddimage.dll" not in dependencies:
         raise ValueError(f"{asset.name} does not import DDImage.dll")
-    if "nvcuda.dll" not in normalized:
+    if "nvcuda.dll" not in dependencies:
         raise ValueError(f"{asset.name} does not import nvcuda.dll")
     cudart = sorted(
         dependency
         for dependency in dependencies
-        if dependency.casefold().startswith("cudart")
-        and dependency.casefold().endswith(".dll")
+        if dependency.startswith("cudart") and dependency.endswith(".dll")
     )
     if cudart:
         raise ValueError(f"{asset.name} imports CUDA Runtime DLLs: {cudart}")
+
+
+def _require_mapping(value: Any, asset: Path, label: str) -> dict[str, Any]:
+    """Return a required manifest mapping."""
+    if not isinstance(value, dict):
+        raise ValueError(f"{asset.name} has an invalid {label} manifest")
+    return value
+
+
+def _validate_oidn_payload(
+    manifest: dict[str, Any],
+    files: dict[str, bytes],
+    asset: Path,
+) -> None:
+    """Validate the isolated OIDN node, helper, and CUDA runtime payload."""
+    if manifest.get("oidn_version") != EXPECTED_OIDN_VERSION:
+        raise ValueError(
+            f"{asset.name} must contain OIDN {EXPECTED_OIDN_VERSION}"
+        )
+
+    node = _require_mapping(manifest.get("oidn_node"), asset, "OIDN node")
+    if node.get("name") != "HOidnDenoise":
+        raise ValueError(f"{asset.name} has an unexpected OIDN node name")
+    _validate_file_record(
+        node,
+        files["HOidnDenoise.dll"],
+        asset,
+        "HOidnDenoise.dll",
+    )
+    node_dependencies = _dependency_set(node, asset, "OIDN plugin")
+    if "ddimage.dll" not in node_dependencies:
+        raise ValueError(f"{asset.name} OIDN plugin does not import DDImage.dll")
+    if "openimagedenoise.dll" in node_dependencies:
+        raise ValueError(
+            f"{asset.name} links OIDN directly into Nuke instead of isolating it"
+        )
+
+    helper = _require_mapping(node.get("helper"), asset, "OIDN helper")
+    if helper.get("name") != "HOidnBridge.exe":
+        raise ValueError(f"{asset.name} has an unexpected OIDN helper name")
+    _validate_file_record(
+        helper,
+        files["HOidnBridge.exe"],
+        asset,
+        "HOidnBridge.exe",
+    )
+    helper_dependencies = _dependency_set(helper, asset, "OIDN helper")
+    if "openimagedenoise.dll" not in helper_dependencies:
+        raise ValueError(f"{asset.name} OIDN helper does not import OpenImageDenoise.dll")
+    if "ddimage.dll" in helper_dependencies:
+        raise ValueError(f"{asset.name} OIDN helper unexpectedly imports DDImage.dll")
+
+    runtime_records = node.get("runtime_dlls")
+    if not isinstance(runtime_records, list):
+        raise ValueError(f"{asset.name} has an invalid OIDN runtime manifest")
+    records_by_name: dict[str, dict[str, Any]] = {}
+    for value in runtime_records:
+        record = _require_mapping(value, asset, "OIDN runtime")
+        name = record.get("name")
+        if not isinstance(name, str) or not name:
+            raise ValueError(f"{asset.name} has an unnamed OIDN runtime DLL")
+        if name in records_by_name:
+            raise ValueError(f"{asset.name} repeats OIDN runtime DLL {name}")
+        records_by_name[name] = record
+    if set(records_by_name) != EXPECTED_OIDN_RUNTIME_DLLS:
+        raise ValueError(
+            f"{asset.name} has an unexpected OIDN runtime set: "
+            f"{sorted(records_by_name)}"
+        )
+    for name, record in records_by_name.items():
+        _validate_file_record(record, files[name], asset, name)
 
 
 def _validate_package_manifest(
@@ -147,7 +201,7 @@ def _validate_package_manifest(
     asset: Path,
     source_commit: str,
 ) -> tuple[str, str, str]:
-    """Validate production metadata and return version compatibility fields."""
+    """Validate production metadata and return compatibility fields."""
     expected_fields = {
         "name": ("HOptixDenoise", "has an unexpected package name"),
         "source_commit": (source_commit, "was built from another commit"),
@@ -193,7 +247,7 @@ def _validate_release_identity(versions: set[str], release_tag: str) -> None:
 
 
 def _validate_supported_matrix(package_pairs: set[tuple[str, str]]) -> None:
-    """Require every supported Nuke and OptiX package combination exactly once."""
+    """Require every supported Nuke and OptiX combination exactly once."""
     expected_pairs = {
         (nuke_line, optix_version)
         for nuke_line in SUPPORTED_NUKE_LINES
@@ -213,21 +267,7 @@ def validate_release_assets(
     release_tag: str,
     source_commit: str,
 ) -> list[Path]:
-    """Validate packages selected for one HOptixDenoise release.
-
-    Args:
-        assets_dir: Directory containing downloaded ZIP artifacts.
-        build_scope: Either ``single`` or ``supported-matrix``.
-        release_tag: Requested GitHub release tag.
-        source_commit: Commit expected in every package manifest.
-
-    Returns:
-        Sorted validated package paths.
-
-    Raises:
-        ValueError: If package count, metadata, filename, binary integrity, or
-            matrix coverage is invalid.
-    """
+    """Validate packages selected for one combined Nuke denoiser release."""
     if build_scope not in EXPECTED_PACKAGE_COUNTS:
         raise ValueError(f"Unsupported build scope: {build_scope}")
 
@@ -241,15 +281,14 @@ def validate_release_assets(
     versions: set[str] = set()
     package_pairs: set[tuple[str, str]] = set()
     for asset in assets:
-        manifest, binary = _read_package(asset)
-        _validate_binary(manifest, binary, asset)
-        _validate_dependencies(manifest, asset)
+        manifest, files = _read_package(asset)
+        _validate_optix_binary(manifest, files["HOptixDenoise.dll"], asset)
+        _validate_oidn_payload(manifest, files, asset)
         version, nuke_line, optix_version = _validate_package_manifest(
             manifest,
             asset,
             source_commit,
         )
-
         pair = (nuke_line, optix_version)
         if pair in package_pairs:
             raise ValueError(f"Duplicate Nuke/OptiX package pair: {pair}")

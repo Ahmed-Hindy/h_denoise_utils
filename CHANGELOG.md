@@ -10,12 +10,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Native `HOptixDenoise` Nuke `PlanarIop` with beauty, albedo, and normal
   inputs, OptiX tiling, GPU selection, normal encoding, blend, and safe
   passthrough controls.
+- Native `HOidnDenoise` Nuke node with the same guide inputs, CUDA device,
+  quality, HDR, clean-auxiliary, normal encoding, blend, and passthrough
+  controls. OIDN runs through an isolated raw-buffer helper to avoid conflicts
+  with Nuke's private Visual C++ and oneTBB runtimes.
 - Shared in-memory OptiX C++ core built on the CUDA Driver API.
 - One-command Windows build, Nuke terminal validation, manifest generation,
   release ZIP packaging, documentation, and self-hosted CI workflow.
-- A Nuke playground for comparing live native OptiX nodes with the bundled OIDN
-  wrapper on production multipart EXRs, including guide extraction, differences,
-  write nodes, runtime selection, and a PowerShell launcher.
+- A Nuke playground for comparing live native OptiX and OIDN nodes on
+  production multipart EXRs, including guide extraction, differences, write
+  nodes, runtime selection, and a PowerShell launcher.
 
 ### Changed
 - Nuke nodes now retain a thread-safe OptiX session and reuse compatible CUDA

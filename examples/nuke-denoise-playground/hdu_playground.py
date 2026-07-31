@@ -1,11 +1,10 @@
-"""Build and control the h_denoise_utils Nuke playground."""
+"""Build and validate the live OptiX and OIDN Nuke playground."""
 
 import os
-import subprocess
 
 import nuke
 
-GENERATED_LABEL = "h_denoise_utils playground"
+GENERATED_LABEL = "h_denoise_utils live denoise playground"
 
 
 def _env(name, default=""):
@@ -32,10 +31,7 @@ def _get_or_create(node_class, name):
 def _available_layers(read_node):
     layers = set()
     for channel in read_node.channels():
-        if "." in channel:
-            layers.add(channel.rsplit(".", 1)[0])
-        else:
-            layers.add("rgba")
+        layers.add(channel.rsplit(".", 1)[0] if "." in channel else "rgba")
     return sorted(layers)
 
 
@@ -44,9 +40,7 @@ def _resolve_layer(requested, layers, fallback):
         return requested
     if fallback in layers:
         return fallback
-    if layers:
-        return layers[0]
-    return requested
+    return layers[0] if layers else requested
 
 
 def _configure_read(name, path, x, y):
@@ -66,19 +60,39 @@ def _configure_shuffle(name, source, layer, x, y):
     return node
 
 
-def _configure_optix(name, beauty, albedo, normal, x, y, tile_index=0):
+def _configure_optix(name, beauty, albedo, normal, x, y):
     node = _get_or_create("HOptixDenoise", name)
     node.setInput(0, beauty)
     node.setInput(1, albedo)
     node.setInput(2, normal)
     node["blend"].setValue(0.0)
-    node["tile_size"].setValue(tile_index)
+    node["tile_size"].setValue(0)
     node["gpu_device"].setValue(0)
     node["normal_encoding"].setValue(0)
     node["passthrough_on_error"].setValue(False)
     variant = name.replace("HDU_OPTIX_", "")
     node["label"].setValue(
         f"OptiX {_env('HDU_PLAYGROUND_OPTIX_VERSION', '?')}\n{variant}"
+    )
+    _set_xy(node, x, y)
+    return node
+
+
+def _configure_oidn(name, beauty, albedo, normal, x, y):
+    node = _get_or_create("HOidnDenoise", name)
+    node.setInput(0, beauty)
+    node.setInput(1, albedo)
+    node.setInput(2, normal)
+    node["blend"].setValue(0.0)
+    node["gpu_device"].setValue(0)
+    node["quality"].setValue("High")
+    node["hdr"].setValue(True)
+    node["clean_aux"].setValue(True)
+    node["normal_encoding"].setValue(0)
+    node["passthrough_on_error"].setValue(False)
+    variant = name.replace("HDU_OIDN_", "")
+    node["label"].setValue(
+        f"OIDN {_env('HDU_PLAYGROUND_OIDN_VERSION', '?')} CUDA\n{variant}"
     )
     _set_xy(node, x, y)
     return node
@@ -127,32 +141,24 @@ def _configure_controls(switch_node, layers, x, y):
                 [
                     "Source beauty",
                     "OptiX beauty only",
-                    "OptiX + albedo",
                     "OptiX + albedo + normal",
-                    "OIDN + guides",
+                    "OIDN beauty only",
+                    "OIDN + albedo + normal",
                     "OptiX vs OIDN difference x20",
                 ],
             )
         )
-        node["view"].setValue(3)
-    if "refresh_oidn" not in node.knobs():
-        knob = nuke.PyScript_Knob("refresh_oidn", "rerun OIDN and reload")
-        knob.setCommand("import hdu_playground; hdu_playground.run_oidn()")
-        node.addKnob(knob)
-    if "reload_reads" not in node.knobs():
-        knob = nuke.PyScript_Knob("reload_reads", "reload EXR reads")
-        knob.setCommand("import hdu_playground; hdu_playground.reload_reads()")
+        node["view"].setValue(4)
+    if "reload_source" not in node.knobs():
+        knob = nuke.PyScript_Knob("reload_source", "reload source EXR")
+        knob.setCommand("import hdu_playground; hdu_playground.reload_source()")
         node.addKnob(knob)
 
     _add_text_knob(node, "input_path", "input", _env("HDU_PLAYGROUND_INPUT"))
-    _add_text_knob(node, "oidn_path", "OIDN output", _env("HDU_PLAYGROUND_OIDN_OUTPUT"))
-    oidn_runtime = os.path.basename(
-        os.path.dirname(_env("HDU_PLAYGROUND_OIDN_EXE", "unknown"))
-    )
     runtime_info = (
         f"Nuke {_env('HDU_PLAYGROUND_NUKE_VERSION', '?')} | "
         f"OptiX {_env('HDU_PLAYGROUND_OPTIX_VERSION', '?')} | "
-        f"OIDN {oidn_runtime}"
+        f"OIDN {_env('HDU_PLAYGROUND_OIDN_VERSION', '?')} CUDA"
     )
     _add_text_knob(node, "runtime_info", "runtime", runtime_info)
     _add_text_knob(node, "layers", "EXR layers", ", ".join(layers))
@@ -160,12 +166,13 @@ def _configure_controls(switch_node, layers, x, y):
         node,
         "usage",
         "usage",
-        "View the connected nodes directly, switch the Viewer source here, "
-        "render the OptiX Write nodes, or rerun OIDN after changing layer "
-        "names in the launcher.",
+        "Inspect the live OptiX and OIDN nodes, switch the Viewer source here, "
+        "or render the Write nodes to compare final EXRs.",
     )
 
-    node["knobChanged"].setValue("import hdu_playground; hdu_playground.on_controls_changed()")
+    node["knobChanged"].setValue(
+        "import hdu_playground; hdu_playground.on_controls_changed()"
+    )
     switch_node["which"].setValue(_enumeration_index(node["view"]))
     return node
 
@@ -183,28 +190,19 @@ def _configure_backdrop(name, label, x, y, width, height, color):
 
 def configure():
     input_path = _env("HDU_PLAYGROUND_INPUT")
-    oidn_output = _env("HDU_PLAYGROUND_OIDN_OUTPUT")
     output_dir = _env("HDU_PLAYGROUND_OUTPUT_DIR")
-    missing_settings = [
-        name
-        for name, value in (
-            ("HDU_PLAYGROUND_INPUT", input_path),
-            ("HDU_PLAYGROUND_OIDN_OUTPUT", oidn_output),
-            ("HDU_PLAYGROUND_OUTPUT_DIR", output_dir),
-        )
-        if not value
-    ]
-    if missing_settings:
+    if not input_path or not output_dir:
         nuke.message(
-            "Missing playground environment settings: "
-            + ", ".join(missing_settings)
-            + ". Launch this script with launch-nuke-playground.ps1."
+            "HDU_PLAYGROUND_INPUT / HDU_PLAYGROUND_OUTPUT_DIR are not set. "
+            "Launch this script with launch-nuke-playground.ps1."
         )
         return
 
     source = _configure_read("HDU_SOURCE_MULTIPART", input_path, 0, 0)
     layers = _available_layers(source)
-    beauty_layer = _resolve_layer(_env("HDU_PLAYGROUND_BEAUTY_LAYER", "C"), layers, "rgba")
+    beauty_layer = _resolve_layer(
+        _env("HDU_PLAYGROUND_BEAUTY_LAYER", "C"), layers, "rgba"
+    )
     albedo_layer = _resolve_layer(
         _env("HDU_PLAYGROUND_ALBEDO_LAYER", "albedo"), layers, beauty_layer
     )
@@ -216,64 +214,96 @@ def configure():
     albedo = _configure_shuffle("HDU_ALBEDO", source, albedo_layer, 180, 130)
     normal = _configure_shuffle("HDU_NORMAL", source, normal_layer, 360, 130)
 
-    optix_beauty = _configure_optix("HDU_OPTIX_BEAUTY", beauty, None, None, -180, 340)
-    optix_albedo = _configure_optix("HDU_OPTIX_ALBEDO", beauty, albedo, None, 40, 340)
-    optix_guided = _configure_optix("HDU_OPTIX_GUIDED", beauty, albedo, normal, 280, 340)
-
-    oidn_read = _configure_read("HDU_OIDN_MULTIPART", oidn_output, 560, 0)
-    oidn_beauty = _configure_shuffle("HDU_OIDN_BEAUTY", oidn_read, beauty_layer, 560, 130)
+    optix_beauty = _configure_optix(
+        "HDU_OPTIX_BEAUTY", beauty, None, None, -260, 340
+    )
+    optix_guided = _configure_optix(
+        "HDU_OPTIX_GUIDED", beauty, albedo, normal, -20, 340
+    )
+    oidn_beauty = _configure_oidn(
+        "HDU_OIDN_BEAUTY", beauty, None, None, 300, 340
+    )
+    oidn_guided = _configure_oidn(
+        "HDU_OIDN_GUIDED", beauty, albedo, normal, 540, 340
+    )
 
     difference = _get_or_create("Merge2", "HDU_OPTIX_OIDN_DIFFERENCE")
     difference.setInput(0, optix_guided)
-    difference.setInput(1, oidn_beauty)
+    difference.setInput(1, oidn_guided)
     difference["operation"].setValue("difference")
     difference["label"].setValue("absolute difference")
-    _set_xy(difference, 500, 340)
+    _set_xy(difference, 780, 340)
 
     difference_gain = _get_or_create("Multiply", "HDU_DIFFERENCE_X20")
     difference_gain.setInput(0, difference)
     for channel_index in range(4):
         difference_gain["value"].setValue(20.0, channel_index)
     difference_gain["label"].setValue("difference x20")
-    _set_xy(difference_gain, 500, 440)
+    _set_xy(difference_gain, 780, 440)
 
     switch_node = _get_or_create("Switch", "HDU_VIEW_SWITCH")
-    for index, candidate in enumerate(
-        [beauty, optix_beauty, optix_albedo, optix_guided, oidn_beauty, difference_gain]
-    ):
+    candidates = [
+        beauty,
+        optix_beauty,
+        optix_guided,
+        oidn_beauty,
+        oidn_guided,
+        difference_gain,
+    ]
+    for index, candidate in enumerate(candidates):
         switch_node.setInput(index, candidate)
     switch_node["label"].setValue("Controlled by HDU_PLAYGROUND_CONTROLS")
-    _set_xy(switch_node, 220, 600)
+    _set_xy(switch_node, 250, 700)
 
     viewer = _get_or_create("Viewer", "HDU_PLAYGROUND_VIEWER")
     viewer.setInput(0, switch_node)
-    _set_xy(viewer, 220, 730)
+    _set_xy(viewer, 250, 820)
 
     stem = os.path.splitext(os.path.basename(input_path))[0]
     optix_version = _env("HDU_PLAYGROUND_OPTIX_VERSION", "unknown")
-    _configure_write(
-        "HDU_WRITE_OPTIX_BEAUTY",
-        optix_beauty,
-        os.path.join(output_dir, stem + ".nuke-optix-" + optix_version + ".beauty.exr"),
-        -180,
-        520,
+    oidn_version = _env("HDU_PLAYGROUND_OIDN_VERSION", "unknown")
+    writes = (
+        (
+            "HDU_WRITE_OPTIX_BEAUTY",
+            optix_beauty,
+            f"{stem}.nuke-optix-{optix_version}.beauty.exr",
+            -260,
+        ),
+        (
+            "HDU_WRITE_OPTIX_GUIDED",
+            optix_guided,
+            f"{stem}.nuke-optix-{optix_version}.guided.exr",
+            -20,
+        ),
+        (
+            "HDU_WRITE_OIDN_BEAUTY",
+            oidn_beauty,
+            f"{stem}.nuke-oidn-{oidn_version}.beauty.exr",
+            300,
+        ),
+        (
+            "HDU_WRITE_OIDN_GUIDED",
+            oidn_guided,
+            f"{stem}.nuke-oidn-{oidn_version}.guided.exr",
+            540,
+        ),
+        (
+            "HDU_WRITE_OPTIX_OIDN_DIFFERENCE",
+            difference_gain,
+            f"{stem}.optix-vs-oidn-difference-x20.exr",
+            780,
+        ),
     )
-    _configure_write(
-        "HDU_WRITE_OPTIX_GUIDED",
-        optix_guided,
-        os.path.join(output_dir, stem + ".nuke-optix-" + optix_version + ".guided.exr"),
-        280,
-        520,
-    )
-    _configure_write(
-        "HDU_WRITE_OPTIX_OIDN_DIFFERENCE",
-        difference_gain,
-        os.path.join(output_dir, stem + ".optix-vs-oidn-difference-x20.exr"),
-        500,
-        520,
-    )
+    for name, input_node, filename, xpos in writes:
+        _configure_write(
+            name,
+            input_node,
+            os.path.join(output_dir, filename),
+            xpos,
+            560,
+        )
 
-    _configure_controls(switch_node, layers, 760, 120)
+    _configure_controls(switch_node, layers, 1030, 120)
     _configure_backdrop(
         "HDU_BACKDROP_INPUTS",
         "SOURCE + GUIDE EXTRACTION",
@@ -285,21 +315,30 @@ def configure():
     )
     _configure_backdrop(
         "HDU_BACKDROP_OPTIX",
-        "LIVE NATIVE OPTIX NODES",
-        -250,
+        "LIVE NATIVE OPTIX",
+        -330,
         270,
-        720,
-        430,
+        560,
+        440,
         0x355A42FF,
     )
     _configure_backdrop(
         "HDU_BACKDROP_OIDN",
-        "OIDN CLI OUTPUT + COMPARISON",
-        470,
-        -70,
-        300,
-        610,
+        "LIVE OIDN CUDA NODE",
+        250,
+        270,
+        560,
+        440,
         0x5A4935FF,
+    )
+    _configure_backdrop(
+        "HDU_BACKDROP_COMPARE",
+        "LIVE COMPARISON",
+        730,
+        270,
+        300,
+        440,
+        0x5A354FFF,
     )
 
     root = nuke.root()
@@ -307,7 +346,7 @@ def configure():
         root["label"].setValue(GENERATED_LABEL)
     if hasattr(root, "setModified"):
         root.setModified(False)
-    print("HDU playground configured")
+    print("HDU live denoise playground configured")
     print("Input:", input_path)
     print("Layers:", ", ".join(layers))
     print("Beauty/albedo/normal:", beauty_layer, albedo_layer, normal_layer)
@@ -322,54 +361,10 @@ def on_controls_changed():
         switch_node["which"].setValue(_enumeration_index(knob))
 
 
-def reload_reads():
-    for name in ("HDU_SOURCE_MULTIPART", "HDU_OIDN_MULTIPART"):
-        node = _node(name)
-        if node is not None and "reload" in node.knobs():
-            node["reload"].execute()
-
-
-def run_oidn():
-    executable = _env("HDU_PLAYGROUND_OIDN_EXE")
-    input_path = _env("HDU_PLAYGROUND_INPUT")
-    output_path = _env("HDU_PLAYGROUND_OIDN_OUTPUT")
-    beauty = _env("HDU_PLAYGROUND_BEAUTY_LAYER", "C")
-    albedo = _env("HDU_PLAYGROUND_ALBEDO_LAYER", "albedo")
-    normal = _env("HDU_PLAYGROUND_NORMAL_LAYER", "N")
-    if not executable or not os.path.isfile(executable):
-        nuke.message("OIDN executable is missing. Relaunch with launch-nuke-playground.ps1.")
-        return
-
-    command = [
-        executable,
-        "-v",
-        "1",
-        "-multipart",
-        input_path,
-        "-o",
-        output_path,
-        "-beauty-name",
-        beauty,
-        "-albedo-name",
-        albedo,
-        "-normal-name",
-        normal,
-    ]
-    result = subprocess.run(
-        command,
-        cwd=os.path.dirname(executable),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
-    print(result.stdout)
-    if result.returncode != 0:
-        nuke.message(
-            f"OIDN failed with exit code {result.returncode}. See the Nuke console."
-        )
-        return
-    reload_reads()
-    nuke.message(f"OIDN output refreshed:\n{output_path}")
+def reload_source():
+    node = _node("HDU_SOURCE_MULTIPART")
+    if node is not None and "reload" in node.knobs():
+        node["reload"].execute()
 
 
 def _validate_write_output(node_name, expected_width, expected_height):
@@ -401,7 +396,6 @@ def _validate_write_output(node_name, expected_width, expected_height):
             raise RuntimeError(f"Output is missing RGB channels: {output_path}")
     finally:
         nuke.delete(probe)
-
     print(f"Validated {node_name}: {output_path}")
 
 
@@ -414,32 +408,31 @@ def validate_playground():
         "HDU_ALBEDO",
         "HDU_NORMAL",
         "HDU_OPTIX_BEAUTY",
-        "HDU_OPTIX_ALBEDO",
         "HDU_OPTIX_GUIDED",
-        "HDU_OIDN_MULTIPART",
         "HDU_OIDN_BEAUTY",
+        "HDU_OIDN_GUIDED",
         "HDU_OPTIX_OIDN_DIFFERENCE",
         "HDU_WRITE_OPTIX_BEAUTY",
         "HDU_WRITE_OPTIX_GUIDED",
+        "HDU_WRITE_OIDN_BEAUTY",
+        "HDU_WRITE_OIDN_GUIDED",
         "HDU_WRITE_OPTIX_OIDN_DIFFERENCE",
         "HDU_PLAYGROUND_CONTROLS",
         "HDU_PLAYGROUND_VIEWER",
     ]
-    missing = [name for name in required if _node(name) is None]
-    if missing:
+    if any(_node(name) is None for name in required):
         configure()
-        missing = [name for name in required if _node(name) is None]
+    missing = [name for name in required if _node(name) is None]
     if missing:
         raise RuntimeError(f"Playground nodes are missing: {', '.join(missing)}")
 
     source = _node("HDU_SOURCE_MULTIPART")
     for node_name in (
-        "HDU_WRITE_OPTIX_BEAUTY",
         "HDU_WRITE_OPTIX_GUIDED",
+        "HDU_WRITE_OIDN_GUIDED",
         "HDU_WRITE_OPTIX_OIDN_DIFFERENCE",
     ):
         _validate_write_output(node_name, source.width(), source.height())
-
     print(f"HDU Nuke playground validation passed: {len(nuke.allNodes())} nodes")
 
 

@@ -15,6 +15,9 @@ def test_nuke_plugin_sources_are_present() -> None:
     expected = (
         NUKE_ROOT / "CMakeLists.txt",
         NUKE_ROOT / "src" / "HOptixDenoise.cpp",
+        NUKE_ROOT / "src" / "HOidnDenoise.cpp",
+        NUKE_ROOT / "src" / "HOidnBridge.cpp",
+        NUKE_ROOT / "src" / "oidn_bridge_protocol.h",
         NUKE_ROOT / "stub" / "optix_denoiser_stub.cpp",
         NUKE_ROOT / "package" / "init.py",
         NUKE_ROOT / "package" / "menu.py",
@@ -40,9 +43,15 @@ def test_nuke_python_hooks_parse() -> None:
     for path in paths:
         ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
+    menu = paths[1].read_text(encoding="utf-8")
+    assert '"Filter/HOptixDenoise"' in menu
+    assert '"Filter/HOidnDenoise"' in menu
+
     validator = paths[-1].read_text(encoding="utf-8")
     assert 'nuke.addFormat("520 8 1.0 HOptixDenoiseTiledTest")' in validator
     assert "tile_size, render_format in render_cases" in validator
+    assert 'nuke.createNode("HOidnDenoise"' in validator
+    assert '"HDU_NUKE_VALIDATE_OIDN"' in validator
 
 
 def test_cmake_defines_real_and_stub_core_targets() -> None:
@@ -52,6 +61,10 @@ def test_cmake_defines_real_and_stub_core_targets() -> None:
     assert "optix_denoiser_stub.cpp" in cmake
     assert "optix_denoiser.cpp" in cmake
     assert "add_library(HOptixDenoise SHARED" in cmake
+    assert "add_library(HOidnDenoise SHARED" in cmake
+    assert "add_executable(HOidnBridge" in cmake
+    assert "/DELAYLOAD:OpenImageDenoise.dll" in cmake
+    assert "MultiThreaded$<$<CONFIG:Debug>:Debug>" in cmake
     assert "DDImage.lib" in cmake
 
 
@@ -92,6 +105,45 @@ def test_nuke_node_exposes_expected_contract() -> None:
         assert expected in source
 
 
+def test_oidn_node_uses_an_isolated_cuda_helper() -> None:
+    """Prevent Intel runtime DLLs from loading directly into Nuke."""
+    node_source = (NUKE_ROOT / "src" / "HOidnDenoise.cpp").read_text(
+        encoding="utf-8"
+    )
+    bridge_source = (NUKE_ROOT / "src" / "HOidnBridge.cpp").read_text(
+        encoding="utf-8"
+    )
+    protocol = (NUKE_ROOT / "src" / "oidn_bridge_protocol.h").read_text(
+        encoding="utf-8"
+    )
+
+    for expected in (
+        'kClass = "HOidnDenoise"',
+        'return "beauty"',
+        'return "albedo"',
+        'return "normal"',
+        '"gpu_device"',
+        '"quality"',
+        '"hdr"',
+        '"clean_aux"',
+        '"normal_encoding"',
+        '"passthrough_on_error"',
+        '"HOidnBridge.exe"',
+        "CreateProcessW",
+        "TerminateProcess",
+        "CREATE_NO_WINDOW",
+    ):
+        assert expected in node_source
+    assert "OpenImageDenoise/oidn.hpp" not in node_source
+    assert "OpenImageDenoise/oidn.hpp" in bridge_source
+    assert "oidn::DeviceType::CUDA" in bridge_source
+    assert 'SetDllDirectoryW(L"")' in bridge_source
+    assert "SetDefaultDllDirectories" in bridge_source
+    assert "HDUOIDN1" not in protocol
+    assert "kMagic" in protocol
+    assert "static_assert(sizeof(Header) == 32)" in protocol
+
+
 def test_nuke_build_validates_pe_dependencies() -> None:
     """Keep production packages on the CUDA Driver API dependency surface."""
     build_script = (
@@ -105,6 +157,13 @@ def test_nuke_build_validates_pe_dependencies() -> None:
     assert "cudartDependencies" in build_script
     assert "validated = -not $SkipValidation.IsPresent" in build_script
     assert "dependencies = $dependencies" in build_script
+    assert '"HOidnDenoise.dll"' in build_script
+    assert '"HOidnBridge.exe"' in build_script
+    assert "OIDN Nuke plugin must isolate OpenImageDenoise" in build_script
+    assert "OpenImageDenoise_device_cuda.dll" in build_script
+    assert "OpenImageDenoise_device_cpu.dll" not in build_script
+    assert 'oidn_version = if ($buildOidn)' in build_script
+    assert "HDU_NUKE_VALIDATE_OIDN" in build_script
 
 
 def test_nuke_workflow_supports_single_matrix_and_release_builds() -> None:
@@ -125,6 +184,8 @@ def test_nuke_workflow_supports_single_matrix_and_release_builds() -> None:
     assert "Remove stale packages" in workflow
     assert "nuke-optix-cuda-windows-12.9.1" in workflow
     assert "nuke-optix-sdk-${{ matrix.optix_version }}" in workflow
+    assert "nuke-oidn-sdk-windows-2.5.0" in workflow
+    assert workflow.count("actions/cache@v5") == 6
     assert "tools/validate_nuke_release_assets.py" in workflow
     assert '--source-commit "${GITHUB_SHA}"' in workflow
     assert 'commits/${RELEASE_TAG}' in workflow

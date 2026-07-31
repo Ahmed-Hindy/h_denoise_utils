@@ -1,4 +1,4 @@
-name: Nuke OptiX Plugin
+name: Nuke Denoiser Nodes
 
 on:
   workflow_dispatch:
@@ -54,16 +54,22 @@ jobs:
           persist-credentials: false
 
       - name: Cache CUDA driver headers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: build/deps/cuda-redist
           key: nuke-optix-cuda-windows-12.9.1
 
       - name: Cache OptiX headers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: build/deps/optix-${{ inputs.optix_version }}
           key: nuke-optix-sdk-${{ inputs.optix_version }}
+
+      - name: Cache OIDN SDK
+        uses: actions/cache@v5
+        with:
+          path: h_denoise_utils/vendor/oidn/windows-x64/oidn-2.5.0
+          key: nuke-oidn-sdk-windows-2.5.0
 
       - name: Remove stale packages
         shell: pwsh
@@ -110,16 +116,22 @@ jobs:
           persist-credentials: false
 
       - name: Cache CUDA driver headers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: build/deps/cuda-redist
           key: nuke-optix-cuda-windows-12.9.1
 
       - name: Cache OptiX headers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: build/deps/optix-${{ matrix.optix_version }}
           key: nuke-optix-sdk-${{ matrix.optix_version }}
+
+      - name: Cache OIDN SDK
+        uses: actions/cache@v5
+        with:
+          path: h_denoise_utils/vendor/oidn/windows-x64/oidn-2.5.0
+          key: nuke-oidn-sdk-windows-2.5.0
 
       - name: Remove stale packages
         shell: pwsh
@@ -203,7 +215,7 @@ jobs:
           else
             gh release create "${RELEASE_TAG}" \
               --target "${GITHUB_SHA}" \
-              --title "HOptixDenoise ${RELEASE_TAG}" \
-              --notes "Validated native HOptixDenoise packages."
+              --title "Nuke denoiser nodes ${RELEASE_TAG}" \
+              --notes "Validated native HOptixDenoise and HOidnDenoise packages."
           fi
           gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber
