@@ -4,217 +4,152 @@ Last updated: 2026-07-31
 
 ## Current state
 
-Work remains on the draft pull request and must not be merged yet.
+Work remains on draft pull request #44 and must not be merged or published yet.
 
 - Branch: `dev/nuke-optix`
-- Head: `3b6d828d4ddfd48b5802cdc1739fa65f71c81da8`
-- Pull request: [#44 — Add native OptiX and OIDN Nuke nodes](https://github.com/Ahmed-Hindy/h_denoise_utils/pull/44)
-- Base: `main`
-- PR state: draft, mergeable, clean
+- Package identity: `HDenoiseNodes`
+- Nodes: `HOptixDenoise` and `HOidnDenoise`
+- Platform: Windows x64
+- PR: draft and mergeable
 
-The branch provides one Windows Nuke package containing two native `PlanarIop`
-nodes:
-
-- `HOptixDenoise`
-- `HOidnDenoise`
-
-Both nodes use beauty, optional albedo, and optional normal inputs. They are
-registered under Nuke's **Filter** menu.
+The permanent design is documented in
+[Nuke denoiser architecture](nuke-plugin-architecture.md). New contributors
+should start with [Nuke denoiser onboarding](nuke-plugin-onboarding.md).
 
 ## Completed implementation
 
 ### HOptixDenoise
 
-- Runs NVIDIA OptiX in the Nuke process.
-- Uses the CUDA Driver API and does not link CUDART.
-- Reuses the CUDA primary context, OptiX context, stream, denoiser, and GPU
-  buffers across compatible renders.
-- Supports input blending, tiling, GPU selection, signed or unsigned normal
-  encoding, and passthrough on error.
-- Resets retained resources after CUDA or OptiX failures.
+- Native Nuke `PlanarIop` using the CUDA Driver API and NVIDIA OptiX.
+- Beauty, optional albedo, and optional normal inputs.
+- Reusable thread-safe CUDA/OptiX session and GPU buffers.
+- Input blend, tile size, GPU selection, normal encoding, and error passthrough.
+- Spatial denoising only.
 
 ### HOidnDenoise
 
-- Is a real native Nuke image node, not a precomputed OIDN `Read` branch.
-- Supports input blending, GPU selection, Fast/Balanced/High quality, HDR input,
-  clean auxiliary guides, normal encoding, and passthrough on error.
-- Uses the OIDN 2.5.0 CUDA backend.
-- Exchanges tightly packed float buffers with `HOidnBridge.exe`; it does not
-  create intermediate EXR files.
-- Terminates the helper and removes temporary exchange files when Nuke aborts a
-  render.
+- Native Nuke `PlanarIop` with the same three-input contract.
+- OIDN 2.5 CUDA backend.
+- Fast, Balanced, and High quality modes.
+- HDR, clean auxiliary guides, normal encoding, GPU selection, blend, and
+  passthrough controls.
+- OIDN runs in `HOidnBridge.exe` through versioned raw float buffers rather than
+  intermediate EXRs.
 
-OIDN must remain outside the Nuke process. Nuke loads private Visual C++ and
-oneTBB runtime DLLs that are incompatible with Intel's OIDN binary package.
-Direct OIDN device creation inside Nuke produced deterministic access
-violations. The isolated helper clears Nuke's inherited DLL search directory
-before loading the packaged OIDN runtime.
+The helper is a required ABI boundary. Direct OIDN initialization inside Nuke
+crashed because Nuke's private Visual C++ and oneTBB DLLs conflict with Intel's
+binary OIDN runtime. The package therefore includes only the OIDN core and CUDA
+runtime DLLs.
 
-The Nuke package intentionally includes only:
+## Package identity decision
 
-- `OpenImageDenoise.dll`
-- `OpenImageDenoise_core.dll`
-- `OpenImageDenoise_device_cuda.dll`
+The combined package has been renamed from the misleading `HOptixDenoise`
+container to:
 
-CPU, oneTBB, SYCL, and HIP modules are excluded.
-
-## Packaging and validation
-
-The Windows build script:
-
-1. Reuses or fetches pinned OptiX, CUDA driver-header, and OIDN dependencies.
-2. Builds both Nuke DLLs and the OIDN helper.
-3. Inspects PE dependencies with `dumpbin`.
-4. Renders through both nodes in Nuke terminal mode.
-5. Records binary hashes, sizes, dependencies, SDK versions, source commit, and
-   validation state in `manifest.json`.
-6. Creates a combined release ZIP under `dist/`.
-
-The release validator rejects:
-
-- missing node, helper, or OIDN runtime files
-- altered hashes or sizes
-- direct OIDN linkage from `HOidnDenoise.dll`
-- missing `DDImage.dll` or CUDA Driver imports
-- CUDART linkage in `HOptixDenoise.dll`
-- unsupported Nuke/OptiX combinations
-- incomplete 12-package matrices
-- packages produced with render validation disabled
-
-The build environment setup is idempotent. Repeated matrix builds in one
-PowerShell process no longer duplicate Visual Studio and Ninja `PATH` entries.
-
-## Validation completed
-
-Local validation from commit `3b6d828`:
-
-- 169 Python tests passed.
-- Ruff passed across the repository.
-- Workflow YAML and PowerShell parsing passed.
-- Nuke node interface and render validation passed on:
-  - Nuke `14.1v8`
-  - Nuke `15.0v1`
-  - Nuke `15.1v4`
-  - Nuke `17.0v3`
-- Each Nuke version was built against OptiX `8.1`, `9.0`, and `9.1`.
-- All 12 final packages passed release-manifest, hash, dependency, source-commit,
-  and matrix validation.
-- The Canyon Run production multipart EXR rendered successfully through:
-  - guided `HOptixDenoise`
-  - guided `HOidnDenoise`
-  - the live amplified OptiX/OIDN difference branch
-- Invalid OIDN GPU selection returns a readable Nuke error without crashing.
-- PR #44 hosted checks and CodeRabbit review pass.
-
-## Playground
-
-Launch the live comparison graph:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass `
-  -File ".\examples\nuke-denoise-playground\launch-nuke-playground.ps1"
+```text
+HDenoiseNodes/
 ```
 
-Run the production-scene comparison headlessly:
+The public Nuke class names remain unchanged. The manifest, CMake install
+location, build script, release validator, fixtures, launcher, package README,
+and documentation all use the neutral package identity.
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass `
-  -File ".\examples\nuke-denoise-playground\launch-nuke-playground.ps1" `
-  -ValidateOnly
-```
+This decision is complete and should not be revisited before the first release
+unless manual artist feedback exposes a concrete naming problem.
 
-The graph contains live OptiX and OIDN beauty-only and guided branches, plus a
-live difference branch. The launcher removes only the generated playground's
-stale `.nk.autosave` file so Nuke cannot restore the previous cached-OIDN graph.
+## Acceptance completed
 
-## Known limitations
+The checked-in `tools/validate_nuke_denoiser_acceptance.py` passes on Nuke
+17.0v3 with the OptiX 9.1 package. It verifies:
 
-- Nuke packages are currently built and validated only on Windows.
-- Both nodes currently require an NVIDIA GPU.
-- `HOptixDenoise` is spatial only; temporal denoising is not implemented.
-- `HOidnDenoise` launches one helper process per evaluation and copies image
-  buffers through a temporary binary file. This is robust but has measurable
-  startup and host-I/O overhead.
-- Package naming still centers `HOptixDenoise` even though the ZIP contains both
-  nodes.
-- The package has no public release yet.
-- The `Nuke Denoiser Nodes` workflow requires a Windows self-hosted runner with
-  the Nuke SDK, licenses, Visual Studio, and an NVIDIA GPU.
+- both native classes instantiate;
+- required knobs exist and have expected defaults and tooltips;
+- all three inputs remain connected after save/reopen;
+- non-default OptiX and OIDN controls serialize correctly;
+- live OptiX and OIDN renders complete;
+- invalid OIDN GPU selection produces readable passthrough behavior;
+- no OIDN exchange files remain after evaluation.
 
-## Recommended next work
+The checked-in `tools/validate_nuke_oidn_cancellation.py` launches a UHD OIDN
+render in a separate Nuke process, sends Ctrl+Break after `HOidnBridge.exe`
+starts, and verifies:
 
-### 1. Manual Nuke acceptance pass
+- Nuke reports cancellation;
+- the helper exits;
+- no exchange files leak.
 
-Do this before architecture or naming changes. In Nuke 17.0v3:
+The live Canyon Run playground also renders guided OptiX, guided OIDN, and the
+amplified difference branch.
 
-- Create both nodes from the **Filter** menu.
-- Confirm input labels and optional guide behavior.
-- Inspect knob names, defaults, tooltips, ranges, and layout.
-- Test interactive Viewer changes, frame changes, and repeated renders.
-- Abort a large OIDN render and confirm the helper process exits immediately.
-- Test passthrough-on-error for invalid GPUs and missing helper/runtime files.
-- Save, close, and reopen a script containing both nodes.
+## Performance benchmark
 
-Record any UX or serialization issues before changing package identity.
+`tools/benchmark_nuke_denoiser_nodes.py` provides a reproducible Nuke 17.0v3
+benchmark. It uses one warm-up frame and the median of three animated-frame EXR
+renders, subtracting a source-write baseline.
 
-### 2. Benchmark the OIDN bridge
+Current approximate guided overhead on CUDA device 0:
 
-Measure beauty-only and guided OIDN renders at representative 2K and 4K sizes.
-Separate:
+| Resolution | OptiX | OIDN Fast | OIDN Balanced | OIDN High |
+| --- | ---: | ---: | ---: | ---: |
+| 1920 x 1080 | 0.35 s | 0.82 s | 0.79 s | 0.84 s |
+| 3840 x 2160 | 1.44 s | 2.81 s | 2.95 s | 3.22 s |
 
-- Nuke plane packing
-- exchange-file write
-- helper startup
-- OIDN execution
-- result readback
+The helper overhead is acceptable for the first release. UHD timings contain
+occasional outliers, so they should not be used as a quality-mode ranking.
+Persistent helper or shared-memory work remains deferred until production
+profiling demonstrates a real bottleneck.
 
-Use the measurements to decide whether a persistent helper process is worth the
-additional protocol and lifecycle complexity. Keep OIDN process isolation even
-if the helper becomes persistent.
+## Validation already completed
 
-### 3. Decide package identity before the first release
+- 169 Python tests passed before the acceptance-tool additions.
+- Ruff, workflow YAML, PowerShell parsing, and whitespace checks passed.
+- All Nuke/OptiX pairs built and rendered locally:
+  - Nuke 14.1v8, 15.0v1, 15.1v4, and 17.0v3;
+  - OptiX 8.1, 9.0, and 9.1.
+- The 12-package matrix passed release identity, source commit, dependency,
+  runtime-set, size, and SHA-256 validation before the neutral-container commit.
+- Hosted PR checks and CodeRabbit are green.
 
-The current extracted directory and manifest name are `HOptixDenoise`, while
-the package contains both nodes. Before publishing, decide whether to keep that
-compatibility name or rename the combined package to something neutral such as
-`HDenoiseNodes` or `h-denoise-nuke`.
+A fresh final matrix must be generated after the latest documentation and
+acceptance-tool commit so package manifests contain the final source SHA.
 
-A rename should update the install directory, manifest name, build workflow,
-release validator, documentation, package filename, and release tag together.
-This is easier before the first public Nuke package has users.
+## Self-hosted workflow status
 
-### 4. Run the self-hosted Nuke workflow
+The repository currently has no registered `nuke-ndk` self-hosted runner.
+Therefore the `Nuke Denoiser Nodes` workflow cannot be meaningfully dispatched;
+it would remain queued. Release publication must remain disabled.
 
-After manual acceptance and the naming decision:
+Once a runner is registered, dispatch in this order:
 
-- register or verify the Windows `nuke-ndk` self-hosted runner
-- dispatch one Nuke 17.0/OptiX 9.1 build
-- inspect the uploaded package
-- dispatch the supported 12-package matrix
-- keep release publication disabled
+1. `single`, Nuke 17.0v3, OptiX 9.1, publish disabled;
+2. inspect the uploaded `HDenoiseNodes` ZIP and manifest;
+3. `supported-matrix`, publish disabled;
+4. run the release validator against all downloaded artifacts.
 
-### 5. Release only after the branch is accepted
+## Remaining pre-merge work
 
-Do not merge or publish from the current handoff state. After the manual pass,
-benchmark decision, naming decision, and self-hosted workflow validation, make
-PR #44 ready for review. Merge and release should remain separate explicit
-steps.
+1. Commit the acceptance, cancellation, benchmark, and documentation updates.
+2. Run focused tests, the full Python suite, Ruff, YAML parsing, PowerShell
+   parsing, and Markdown-link validation.
+3. Build the final 12 local packages from the resulting commit.
+4. Validate the final matrix against that exact source SHA.
+5. Check PR review comments and CI.
+6. Leave the PR draft until the user explicitly decides it is ready.
 
 ## Deferred work
 
-These are not required for the first release:
+Not required for the first release:
 
-- temporal OptiX state in Nuke
-- Linux Nuke packages
-- CPU OIDN inside Nuke packages
-- persistent OIDN helper service
-- multi-frame helper batching
-- non-NVIDIA OIDN backends
+- OptiX temporal state;
+- Linux Nuke packages;
+- CPU or non-NVIDIA OIDN backends;
+- persistent OIDN helper service;
+- shared-memory bridge transport;
+- multi-frame or multi-AOV batching in one native node.
 
 ## Working-tree caution
 
-The worktree contains old untracked local artifacts that are not part of PR #44
-and must not be staged:
+Do not stage the old local artifacts:
 
 - `nul`
 - `tools/build_optix_denoiser.ps1`

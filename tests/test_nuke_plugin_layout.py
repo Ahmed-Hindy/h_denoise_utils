@@ -26,6 +26,10 @@ def test_nuke_plugin_sources_are_present() -> None:
         OPTIX_ROOT / "src" / "optix_denoiser.cpp",
         REPO_ROOT / "tools" / "build_nuke_optix.ps1",
         REPO_ROOT / "tools" / "validate_nuke_optix_plugin.py",
+        REPO_ROOT / "tools" / "validate_nuke_denoiser_acceptance.py",
+        REPO_ROOT / "tools" / "validate_nuke_oidn_cancellation.py",
+        REPO_ROOT / "tools" / "nuke_oidn_long_render.py",
+        REPO_ROOT / "tools" / "benchmark_nuke_denoiser_nodes.py",
         REPO_ROOT / "tools" / "validate_nuke_release_assets.py",
     )
 
@@ -39,6 +43,10 @@ def test_nuke_python_hooks_parse() -> None:
         NUKE_ROOT / "package" / "init.py",
         NUKE_ROOT / "package" / "menu.py",
         REPO_ROOT / "tools" / "validate_nuke_optix_plugin.py",
+        REPO_ROOT / "tools" / "validate_nuke_denoiser_acceptance.py",
+        REPO_ROOT / "tools" / "validate_nuke_oidn_cancellation.py",
+        REPO_ROOT / "tools" / "nuke_oidn_long_render.py",
+        REPO_ROOT / "tools" / "benchmark_nuke_denoiser_nodes.py",
     )
     for path in paths:
         ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -47,7 +55,9 @@ def test_nuke_python_hooks_parse() -> None:
     assert '"Filter/HOptixDenoise"' in menu
     assert '"Filter/HOidnDenoise"' in menu
 
-    validator = paths[-1].read_text(encoding="utf-8")
+    validator = (REPO_ROOT / "tools" / "validate_nuke_optix_plugin.py").read_text(
+        encoding="utf-8"
+    )
     assert 'nuke.addFormat("520 8 1.0 HOptixDenoiseTiledTest")' in validator
     assert "tile_size, render_format in render_cases" in validator
     assert 'nuke.createNode("HOidnDenoise"' in validator

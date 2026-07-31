@@ -139,6 +139,23 @@ Nuke version:
 - alpha and non-RGB beauty channels remain unchanged;
 - the production playground renders OptiX, OIDN, and their difference.
 
+Run the automated acceptance pass with:
+
+```powershell
+$env:NUKE_PATH = "<absolute-HDenoiseNodes-path>"
+Remove-Item Env:CUDA_CACHE_MAXSIZE -ErrorAction SilentlyContinue
+& "C:\Program Files\Nuke17.0v3\Nuke17.0.exe" `
+  -t tools/validate_nuke_denoiser_acceptance.py
+```
+
+Run the external Ctrl+Break cancellation test with:
+
+```powershell
+uv --system-certs run python tools/validate_nuke_oidn_cancellation.py `
+  --nuke "C:\Program Files\Nuke17.0v3\Nuke17.0.exe" `
+  --plugin "build\nuke-optix-package\nuke-17.0v3\optix-9.1\HDenoiseNodes"
+```
+
 Current acceptance evidence is recorded in
 [Nuke denoiser handoff](nuke-plugin-handoff.md).
 
@@ -182,13 +199,27 @@ powershell -NoProfile -ExecutionPolicy Bypass `
   -ValidateOnly
 ```
 
-### 5. Supported local matrix
+### 5. Performance benchmark
+
+Run the reproducible 1080p/UHD benchmark with:
+
+```powershell
+$env:NUKE_PATH = "<absolute-HDenoiseNodes-path>"
+Remove-Item Env:CUDA_CACHE_MAXSIZE -ErrorAction SilentlyContinue
+& "C:\Program Files\Nuke17.0v3\Nuke17.0.exe" `
+  -t tools/benchmark_nuke_denoiser_nodes.py
+```
+
+The JSON report is written under `%TEMP%\hdu-nuke-benchmark\benchmark.json`.
+Treat it as end-to-end timing evidence, not a quality ranking.
+
+### 6. Supported local matrix
 
 Build all 12 Nuke/OptiX pairs serially. The build script intentionally reuses
 an initialized Visual Studio environment and avoids repeatedly prepending Ninja
 to `PATH`.
 
-### 6. Release validator
+### 7. Release validator
 
 Collect the 12 current ZIPs into a clean directory, then run:
 
@@ -200,7 +231,7 @@ uv --system-certs run python .\tools\validate_nuke_release_assets.py `
   --source-commit <full-git-sha>
 ```
 
-### 7. Self-hosted workflow
+### 8. Self-hosted workflow
 
 Dispatch **Nuke Denoiser Nodes** with release publication disabled. Use
 `supported-matrix` before a public release and `single` for targeted validation.

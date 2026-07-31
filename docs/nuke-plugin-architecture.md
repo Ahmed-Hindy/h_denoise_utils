@@ -215,14 +215,15 @@ Approximate denoiser overhead after subtracting the source-write baseline was:
 
 | Resolution | OptiX guided | OIDN Fast | OIDN Balanced | OIDN High |
 | --- | ---: | ---: | ---: | ---: |
-| 1920 x 1080 | 0.33 s | 0.72 s | 0.84 s | 0.89 s |
-| 3840 x 2160 | 1.34 s | 2.25 s | 3.09 s | 2.59 s |
+| 1920 x 1080 | 0.35 s | 0.82 s | 0.79 s | 0.84 s |
+| 3840 x 2160 | 1.44 s | 2.81 s | 2.95 s | 3.22 s |
 
-The UHD quality ordering was noisy across only three samples, so these numbers
-characterize end-to-end cost rather than rank OIDN quality modes. High remains
-the production default. The helper boundary is acceptable for this first
-release, but persistent helper or shared-memory transport may be considered if
-real production profiling shows it is a bottleneck.
+Run the checked-in benchmark with `tools/benchmark_nuke_denoiser_nodes.py`.
+The UHD samples contained occasional multi-second outliers, so these numbers
+characterize end-to-end cost rather than provide a precise quality-mode ranking.
+High remains the production default. The helper boundary is acceptable for the
+first release, but a persistent helper or shared-memory transport may be
+considered if real production profiling shows it is a bottleneck.
 
 ## Deliberate non-goals
 
