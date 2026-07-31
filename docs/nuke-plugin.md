@@ -10,6 +10,9 @@ three-input image contract:
 The Nuke adapters own NDK image requests, channels, knobs, abort handling, and
 error reporting. Alpha and non-RGB beauty channels pass through unchanged.
 
+For the current branch state, validation evidence, known limitations, and the
+pre-release work sequence, see the [Nuke denoiser nodes handoff](nuke-plugin-handoff.md).
+
 ## Supported inputs
 
 1. `beauty` — required RGB or RGBA noisy render.
@@ -134,6 +137,19 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 
 The stub is for NDK compatibility testing only. It does not build the OIDN node
 and must not be distributed as a production denoiser.
+
+## Current limitations
+
+- Windows is the only validated Nuke package platform.
+- Both nodes currently require an NVIDIA GPU.
+- OptiX temporal denoising is not implemented.
+- OIDN process isolation adds helper startup and host-buffer I/O overhead.
+- The combined package still uses the `HOptixDenoise` directory and manifest
+  identity even though it contains both nodes.
+
+These constraints are intentional for the first implementation. Benchmarking,
+package naming, and manual Nuke acceptance should be resolved before the first
+public Nuke release.
 
 ## Build automation
 

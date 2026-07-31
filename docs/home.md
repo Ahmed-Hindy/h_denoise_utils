@@ -10,6 +10,7 @@ using bundled Intel OIDN and NVIDIA OptiX runtimes.
 - Multiple backends (Intel OIDN CPU / NVIDIA OptiX GPU)
 - AOV support with auto-detection
 - Full-featured Qt GUI and headless API
+- Native `HOptixDenoise` and `HOidnDenoise` nodes for Foundry Nuke
 - Python 3.11 and 3.13 compatible
 - Comprehensive test coverage
 
@@ -19,6 +20,7 @@ using bundled Intel OIDN and NVIDIA OptiX runtimes.
 - [Architecture Guide](architecture.md)
 - [Codebase Tour](codebase-tour.md)
 - [Common Tasks](common-tasks.md)
+- [Native Nuke denoiser nodes](nuke-plugin.md)
 
 ## Quick Start
 
@@ -54,3 +56,5 @@ denoiser.cleanup()
 - [Troubleshooting](troubleshooting.md)
 - [Glossary](glossary.md)
 - [API Reference](modules.md)
+- [Native Nuke denoiser nodes](nuke-plugin.md)
+- [Nuke development handoff](nuke-plugin-handoff.md)
