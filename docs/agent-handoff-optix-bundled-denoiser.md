@@ -33,7 +33,7 @@ This branch is the Houdini-free OptiX release line. Keep `main` as the Houdini-l
   - `optix-denoiser-linux-x64-optix-8.1-<source_key>.zip`
   - `optix-denoiser-linux-x64-optix-9.0-<source_key>.zip`
   - `optix-denoiser-linux-x64-optix-9.1-<source_key>.zip`
-- Fetch scripts: `tools/fetch_optix_denoiser.ps1`, `tools/fetch_optix_denoiser.sh`
+- Fetch scripts: `tools/fetch_optix_denoiser_windows.py`, `tools/fetch_optix_denoiser.sh`
 - Install paths:
   - `h_denoise_utils/vendor/optix-denoiser/windows-x64/optix-8.1/Denoiser.exe`
   - `h_denoise_utils/vendor/optix-denoiser/windows-x64/optix-9.0/Denoiser.exe`
@@ -93,10 +93,10 @@ It then verifies both `pyproject.toml` versions match, builds both zip artifacts
 
 ## Validation Commands
 
-Use native TLS with `uv` on this workstation if package resolution hits local certificate issues:
+Use system certificates with `uv` on this workstation if package resolution hits local certificate issues:
 
 ```powershell
-uv run --native-tls pytest --tb=short
+uv --system-certs run pytest --tb=short
 ```
 
 Latest full test result after the three-runtime update:
@@ -108,7 +108,7 @@ Latest full test result after the three-runtime update:
 Build the OptiX package after fetching the denoiser:
 
 ```powershell
-.\tools\fetch_optix_denoiser.ps1
+uv --system-certs run python .\tools\fetch_optix_denoiser_windows.py
 .\tools\build_windows_package.ps1 -Variant optix
 ```
 

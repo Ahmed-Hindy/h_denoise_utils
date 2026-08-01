@@ -2,8 +2,40 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <memory>
 
 namespace hdu::optix {
+namespace {
+
+void copy_denoise(const DenoiseRequest& request) {
+    if (request.beauty.pixels == nullptr || request.output.pixels == nullptr) {
+        throw Error("stub denoiser requires beauty and output buffers");
+    }
+    if (request.beauty.width != request.output.width ||
+        request.beauty.height != request.output.height) {
+        throw Error("stub output dimensions must match beauty dimensions");
+    }
+
+    const std::size_t value_count =
+        static_cast<std::size_t>(request.beauty.width) *
+        static_cast<std::size_t>(request.beauty.height) * 4U;
+    std::copy_n(request.beauty.pixels, value_count, request.output.pixels);
+}
+
+}  // namespace
+
+class DenoiserSession::Impl final {};
+
+DenoiserSession::DenoiserSession() : impl_(std::make_unique<Impl>()) {}
+DenoiserSession::~DenoiserSession() = default;
+DenoiserSession::DenoiserSession(DenoiserSession&&) noexcept = default;
+DenoiserSession& DenoiserSession::operator=(DenoiserSession&&) noexcept = default;
+
+void DenoiserSession::denoise(const DenoiseRequest& request) {
+    copy_denoise(request);
+}
+
+void DenoiserSession::reset() noexcept {}
 
 int device_count() {
     return 1;
@@ -17,18 +49,7 @@ std::string device_name(int device_index) {
 }
 
 void denoise(const DenoiseRequest& request) {
-    if (request.beauty.pixels == nullptr || request.output.pixels == nullptr) {
-        throw Error("stub denoiser requires beauty and output buffers");
-    }
-    if (request.beauty.width != request.output.width ||
-        request.beauty.height != request.output.height) {
-        throw Error("stub output dimensions must match beauty dimensions");
-    }
-
-    const std::size_t value_count =
-        static_cast<std::size_t>(request.beauty.width) *
-        static_cast<std::size_t>(request.beauty.height) * 4U;
-    std::copy_n(request.beauty.pixels, value_count, request.output.pixels);
+    copy_denoise(request);
 }
 
 }  // namespace hdu::optix

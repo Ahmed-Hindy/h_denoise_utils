@@ -1,9 +1,13 @@
-"""Register the HOptixDenoise node in Nuke's Nodes menu."""
+"""Register the h_denoise_utils nodes in Nuke's Filter menu."""
 
 import nuke
 
-
-nuke.menu("Nodes").addCommand(
+nodes_menu = nuke.menu("Nodes")
+nodes_menu.addCommand(
     "Filter/HOptixDenoise",
     lambda: nuke.createNode("HOptixDenoise"),
+)
+nodes_menu.addCommand(
+    "Filter/HOidnDenoise",
+    lambda: nuke.createNode("HOidnDenoise"),
 )

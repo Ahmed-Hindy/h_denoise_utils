@@ -85,7 +85,7 @@ jobs:
       - name: Validate OIDN UINT channel preservation
         shell: pwsh
         run: |
-          uv run --native-tls --with OpenEXR --with numpy python .\tools\validate_oidn_uint_preservation.py `
+          uv run --system-certs --with OpenEXR --with numpy python .\tools\validate_oidn_uint_preservation.py `
             --denoiser ".\h_denoise_utils\vendor\oidn-denoiser\windows-x64\oidn-$env:OIDN_VERSION\Denoiser.exe"
 
       - name: Install packaging dependencies
@@ -97,7 +97,12 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: .\tools\fetch_optix_denoiser.ps1
+        run: |
+          $arguments = @()
+          if ("${{ github.event_name }}" -eq "pull_request") {
+            $arguments += "--allow-source-key-mismatch"
+          }
+          uv --system-certs run python .\tools\fetch_optix_denoiser_windows.py @arguments
 
       - name: Build bundled portable package
         if: github.event_name != 'push' || (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/'))
@@ -168,7 +173,7 @@ jobs:
         shell: bash
         run: |
           export LD_LIBRARY_PATH="h_denoise_utils/vendor/oidn-denoiser/linux-x64/oidn-${{ env.OIDN_VERSION }}:${LD_LIBRARY_PATH:-}"
-          uv run --native-tls --with OpenEXR --with numpy python ./tools/validate_oidn_uint_preservation.py \
+          uv run --system-certs --with OpenEXR --with numpy python ./tools/validate_oidn_uint_preservation.py \
             --denoiser "./h_denoise_utils/vendor/oidn-denoiser/linux-x64/oidn-${{ env.OIDN_VERSION }}/Denoiser"
 
       - name: Install packaging dependencies
@@ -180,7 +185,12 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: ./tools/fetch_optix_denoiser.sh
+        run: |
+          arguments=()
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            arguments+=(--allow-source-key-mismatch)
+          fi
+          ./tools/fetch_optix_denoiser.sh "${arguments[@]}"
 
       - name: Build bundled portable package
         if: github.event_name != 'push' || (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/'))

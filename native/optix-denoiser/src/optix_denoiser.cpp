@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <memory>
 #include <mutex>
 #include <sstream>
 #include <utility>
@@ -50,20 +51,21 @@ namespace {
     throw Error(message.str());
 }
 
-#define HDU_CUDA_CHECK(expression)                                             \
-    do {                                                                       \
-        const CUresult hdu_cuda_result = (expression);                         \
-        if (hdu_cuda_result != CUDA_SUCCESS) {                                 \
+#define HDU_CUDA_CHECK(expression)                                              \
+    do {                                                                        \
+        const CUresult hdu_cuda_result = (expression);                          \
+        if (hdu_cuda_result != CUDA_SUCCESS) {                                  \
             throw_cuda_error(hdu_cuda_result, #expression, __FILE__, __LINE__); \
-        }                                                                      \
+        }                                                                       \
     } while (false)
 
-#define HDU_OPTIX_CHECK(expression)                                            \
-    do {                                                                       \
-        const OptixResult hdu_optix_result = (expression);                     \
-        if (hdu_optix_result != OPTIX_SUCCESS) {                               \
-            throw_optix_error(hdu_optix_result, #expression, __FILE__, __LINE__); \
-        }                                                                      \
+#define HDU_OPTIX_CHECK(expression)                                             \
+    do {                                                                        \
+        const OptixResult hdu_optix_result = (expression);                      \
+        if (hdu_optix_result != OPTIX_SUCCESS) {                                \
+            throw_optix_error(                                                  \
+                hdu_optix_result, #expression, __FILE__, __LINE__);             \
+        }                                                                       \
     } while (false)
 
 class PrimaryContext final {
@@ -71,20 +73,11 @@ public:
     explicit PrimaryContext(int device_index) {
         HDU_CUDA_CHECK(cuInit(0));
         HDU_CUDA_CHECK(cuDeviceGet(&device_, device_index));
-        HDU_CUDA_CHECK(cuCtxGetCurrent(&previous_context_));
         HDU_CUDA_CHECK(cuDevicePrimaryCtxRetain(&context_, device_));
-        try {
-            HDU_CUDA_CHECK(cuCtxSetCurrent(context_));
-        } catch (...) {
-            cuDevicePrimaryCtxRelease(device_);
-            context_ = nullptr;
-            throw;
-        }
     }
 
     ~PrimaryContext() {
         if (context_ != nullptr) {
-            cuCtxSetCurrent(previous_context_);
             cuDevicePrimaryCtxRelease(device_);
         }
     }
@@ -97,7 +90,31 @@ public:
 private:
     CUdevice device_ = 0;
     CUcontext context_ = nullptr;
+};
+
+class ScopedCurrentContext final {
+public:
+    explicit ScopedCurrentContext(CUcontext context) : context_(context) {
+        HDU_CUDA_CHECK(cuCtxGetCurrent(&previous_context_));
+        if (previous_context_ != context_) {
+            HDU_CUDA_CHECK(cuCtxSetCurrent(context_));
+            changed_ = true;
+        }
+    }
+
+    ~ScopedCurrentContext() {
+        if (changed_) {
+            cuCtxSetCurrent(previous_context_);
+        }
+    }
+
+    ScopedCurrentContext(const ScopedCurrentContext&) = delete;
+    ScopedCurrentContext& operator=(const ScopedCurrentContext&) = delete;
+
+private:
+    CUcontext context_ = nullptr;
     CUcontext previous_context_ = nullptr;
+    bool changed_ = false;
 };
 
 class DeviceAllocation final {
@@ -181,10 +198,13 @@ private:
 
 class Denoiser final {
 public:
-    Denoiser(OptixDeviceContext context, const OptixDenoiserOptions& options) {
+    Denoiser(
+        OptixDeviceContext context,
+        OptixDenoiserModelKind model,
+        const OptixDenoiserOptions& options) {
         HDU_OPTIX_CHECK(optixDenoiserCreate(
             context,
-            OPTIX_DENOISER_MODEL_KIND_HDR,
+            model,
             &options,
             &denoiser_));
     }
@@ -294,6 +314,356 @@ void initialize_cuda() {
 
 }  // namespace
 
+class DenoiserSession::Impl final {
+public:
+    ~Impl() { reset_unlocked(); }
+
+    void denoise(const DenoiseRequest& request) {
+        validate_request(request);
+
+        std::lock_guard<std::mutex> lock(mutex_);
+        try {
+            const int count = device_count();
+            if (count == 0) {
+                throw Error("no CUDA devices were found");
+            }
+            if (request.options.gpu_device < 0 ||
+                request.options.gpu_device >= count) {
+                throw Error("CUDA device index is out of range");
+            }
+
+            ensure_device(request.options.gpu_device);
+            ScopedCurrentContext current(cuda_context_->get());
+            ensure_denoiser(request);
+            ensure_buffers(request);
+            execute(request);
+        } catch (...) {
+            reset_unlocked();
+            throw;
+        }
+    }
+
+    void reset() noexcept {
+        try {
+            std::lock_guard<std::mutex> lock(mutex_);
+            reset_unlocked();
+        } catch (...) {
+            // Reset is best-effort and must remain safe during error handling.
+        }
+    }
+
+private:
+    void ensure_device(int gpu_device) {
+        if (cuda_context_ != nullptr && gpu_device_ == gpu_device) {
+            return;
+        }
+
+        reset_unlocked();
+        initialize_optix();
+        try {
+            cuda_context_ = std::make_unique<PrimaryContext>(gpu_device);
+            ScopedCurrentContext current(cuda_context_->get());
+            stream_ = std::make_unique<Stream>();
+            optix_context_ =
+                std::make_unique<DeviceContext>(cuda_context_->get());
+            gpu_device_ = gpu_device;
+        } catch (...) {
+            reset_unlocked();
+            throw;
+        }
+    }
+
+    void ensure_denoiser(const DenoiseRequest& request) {
+        const bool has_albedo = request.albedo.pixels != nullptr;
+        const bool has_normal = request.normal.pixels != nullptr;
+        const bool matches =
+            denoiser_ != nullptr &&
+            has_albedo_ == has_albedo &&
+            has_normal_ == has_normal &&
+            denoise_alpha_ == request.options.denoise_alpha &&
+            hdr_ == request.options.hdr;
+        if (matches) {
+            return;
+        }
+
+        clear_buffers();
+        denoiser_.reset();
+
+        OptixDenoiserOptions options{};
+        options.guideAlbedo = has_albedo;
+        options.guideNormal = has_normal;
+#if OPTIX_VERSION >= 80000
+        options.denoiseAlpha = static_cast<OptixDenoiserAlphaMode>(
+            request.options.denoise_alpha ? 1 : 0);
+#endif
+        const OptixDenoiserModelKind model = request.options.hdr
+            ? OPTIX_DENOISER_MODEL_KIND_HDR
+            : OPTIX_DENOISER_MODEL_KIND_LDR;
+        denoiser_ =
+            std::make_unique<Denoiser>(optix_context_->get(), model, options);
+        has_albedo_ = has_albedo;
+        has_normal_ = has_normal;
+        denoise_alpha_ = request.options.denoise_alpha;
+        hdr_ = request.options.hdr;
+    }
+
+    void ensure_buffers(const DenoiseRequest& request) {
+        if (input_buffer_.get() != 0 &&
+            width_ == request.beauty.width &&
+            height_ == request.beauty.height &&
+            requested_tile_width_ == request.options.tile_width &&
+            requested_tile_height_ == request.options.tile_height) {
+            return;
+        }
+
+        clear_buffers();
+        width_ = request.beauty.width;
+        height_ = request.beauty.height;
+        requested_tile_width_ = request.options.tile_width;
+        requested_tile_height_ = request.options.tile_height;
+        image_bytes_ = image_byte_size(width_, height_);
+
+        input_buffer_ = DeviceAllocation(image_bytes_);
+        output_buffer_ = DeviceAllocation(image_bytes_);
+        if (has_albedo_) {
+            albedo_buffer_ = DeviceAllocation(image_bytes_);
+        }
+        if (has_normal_) {
+            normal_buffer_ = DeviceAllocation(image_bytes_);
+        }
+
+        HDU_OPTIX_CHECK(optixDenoiserComputeMemoryResources(
+            denoiser_->get(), width_, height_, &sizes_));
+
+        use_tiling_ =
+            requested_tile_width_ != 0 &&
+            (requested_tile_width_ < width_ ||
+             requested_tile_height_ < height_);
+        tile_width_ =
+            use_tiling_ ? std::min(requested_tile_width_, width_) : width_;
+        tile_height_ =
+            use_tiling_ ? std::min(requested_tile_height_, height_) : height_;
+        overlap_ = use_tiling_ ? sizes_.overlapWindowSizeInPixels : 0U;
+        scratch_size_ =
+            use_tiling_ ? sizes_.withOverlapScratchSizeInBytes
+                        : sizes_.withoutOverlapScratchSizeInBytes;
+
+        state_buffer_ = DeviceAllocation(sizes_.stateSizeInBytes);
+        scratch_buffer_ = DeviceAllocation(scratch_size_);
+        intensity_buffer_ = DeviceAllocation(sizeof(float));
+
+        HDU_OPTIX_CHECK(optixDenoiserSetup(
+            denoiser_->get(),
+            stream_->get(),
+            tile_width_ + 2U * overlap_,
+            tile_height_ + 2U * overlap_,
+            state_buffer_.get(),
+            sizes_.stateSizeInBytes,
+            scratch_buffer_.get(),
+            scratch_size_));
+    }
+
+    void execute(const DenoiseRequest& request) {
+        HDU_CUDA_CHECK(cuMemcpyHtoDAsync(
+            input_buffer_.get(),
+            request.beauty.pixels,
+            image_bytes_,
+            stream_->get()));
+
+        OptixDenoiserLayer layer{};
+        layer.input = make_image(input_buffer_, width_, height_);
+        layer.output = make_image(output_buffer_, width_, height_);
+
+        OptixDenoiserGuideLayer guide{};
+        if (has_albedo_) {
+            HDU_CUDA_CHECK(cuMemcpyHtoDAsync(
+                albedo_buffer_.get(),
+                request.albedo.pixels,
+                image_bytes_,
+                stream_->get()));
+            guide.albedo = make_image(albedo_buffer_, width_, height_);
+        }
+        if (has_normal_) {
+            HDU_CUDA_CHECK(cuMemcpyHtoDAsync(
+                normal_buffer_.get(),
+                request.normal.pixels,
+                image_bytes_,
+                stream_->get()));
+            guide.normal = make_image(normal_buffer_, width_, height_);
+        }
+
+        HDU_OPTIX_CHECK(optixDenoiserComputeIntensity(
+            denoiser_->get(),
+            stream_->get(),
+            &layer.input,
+            intensity_buffer_.get(),
+            scratch_buffer_.get(),
+            scratch_size_));
+
+        OptixDenoiserParams parameters{};
+        parameters.hdrIntensity = intensity_buffer_.get();
+        parameters.blendFactor = request.options.blend_factor;
+#if OPTIX_VERSION < 80000
+        parameters.denoiseAlpha = static_cast<OptixDenoiserAlphaMode>(
+            request.options.denoise_alpha ? 1 : 0);
+#endif
+
+        if (use_tiling_) {
+            HDU_OPTIX_CHECK(optixUtilDenoiserInvokeTiled(
+                denoiser_->get(),
+                stream_->get(),
+                &parameters,
+                state_buffer_.get(),
+                sizes_.stateSizeInBytes,
+                &guide,
+                &layer,
+                1U,
+                scratch_buffer_.get(),
+                scratch_size_,
+                overlap_,
+                tile_width_,
+                tile_height_));
+        } else {
+            HDU_OPTIX_CHECK(optixDenoiserInvoke(
+                denoiser_->get(),
+                stream_->get(),
+                &parameters,
+                state_buffer_.get(),
+                sizes_.stateSizeInBytes,
+                &guide,
+                &layer,
+                1U,
+                0U,
+                0U,
+                scratch_buffer_.get(),
+                scratch_size_));
+        }
+
+        HDU_CUDA_CHECK(cuMemcpyDtoHAsync(
+            request.output.pixels,
+            output_buffer_.get(),
+            image_bytes_,
+            stream_->get()));
+        HDU_CUDA_CHECK(cuStreamSynchronize(stream_->get()));
+
+        if (!request.options.denoise_alpha) {
+            const std::size_t pixel_count =
+                static_cast<std::size_t>(width_) *
+                static_cast<std::size_t>(height_);
+            for (std::size_t pixel = 0; pixel < pixel_count; ++pixel) {
+                request.output.pixels[pixel * 4U + 3U] =
+                    request.beauty.pixels[pixel * 4U + 3U];
+            }
+        }
+    }
+
+    void clear_buffers() noexcept {
+        intensity_buffer_ = {};
+        scratch_buffer_ = {};
+        state_buffer_ = {};
+        normal_buffer_ = {};
+        albedo_buffer_ = {};
+        output_buffer_ = {};
+        input_buffer_ = {};
+        sizes_ = {};
+        width_ = 0;
+        height_ = 0;
+        requested_tile_width_ = 0;
+        requested_tile_height_ = 0;
+        tile_width_ = 0;
+        tile_height_ = 0;
+        overlap_ = 0;
+        image_bytes_ = 0;
+        scratch_size_ = 0;
+        use_tiling_ = false;
+    }
+
+    void reset_unlocked() noexcept {
+        if (cuda_context_ != nullptr) {
+            try {
+                ScopedCurrentContext current(cuda_context_->get());
+                if (stream_ != nullptr) {
+                    cuStreamSynchronize(stream_->get());
+                }
+                clear_buffers();
+                denoiser_.reset();
+                stream_.reset();
+                optix_context_.reset();
+            } catch (...) {
+                // The context may already be invalid; release host-side handles.
+                clear_buffers();
+                denoiser_.reset();
+                stream_.reset();
+                optix_context_.reset();
+            }
+        } else {
+            clear_buffers();
+            denoiser_.reset();
+            stream_.reset();
+            optix_context_.reset();
+        }
+        cuda_context_.reset();
+        gpu_device_ = -1;
+        has_albedo_ = false;
+        has_normal_ = false;
+        denoise_alpha_ = false;
+        hdr_ = true;
+    }
+
+    std::mutex mutex_;
+    int gpu_device_ = -1;
+    std::unique_ptr<PrimaryContext> cuda_context_;
+    std::unique_ptr<Stream> stream_;
+    std::unique_ptr<DeviceContext> optix_context_;
+    std::unique_ptr<Denoiser> denoiser_;
+
+    bool has_albedo_ = false;
+    bool has_normal_ = false;
+    bool denoise_alpha_ = false;
+    bool hdr_ = true;
+
+    unsigned int width_ = 0;
+    unsigned int height_ = 0;
+    unsigned int requested_tile_width_ = 0;
+    unsigned int requested_tile_height_ = 0;
+    unsigned int tile_width_ = 0;
+    unsigned int tile_height_ = 0;
+    unsigned int overlap_ = 0;
+    bool use_tiling_ = false;
+    std::size_t image_bytes_ = 0;
+    std::size_t scratch_size_ = 0;
+    OptixDenoiserSizes sizes_{};
+
+    DeviceAllocation input_buffer_;
+    DeviceAllocation output_buffer_;
+    DeviceAllocation albedo_buffer_;
+    DeviceAllocation normal_buffer_;
+    DeviceAllocation state_buffer_;
+    DeviceAllocation scratch_buffer_;
+    DeviceAllocation intensity_buffer_;
+};
+
+DenoiserSession::DenoiserSession() : impl_(std::make_unique<Impl>()) {}
+
+DenoiserSession::~DenoiserSession() = default;
+
+DenoiserSession::DenoiserSession(DenoiserSession&&) noexcept = default;
+
+DenoiserSession& DenoiserSession::operator=(DenoiserSession&&) noexcept = default;
+
+void DenoiserSession::denoise(const DenoiseRequest& request) {
+    if (impl_ == nullptr) {
+        impl_ = std::make_unique<Impl>();
+    }
+    impl_->denoise(request);
+}
+
+void DenoiserSession::reset() noexcept {
+    if (impl_ != nullptr) {
+        impl_->reset();
+    }
+}
+
 int device_count() {
     initialize_cuda();
     int count = 0;
@@ -315,154 +685,8 @@ std::string device_name(int device_index) {
 }
 
 void denoise(const DenoiseRequest& request) {
-    validate_request(request);
-
-    const int count = device_count();
-    if (count == 0) {
-        throw Error("no CUDA devices were found");
-    }
-    if (request.options.gpu_device < 0 ||
-        request.options.gpu_device >= count) {
-        throw Error("CUDA device index is out of range");
-    }
-
-    PrimaryContext cuda_context(request.options.gpu_device);
-    initialize_optix();
-    Stream stream;
-    DeviceContext optix_context(cuda_context.get());
-
-    OptixDenoiserOptions denoiser_options{};
-    denoiser_options.guideAlbedo = request.albedo.pixels != nullptr;
-    denoiser_options.guideNormal = request.normal.pixels != nullptr;
-#if OPTIX_VERSION >= 80000
-    denoiser_options.denoiseAlpha = static_cast<OptixDenoiserAlphaMode>(
-        request.options.denoise_alpha ? 1 : 0);
-#endif
-
-    Denoiser denoiser(optix_context.get(), denoiser_options);
-
-    const unsigned int width = request.beauty.width;
-    const unsigned int height = request.beauty.height;
-    const std::size_t bytes = image_byte_size(width, height);
-
-    DeviceAllocation input_buffer(bytes);
-    DeviceAllocation output_buffer(bytes);
-    HDU_CUDA_CHECK(cuMemcpyHtoDAsync(
-        input_buffer.get(), request.beauty.pixels, bytes, stream.get()));
-
-    OptixDenoiserLayer layer{};
-    layer.input = make_image(input_buffer, width, height);
-    layer.output = make_image(output_buffer, width, height);
-
-    DeviceAllocation albedo_buffer;
-    DeviceAllocation normal_buffer;
-    OptixDenoiserGuideLayer guide{};
-
-    if (request.albedo.pixels != nullptr) {
-        albedo_buffer = DeviceAllocation(bytes);
-        HDU_CUDA_CHECK(cuMemcpyHtoDAsync(
-            albedo_buffer.get(), request.albedo.pixels, bytes, stream.get()));
-        guide.albedo = make_image(albedo_buffer, width, height);
-    }
-    if (request.normal.pixels != nullptr) {
-        normal_buffer = DeviceAllocation(bytes);
-        HDU_CUDA_CHECK(cuMemcpyHtoDAsync(
-            normal_buffer.get(), request.normal.pixels, bytes, stream.get()));
-        guide.normal = make_image(normal_buffer, width, height);
-    }
-
-    OptixDenoiserSizes sizes{};
-    HDU_OPTIX_CHECK(optixDenoiserComputeMemoryResources(
-        denoiser.get(), width, height, &sizes));
-
-    const bool use_tiling =
-        request.options.tile_width != 0 &&
-        (request.options.tile_width < width ||
-         request.options.tile_height < height);
-    const unsigned int tile_width =
-        use_tiling ? std::min(request.options.tile_width, width) : width;
-    const unsigned int tile_height =
-        use_tiling ? std::min(request.options.tile_height, height) : height;
-    const unsigned int overlap =
-        use_tiling ? sizes.overlapWindowSizeInPixels : 0U;
-    const std::size_t scratch_size =
-        use_tiling ? sizes.withOverlapScratchSizeInBytes
-                   : sizes.withoutOverlapScratchSizeInBytes;
-
-    DeviceAllocation state_buffer(sizes.stateSizeInBytes);
-    DeviceAllocation scratch_buffer(scratch_size);
-    DeviceAllocation intensity_buffer(sizeof(float));
-
-    HDU_OPTIX_CHECK(optixDenoiserSetup(
-        denoiser.get(),
-        stream.get(),
-        tile_width + 2U * overlap,
-        tile_height + 2U * overlap,
-        state_buffer.get(),
-        sizes.stateSizeInBytes,
-        scratch_buffer.get(),
-        scratch_size));
-
-    HDU_OPTIX_CHECK(optixDenoiserComputeIntensity(
-        denoiser.get(),
-        stream.get(),
-        &layer.input,
-        intensity_buffer.get(),
-        scratch_buffer.get(),
-        scratch_size));
-
-    OptixDenoiserParams parameters{};
-    parameters.hdrIntensity = intensity_buffer.get();
-    parameters.blendFactor = request.options.blend_factor;
-#if OPTIX_VERSION < 80000
-    parameters.denoiseAlpha = static_cast<OptixDenoiserAlphaMode>(
-        request.options.denoise_alpha ? 1 : 0);
-#endif
-
-    if (use_tiling) {
-        HDU_OPTIX_CHECK(optixUtilDenoiserInvokeTiled(
-            denoiser.get(),
-            stream.get(),
-            &parameters,
-            state_buffer.get(),
-            sizes.stateSizeInBytes,
-            &guide,
-            &layer,
-            1U,
-            scratch_buffer.get(),
-            scratch_size,
-            overlap,
-            tile_width,
-            tile_height));
-    } else {
-        HDU_OPTIX_CHECK(optixDenoiserInvoke(
-            denoiser.get(),
-            stream.get(),
-            &parameters,
-            state_buffer.get(),
-            sizes.stateSizeInBytes,
-            &guide,
-            &layer,
-            1U,
-            0U,
-            0U,
-            scratch_buffer.get(),
-            scratch_size));
-    }
-
-    HDU_CUDA_CHECK(cuMemcpyDtoHAsync(
-        request.output.pixels, output_buffer.get(), bytes, stream.get()));
-    HDU_CUDA_CHECK(cuStreamSynchronize(stream.get()));
-
-    if (!request.options.denoise_alpha) {
-        const std::size_t pixel_count =
-            static_cast<std::size_t>(width) *
-            static_cast<std::size_t>(height);
-        for (std::size_t pixel = 0; pixel < pixel_count; ++pixel) {
-            request.output.pixels[pixel * 4U + 3U] =
-                request.beauty.pixels[pixel * 4U + 3U];
-        }
-    }
+    DenoiserSession session;
+    session.denoise(request);
 }
 
 }  // namespace hdu::optix

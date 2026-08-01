@@ -32,7 +32,7 @@
 Fetch OptiX:
 
 ```powershell
-.\tools\fetch_optix_denoiser.ps1
+uv --system-certs run python .\tools\fetch_optix_denoiser_windows.py
 ```
 
 Fetch the official OIDN SDK/runtime used to build the custom wrapper:

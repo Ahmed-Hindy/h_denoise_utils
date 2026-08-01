@@ -10,9 +10,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Native `HOptixDenoise` Nuke `PlanarIop` with beauty, albedo, and normal
   inputs, OptiX tiling, GPU selection, normal encoding, blend, and safe
   passthrough controls.
+- Native `HOidnDenoise` Nuke node with the same guide inputs, CUDA device,
+  quality, HDR, clean-auxiliary, normal encoding, blend, and passthrough
+  controls. OIDN runs through an isolated raw-buffer helper to avoid conflicts
+  with Nuke's private Visual C++ and oneTBB runtimes.
 - Shared in-memory OptiX C++ core built on the CUDA Driver API.
 - One-command Windows build, Nuke terminal validation, manifest generation,
   release ZIP packaging, documentation, and self-hosted CI workflow.
+- A Nuke playground for comparing live native OptiX and OIDN nodes on
+  production multipart EXRs, including guide extraction, differences, write
+  nodes, runtime selection, and a PowerShell launcher.
+
+### Changed
+- Nuke nodes now retain a thread-safe OptiX session and reuse compatible CUDA
+  contexts, streams, denoisers, and GPU buffers between renders.
+- Nuke validation now covers repeated renders, real tiled invocation, and
+  image-size changes across the supported Nuke and OptiX versions.
+- Standalone CLI repeat runs now reuse one OptiX session for accurate profiling.
+- Native OptiX source changes now compile on Windows and Linux pull requests,
+  with platform-specific source keys and cache inputs.
+- The Nuke workflow can build one package or the serial 12-package supported
+  matrix, reuse pinned SDK caches, and optionally publish manifest-validated
+  release assets.
+- The combined Nuke package directory and manifest identity are now the neutral
+  `HDenoiseNodes`; the public node class names remain `HOptixDenoise` and
+  `HOidnDenoise`.
+
+### Fixed
+- Large Nuke plane conversions and output writes now respond to render aborts.
+- The Windows Nuke build script now hashes files correctly under Windows
+  PowerShell 5.1.
+- Nuke packaging now rejects binaries that omit required Nuke/CUDA Driver
+  imports or accidentally link a CUDA Runtime DLL.
+- The legacy standalone CLI now applies its alpha mode before OptiX denoiser
+  creation and reports named OptiX initialization errors.
+- Pull-request packaging can reuse a compatible published OptiX runtime when
+  native source changes produce a source key that is not released yet.
+- Partial OptiX fetches preserve installed variants, archives reject path
+  traversal, and interrupted CUDA downloads recover without manual cleanup.
+- RGB and other sub-four-channel standalone outputs no longer write beyond
+  their pixel stride, and legacy AOV output paths no longer assume an extension.
+- Static Linux OpenImageIO builds now link their PNG dependency explicitly
+  instead of accidentally discovering an untracked system library.
 
 ## [2.0.1] — 2026-07-28
 

@@ -3,6 +3,8 @@ param(
     [string]$OptixVersion = "9.1",
     [string]$NukeVersion = "17.0v3",
     [string]$NukeRoot = "",
+    [string]$OidnVersion = "2.5.0",
+    [string]$OidnRoot = "",
     [ValidateSet("Release", "RelWithDebInfo", "Debug")]
     [string]$Configuration = "Release",
     [switch]$Stub,
@@ -34,6 +36,13 @@ function Invoke-Native {
 }
 
 function Import-VisualStudioEnvironment {
+    if ($env:VSCMD_VER -and
+        (Get-Command cl.exe -ErrorAction SilentlyContinue) -and
+        (Get-Command link.exe -ErrorAction SilentlyContinue) -and
+        (Get-Command dumpbin.exe -ErrorAction SilentlyContinue)) {
+        return
+    }
+
     $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
     if (-not (Test-Path -LiteralPath $vswhere)) {
         throw "Visual Studio Installer's vswhere.exe was not found."
@@ -78,6 +87,45 @@ function Resolve-Executable {
     throw "Required executable was not found: $Name"
 }
 
+function Get-Sha256Hash {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $stream = [System.IO.File]::OpenRead((Resolve-Path -LiteralPath $Path).Path)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return -join ($sha.ComputeHash($stream) |
+            ForEach-Object { $_.ToString("x2") })
+    }
+    finally {
+        $stream.Dispose()
+        $sha.Dispose()
+    }
+}
+
+function Get-PeDependencies {
+    param(
+        [Parameter(Mandatory = $true)][string]$Dumpbin,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    $output = & $Dumpbin /dependents $Path
+    if ($LASTEXITCODE -ne 0) {
+        throw "dumpbin failed with exit code ${LASTEXITCODE}: $Path"
+    }
+
+    $dependencies = @($output |
+        ForEach-Object {
+            if ($_ -match '^\s+([A-Za-z0-9_.-]+\.dll)\s*$') {
+                $Matches[1]
+            }
+        } |
+        Sort-Object -Unique)
+    if ($dependencies.Count -eq 0) {
+        throw "No PE dependencies were found for $Path"
+    }
+    return $dependencies
+}
+
 function Sync-OptixHeaders {
     param(
         [Parameter(Mandatory = $true)][string]$Destination,
@@ -109,6 +157,53 @@ function Sync-OptixHeaders {
     }
 }
 
+function Resolve-OidnSdkRoot {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$Version,
+        [string]$ExplicitRoot,
+        [switch]$AllowFetch
+    )
+
+    $candidates = [System.Collections.Generic.List[string]]::new()
+    if ($ExplicitRoot) {
+        $candidates.Add($ExplicitRoot)
+    }
+    $candidates.Add((Join-Path $RepoRoot "h_denoise_utils\vendor\oidn\windows-x64\oidn-$Version"))
+
+    $commonGitDir = (& git -C $RepoRoot rev-parse --git-common-dir).Trim()
+    if ($commonGitDir) {
+        if (-not [IO.Path]::IsPathRooted($commonGitDir)) {
+            $commonGitDir = Join-Path $RepoRoot $commonGitDir
+        }
+        $resolvedGitDir = Resolve-Path -LiteralPath $commonGitDir -ErrorAction SilentlyContinue
+        if ($resolvedGitDir) {
+            $mainCheckout = Split-Path -Parent $resolvedGitDir.Path
+            $candidates.Add((Join-Path $mainCheckout "h_denoise_utils\vendor\oidn\windows-x64\oidn-$Version"))
+        }
+    }
+
+    foreach ($candidate in $candidates) {
+        if ((Test-Path -LiteralPath (Join-Path $candidate "include\OpenImageDenoise\oidn.hpp")) -and
+            (Test-Path -LiteralPath (Join-Path $candidate "lib\OpenImageDenoise.lib")) -and
+            (Test-Path -LiteralPath (Join-Path $candidate "bin\OpenImageDenoise.dll"))) {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
+    }
+
+    if ($AllowFetch) {
+        & (Join-Path $PSScriptRoot "fetch_oidn.ps1") -Version $Version -Platform "windows-x64"
+        $fetched = Join-Path $RepoRoot "h_denoise_utils\vendor\oidn\windows-x64\oidn-$Version"
+        if ((Test-Path -LiteralPath (Join-Path $fetched "include\OpenImageDenoise\oidn.hpp")) -and
+            (Test-Path -LiteralPath (Join-Path $fetched "lib\OpenImageDenoise.lib")) -and
+            (Test-Path -LiteralPath (Join-Path $fetched "bin\OpenImageDenoise.dll"))) {
+            return (Resolve-Path -LiteralPath $fetched).Path
+        }
+    }
+
+    throw "OIDN $Version SDK was not found. Set -OidnRoot or run without -SkipDependencyFetch."
+}
+
 function Sync-CudaDriverHeaders {
     param([Parameter(Mandatory = $true)][string]$DependencyRoot)
 
@@ -131,7 +226,7 @@ function Sync-CudaDriverHeaders {
     }
 
     if ($windowsPackage.sha256) {
-        $actualHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        $actualHash = Get-Sha256Hash -Path $archivePath
         if ($actualHash -ne $windowsPackage.sha256.ToLowerInvariant()) {
             throw "CUDA redistributable SHA-256 mismatch: $archivePath"
         }
@@ -193,12 +288,25 @@ $ninja = Resolve-Executable ninja.exe @(
 )
 $cl = (Resolve-Executable cl.exe).Replace("\", "/")
 $rc = (Resolve-Executable rc.exe).Replace("\", "/")
+$dumpbin = Resolve-Executable dumpbin.exe
 $ninjaForCMake = $ninja.Replace("\", "/")
-$env:PATH = "$(Split-Path -Parent $ninja);$env:PATH"
+$ninjaDirectory = Split-Path -Parent $ninja
+if (($env:PATH -split [IO.Path]::PathSeparator) -notcontains $ninjaDirectory) {
+    $env:PATH = "$ninjaDirectory$([IO.Path]::PathSeparator)$env:PATH"
+}
 
 $dependencyRoot = Join-Path $repoRoot "build\deps"
 $optixRoot = Join-Path $dependencyRoot "optix-$OptixVersion"
 $cudaRoot = ""
+$buildOidn = -not $Stub.IsPresent
+$resolvedOidnRoot = ""
+if ($buildOidn) {
+    $resolvedOidnRoot = Resolve-OidnSdkRoot `
+        -RepoRoot $repoRoot `
+        -Version $OidnVersion `
+        -ExplicitRoot $OidnRoot `
+        -AllowFetch:(-not $SkipDependencyFetch)
+}
 if (-not $Stub) {
     if (-not $SkipDependencyFetch) {
         Sync-OptixHeaders -Destination $optixRoot -Commit $optixSdkCommits[$OptixVersion]
@@ -221,6 +329,7 @@ if (-not $Stub) {
     }
 }
 
+$packageName = "HDenoiseNodes"
 $variant = if ($Stub) { "stub" } else { "optix-$OptixVersion" }
 $buildRoot = Join-Path $repoRoot "build\nuke-optix\nuke-$NukeVersion\$variant"
 $packageRoot = Join-Path $repoRoot "build\nuke-optix-package\nuke-$NukeVersion\$variant"
@@ -244,8 +353,12 @@ $configureArguments = @(
     "-DNUKE_VERSION=$NukeVersion",
     "-DNUKE_ROOT=$NukeRoot",
     "-DHDU_VERSION=$projectVersion",
-    "-DHDU_NUKE_STUB_OPTIX=$($Stub.IsPresent)"
+    "-DHDU_NUKE_STUB_OPTIX=$($Stub.IsPresent)",
+    "-DHDU_NUKE_BUILD_OIDN=$buildOidn"
 )
+if ($buildOidn) {
+    $configureArguments += "-DOIDN_ROOT=$resolvedOidnRoot"
+}
 if (-not $Stub) {
     $configureArguments += "-DOPTIX_ROOT=$optixRoot"
     $configureArguments += "-DCUDA_REDIST_ROOT=$cudaRoot"
@@ -259,15 +372,87 @@ Invoke-Native -Command $cmake -Arguments @(
     "--install", $buildRoot, "--prefix", $packageRoot
 )
 
-$pluginRoot = Join-Path $packageRoot "HOptixDenoise"
+$pluginRoot = Join-Path $packageRoot $packageName
 $pluginBinary = Join-Path $pluginRoot "HOptixDenoise.dll"
 if (-not (Test-Path -LiteralPath $pluginBinary)) {
     throw "Nuke plugin was not created: $pluginBinary"
 }
 
+$oidnPluginBinary = Join-Path $pluginRoot "HOidnDenoise.dll"
+$oidnHelperBinary = Join-Path $pluginRoot "HOidnBridge.exe"
+if ($buildOidn -and -not (Test-Path -LiteralPath $oidnPluginBinary)) {
+    throw "OIDN Nuke plugin was not created: $oidnPluginBinary"
+}
+if ($buildOidn -and -not (Test-Path -LiteralPath $oidnHelperBinary)) {
+    throw "OIDN helper was not created: $oidnHelperBinary"
+}
+
+$dependencies = @(Get-PeDependencies -Dumpbin $dumpbin -Path $pluginBinary)
+if ($dependencies -notcontains "DDImage.dll") {
+    throw "Nuke plugin does not import DDImage.dll."
+}
+if (-not $Stub -and $dependencies -notcontains "nvcuda.dll") {
+    throw "Production Nuke plugin does not import nvcuda.dll."
+}
+$cudartDependencies = @($dependencies | Where-Object { $_ -match '^cudart.*\.dll$' })
+if ($cudartDependencies.Count -gt 0) {
+    throw "Nuke plugin unexpectedly imports CUDA Runtime DLLs: $($cudartDependencies -join ', ')"
+}
+
+$oidnDependencies = @()
+$oidnHelperDependencies = @()
+$oidnRuntimeManifest = @()
+if ($buildOidn) {
+    $oidnDependencies = @(Get-PeDependencies -Dumpbin $dumpbin -Path $oidnPluginBinary)
+    if ($oidnDependencies -notcontains "DDImage.dll") {
+        throw "OIDN Nuke plugin does not import DDImage.dll."
+    }
+    if ($oidnDependencies -contains "OpenImageDenoise.dll") {
+        throw "OIDN Nuke plugin must isolate OpenImageDenoise in HOidnBridge.exe."
+    }
+    $oidnHelperDependencies = @(Get-PeDependencies -Dumpbin $dumpbin -Path $oidnHelperBinary)
+    if ($oidnHelperDependencies -notcontains "OpenImageDenoise.dll") {
+        throw "OIDN helper does not import OpenImageDenoise.dll."
+    }
+
+    $runtimeNames = @(
+        "OpenImageDenoise.dll",
+        "OpenImageDenoise_core.dll",
+        "OpenImageDenoise_device_cuda.dll"
+    )
+    $runtimeFiles = @($runtimeNames | ForEach-Object {
+        $runtimePath = Join-Path $resolvedOidnRoot "bin\$_"
+        if (-not (Test-Path -LiteralPath $runtimePath -PathType Leaf)) {
+            throw "Required OIDN CUDA runtime DLL was not found: $runtimePath"
+        }
+        Get-Item -LiteralPath $runtimePath
+    })
+    foreach ($runtimeFile in $runtimeFiles) {
+        $destination = Join-Path $pluginRoot $runtimeFile.Name
+        Copy-Item -LiteralPath $runtimeFile.FullName -Destination $destination -Force
+        $oidnRuntimeManifest += [ordered]@{
+            name = $runtimeFile.Name
+            sha256 = Get-Sha256Hash -Path $destination
+            size = (Get-Item -LiteralPath $destination).Length
+        }
+    }
+
+    foreach ($licenseName in @(
+        "LICENSE.txt",
+        "third-party-programs.txt",
+        "third-party-programs-DPCPP.txt",
+        "third-party-programs-oneTBB.txt"
+    )) {
+        $licensePath = Join-Path $resolvedOidnRoot "doc\$licenseName"
+        if (Test-Path -LiteralPath $licensePath) {
+            Copy-Item -LiteralPath $licensePath -Destination (Join-Path $pluginRoot $licenseName) -Force
+        }
+    }
+}
+
 $sourceCommit = (& git -C $repoRoot rev-parse HEAD).Trim()
 $manifest = [ordered]@{
-    name = "HOptixDenoise"
+    name = $packageName
     version = $projectVersion
     source_commit = $sourceCommit
     nuke_version = $NukeVersion
@@ -277,8 +462,29 @@ $manifest = [ordered]@{
     platform = "windows-x64"
     build_configuration = $Configuration
     stub = $Stub.IsPresent
-    sha256 = (Get-FileHash -LiteralPath $pluginBinary -Algorithm SHA256).Hash.ToLowerInvariant()
+    validated = -not $SkipValidation.IsPresent
+    dependencies = $dependencies
+    sha256 = Get-Sha256Hash -Path $pluginBinary
     size = (Get-Item -LiteralPath $pluginBinary).Length
+    oidn_version = if ($buildOidn) { $OidnVersion } else { $null }
+    oidn_node = if ($buildOidn) {
+        [ordered]@{
+            name = "HOidnDenoise"
+            dependencies = $oidnDependencies
+            sha256 = Get-Sha256Hash -Path $oidnPluginBinary
+            size = (Get-Item -LiteralPath $oidnPluginBinary).Length
+            helper = [ordered]@{
+                name = "HOidnBridge.exe"
+                dependencies = $oidnHelperDependencies
+                sha256 = Get-Sha256Hash -Path $oidnHelperBinary
+                size = (Get-Item -LiteralPath $oidnHelperBinary).Length
+            }
+            runtime_dlls = $oidnRuntimeManifest
+        }
+    }
+    else {
+        $null
+    }
 }
 $manifestPath = Join-Path $pluginRoot "manifest.json"
 $manifestJson = $manifest | ConvertTo-Json -Depth 5
@@ -290,14 +496,20 @@ $manifestJson = $manifest | ConvertTo-Json -Depth 5
 
 if (-not $SkipValidation) {
     $previousNukePath = $env:NUKE_PATH
+    $previousOidnValidation = $env:HDU_NUKE_VALIDATE_OIDN
+    $previousCudaCacheMaxSize = $env:CUDA_CACHE_MAXSIZE
     try {
         $env:NUKE_PATH = $pluginRoot
+        $env:HDU_NUKE_VALIDATE_OIDN = if ($buildOidn) { "1" } else { "0" }
+        Remove-Item -Path Env:CUDA_CACHE_MAXSIZE -ErrorAction SilentlyContinue
         Invoke-Native -Command $nukeExecutable -Arguments @(
             "-t", (Join-Path $repoRoot "tools\validate_nuke_optix_plugin.py")
         )
     }
     finally {
         $env:NUKE_PATH = $previousNukePath
+        $env:HDU_NUKE_VALIDATE_OIDN = $previousOidnValidation
+        $env:CUDA_CACHE_MAXSIZE = $previousCudaCacheMaxSize
     }
 }
 

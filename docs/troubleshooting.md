@@ -2,7 +2,7 @@
 
 ## No bundled OptiX denoiser found
 
-- Run `.\tools\fetch_optix_denoiser.ps1` from the repo root.
+- Run `uv --system-certs run python .\tools\fetch_optix_denoiser_windows.py` from the repo root.
 - Confirm `h_denoise_utils/vendor/optix-denoiser/windows-x64/optix-9.0/Denoiser.exe`
   exists.
 - On Linux, run `./tools/fetch_optix_denoiser.sh` and confirm
