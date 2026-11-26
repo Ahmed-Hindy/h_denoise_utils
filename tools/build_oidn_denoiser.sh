@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="2.5.0"
+VERSION="2.5.1"
 CONFIGURATION="Release"
 PLATFORM="linux-x64"
 SOURCE_COMMIT=""

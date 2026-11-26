@@ -6,7 +6,7 @@ on:
       oidn_version:
         description: Intel Open Image Denoise version
         required: true
-        default: "2.4.1"
+        default: "2.5.1"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPOSITORY="RenderKit/oidn"
-VERSION="2.5.0"
+VERSION="2.5.1"
 TAG=""
 PLATFORM="linux-x64"
 ASSET_NAME=""

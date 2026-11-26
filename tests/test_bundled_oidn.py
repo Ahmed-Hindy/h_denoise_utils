@@ -69,9 +69,9 @@ def test_denoiser_subprocess_environment_skips_windows_and_optix(tmp_path):
 
 def test_pinned_oidn_release_metadata():
     """The packaged runtime and fetcher defaults target the same OIDN release."""
-    assert bundled_oidn.PINNED_OIDN_VERSION == "2.5.0"
-    assert bundled_oidn.PINNED_OIDN_RELEASE == "v2.5.0"
-    assert bundled_oidn.PINNED_OIDN_WINDOWS_ASSET == "oidn-2.5.0.x64.windows.zip"
+    assert bundled_oidn.PINNED_OIDN_VERSION == "2.5.1"
+    assert bundled_oidn.PINNED_OIDN_RELEASE == "v2.5.1"
+    assert bundled_oidn.PINNED_OIDN_WINDOWS_ASSET == "oidn-2.5.1.x64.windows.zip"
 
 
 def test_resolve_uses_bundled_runtime(monkeypatch, tmp_path):

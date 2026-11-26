@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "2.5.0",
+    [string]$Version = "2.5.1",
     [string]$Configuration = "Release",
     [string]$Platform = "windows-x64",
     [string]$SourceCommit = "",
