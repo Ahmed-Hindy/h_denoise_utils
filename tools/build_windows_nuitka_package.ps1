@@ -211,12 +211,12 @@ try {
 
     if ($IncludeBundledRuntimes) {
         $optixSource = Join-Path $repoRoot "h_denoise_utils\vendor\optix-denoiser\windows-x64"
-        $oidnSource = Join-Path $repoRoot "h_denoise_utils\vendor\oidn-denoiser\windows-x64\oidn-2.5.0"
+        $oidnSource = Join-Path $repoRoot "h_denoise_utils\vendor\oidn-denoiser\windows-x64\oidn-2.5.1"
         if (-not (Test-Path -LiteralPath $optixSource)) {
             throw "Bundled OptiX runtimes were not found: $optixSource"
         }
         if (-not (Test-Path -LiteralPath $oidnSource)) {
-            throw "Bundled OIDN 2.5.0 runtime was not found: $oidnSource"
+            throw "Bundled OIDN 2.5.1 runtime was not found: $oidnSource"
         }
 
         $vendorRoot = Join-Path $appDir "h_denoise_utils\vendor"

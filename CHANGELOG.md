@@ -14,6 +14,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - One-command Windows build, Nuke terminal validation, manifest generation,
   release ZIP packaging, documentation, and self-hosted CI workflow.
 
+### Changed
+- Update the bundled Intel OIDN runtime to 2.5.1.
+
 ## [2.0.1] — 2026-07-28
 
 ### Changed

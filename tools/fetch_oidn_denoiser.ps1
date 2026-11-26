@@ -1,7 +1,7 @@
 param(
     [string]$Repository = "Ahmed-Hindy/h_denoise_utils",
     [string]$Tag = "",
-    [string]$Version = "2.5.0",
+    [string]$Version = "2.5.1",
     [string]$Platform = "windows-x64",
     [string]$SourceShortSha = "",
     [string]$Configuration = "Release",

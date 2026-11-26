@@ -172,7 +172,7 @@ $report | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $reportPath -Encodi
 $summaryLines = @(
     "## Windows packaging comparison",
     "",
-    "Both packages use Python 3.11, PySide6, OptiX 8.1/9.0/9.1, and OIDN 2.5.0 from the same commit.",
+    "Both packages use Python 3.11, PySide6, OptiX 8.1/9.0/9.1, and OIDN 2.5.1 from the same commit.",
     "",
     "| Metric | Nuitka | PyInstaller | Nuitka delta |",
     "|---|---:|---:|---:|",

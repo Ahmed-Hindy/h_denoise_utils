@@ -32,7 +32,7 @@ jobs:
       contents: read
     env:
       QT_BACKEND: pyside6
-      OIDN_VERSION: "2.5.0"
+      OIDN_VERSION: "2.5.1"
 
     steps:
       - uses: actions/checkout@v6
